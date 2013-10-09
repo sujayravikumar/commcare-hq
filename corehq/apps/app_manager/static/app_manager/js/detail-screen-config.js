@@ -908,8 +908,8 @@ var DetailScreenConfig = (function () {
     DetailScreenConfig.TIME_AGO = {
         year: 365.25,
         month: 365.25 / 12,
-        week: 7,
-        day: 1
+        week: 7.0,
+        day: 1.0
     };
 
     DetailScreenConfig.MENU_OPTIONS = [
