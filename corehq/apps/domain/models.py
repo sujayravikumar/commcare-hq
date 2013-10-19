@@ -389,9 +389,12 @@ class Domain(Document, HQBillingDomainMixin, SnapshotMixin):
 
     def applications(self):
         from corehq.apps.app_manager.models import ApplicationBase
-        return ApplicationBase.view('app_manager/applications_brief',
-                                    startkey=[self.name],
-                                    endkey=[self.name, {}]).all()
+        return cache_core.cached_view(
+            ApplicationBase.get_db(),
+            'app_manager/applications_brief',
+            startkey=[self.name],
+            endkey=[self.name, {}]
+        )
 
     def full_applications(self, include_builds=True):
         from corehq.apps.app_manager.models import Application, RemoteApp
