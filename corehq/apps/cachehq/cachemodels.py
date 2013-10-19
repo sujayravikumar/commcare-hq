@@ -90,3 +90,27 @@ class ReportGenerationCache(GenerationCache):
         "reportconfig/daily_notifications",
         'groupexport/by_domain',
     ]
+
+class ApplicationGenerationCache(GenerationCache):
+    generation_key = '#gen#applications#'
+    doc_types = ['Application', 'RemoteApp', 'SavedAppBuild']
+    views = [
+        'app_manager/applications',
+        'app_manager/applications_brief',
+        'app_manager/builds_by_date',
+        'app_manager/factory_apps',
+        'app_manager/saved_apps',
+        'app_manager/settings',
+        'app_manager/xforms_index',
+    ]
+
+
+class ADMGenerationCache(GenerationCache):
+    generation_key = '#gen#adm#'
+    doc_types = ['ADMReport', 'ConfigurableADMColumn', 'ADMColumn']
+    views = [
+        'adm/all_default_columns',
+        'adm/all_default_reports',
+        'adm/configurable_columns',
+    ]
+

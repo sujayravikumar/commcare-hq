@@ -879,6 +879,8 @@ COUCH_CACHE_BACKENDS = [
     'corehq.apps.cachehq.cachemodels.UserRoleGenerationCache',
     'corehq.apps.cachehq.cachemodels.TeamGenerationCache',
     'corehq.apps.cachehq.cachemodels.ReportGenerationCache',
+    'corehq.apps.cachehq.cachemodels.ApplicationGenerationCache',
+    'corehq.apps.cachehq.cachemodels.ADMGenerationCache',
     'dimagi.utils.couch.cache.cache_core.gen.GlobalCache',
 ]
 
