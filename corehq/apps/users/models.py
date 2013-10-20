@@ -16,6 +16,7 @@ from django.core.exceptions import ValidationError
 from django.template.loader import render_to_string
 from couchdbkit.ext.django.schema import *
 from couchdbkit.resource import ResourceNotFound
+from dimagi.utils.couch.cache import cache_core
 from dimagi.utils.couch.database import get_safe_write_kwargs
 from dimagi.utils.logging import notify_exception
 
@@ -965,12 +966,24 @@ class CouchUser(Document, DjangoUserMixin, IsMemberOfMixin, UnicodeMixIn, EulaMi
     @classmethod
     def get_by_username(cls, username):
         def get(stale, raise_if_none):
-            result = cls.get_db().view('users/by_username',
+            result = cache_core.cached_view(
+                cls.get_db(),
+                'users/by_username',
                 key=username,
                 include_docs=True,
-                #stale=stale,
+                force_invalidate=True if stale is None else False
             )
-            return result.one(except_all=raise_if_none)
+
+            if not result and raise_if_none:
+                raise NoResultFound
+
+            length = len(result)
+            if length > 1:
+                raise MultipleResultsFound("Multiple results found for users/by_username %s" % username)
+            elif length == 0:
+                return None
+            else:
+                return result[0]
         try:
             result = get(stale=settings.COUCH_STALE_QUERY, raise_if_none=True)
             if result['doc'] is None or result['doc']['username'] != username:
@@ -979,6 +992,7 @@ class CouchUser(Document, DjangoUserMixin, IsMemberOfMixin, UnicodeMixIn, EulaMi
             logging.exception('called get_by_username(%r) and it failed pretty bad' % username)
             raise
         except NoResultFound:
+            print "no result found"
             result = get(stale=None, raise_if_none=False)
 
         if result:

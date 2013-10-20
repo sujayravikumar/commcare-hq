@@ -1,9 +1,11 @@
 from __future__ import absolute_import
 from couchdbkit.ext.django.schema import *
+from dimagi.utils.couch.cache import cache_core
 from dimagi.utils.decorators.memoized import memoized
 from corehq.apps.users.models import CouchUser, CommCareUser
 from dimagi.utils.couch.undo import UndoableDocument, DeleteDocRecord
 from django.conf import settings
+from dimagi.utils.logging import notify_exception
 
 
 class Group(UndoableDocument):
@@ -23,6 +25,21 @@ class Group(UndoableDocument):
 
     # custom data can live here
     metadata = DictProperty()
+
+    def save(self, **params):
+        super(Group, self).save(**params)
+
+        from corehq.apps.groups.signals import commcare_group_post_save
+        results = commcare_group_post_save.send_robust(sender='group', group=self)
+        for result in results:
+            # Second argument is None if there was no error
+            if result[1]:
+                notify_exception(
+                    None,
+                    message="Error occured while saving group%s: %s" %
+                            (self.name, str(result[1]))
+                )
+
 
     def add_user(self, couch_user_id, save=True):
         if not isinstance(couch_user_id, basestring):
@@ -117,18 +134,26 @@ class Group(UndoableDocument):
 
     @classmethod
     def by_domain(cls, domain):
-        return cls.view('groups/by_domain',
+        return cache_core.cached_view(
+            cls.get_db(),
+            'groups/by_domain',
             key=domain,
             include_docs=True,
-            #stale=settings.COUCH_STALE_QUERY,
-        ).all()
+            wrapper=cls.wrap
+        )
 
     @classmethod
     def ids_by_domain(cls, domain):
-        return [r['id'] for r in cls.get_db().view('groups/by_domain',
+        return [r['id'] for r in cache_core.cached_view(
+            cls.get_db(), 'groups/by_domain',
             key=domain,
             include_docs=False,
         )]
+
+        # return [r['id'] for r in cls.get_db().view('groups/by_domain',
+        #     key=domain,
+        #     include_docs=False,
+        # )]
 
     @classmethod
     def by_name(cls, domain, name, one=True):
@@ -148,7 +173,8 @@ class Group(UndoableDocument):
             user_id = user_or_user_id.user_id
         except AttributeError:
             user_id = user_or_user_id
-        results = cls.view('groups/by_user', key=user_id, include_docs=wrap)
+        #results = cls.view('groups/by_user', key=user_id, include_docs=wrap)
+        results = cache_core.cached_view(cls.get_db(), 'groups/by_user', key=user_id, include_docs=wrap, wrapper=cls.wrap if wrap else None)
         if wrap:
             return results
         if include_names:
@@ -213,3 +239,7 @@ class Group(UndoableDocument):
 class DeleteGroupRecord(DeleteDocRecord):
     def get_doc(self):
         return Group.get(self.doc_id)
+
+
+from .signals import *
+

@@ -4,9 +4,11 @@ from django.utils.safestring import mark_safe, mark_for_escaping
 from django.core.urlresolvers import reverse
 from django.utils.translation import ugettext as _
 from django.utils.translation import ugettext_noop
+from corehq.apps.app_manager.models import ApplicationBase
 from corehq.apps.domain.utils import get_adm_enabled_domains
 from corehq.apps.indicators.dispatcher import IndicatorAdminInterfaceDispatcher
 from corehq.apps.indicators.utils import get_indicator_domains
+from dimagi.utils.couch.cache import cache_core
 
 from dimagi.utils.couch.database import get_db
 from dimagi.utils.decorators.memoized import memoized
@@ -408,13 +410,9 @@ class ApplicationsTab(UITab):
     @property
     def dropdown_items(self):
         # todo async refresh submenu when on the applications page and you change the application name
-        key = [self.domain]
-        apps = get_db().view('app_manager/applications_brief',
-            reduce=False,
-            startkey=key,
-            endkey=key+[{}],
-            #stale=settings.COUCH_STALE_QUERY,
-        ).all()
+        from corehq.apps.domain.models import Domain
+        domain = Domain.get_by_name(self.domain)
+        apps = domain.applications()
         submenu_context = []
         if not apps:
             return submenu_context
