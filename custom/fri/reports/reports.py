@@ -3,6 +3,7 @@ import logging
 from datetime import datetime, time, timedelta
 from django.utils.translation import ugettext_noop
 from django.utils.translation import ugettext as _
+from corehq.apps.domain.models import Domain
 from corehq.apps.reports.standard import CustomProjectReport, DatespanMixin
 from corehq.apps.reports.generic import GenericTabularReport
 from corehq.apps.reports.datatables import DataTablesColumn, DataTablesHeader
@@ -25,6 +26,13 @@ NO_RESPONSE = 2
 
 class FRIReport(CustomProjectReport, GenericTabularReport):
     _interactive_participants = None
+    _domain_obj = None
+
+    @property
+    def domain_obj(self):
+        if not self._domain_obj:
+            self._domain_obj = Domain.get_by_name(self.domain, strict=True)
+        return self._domain_obj
 
     @property
     def interactive_participants(self):
@@ -327,7 +335,9 @@ class SurveyResponsesReport(FRIReport):
                 elif response == NO_RESPONSE:
                     row.append(self._fmt(_("No Response")))
                 else:
-                    row.append(self._fmt_timestamp(response.date))
+                    response_timestamp = tz_utils.adjust_datetime_to_timezone(
+                        response.date, pytz.utc.zone, self.domain_obj.default_timezone)
+                    row.append(self._fmt_timestamp(response_timestamp))
             result.append(row)
         return result
 
@@ -346,13 +356,13 @@ class SurveyResponsesReport(FRIReport):
     def get_first_survey_response(self, case, dt):
         timestamp_start = datetime.combine(dt, time(20, 45))
         timestamp_start = tz_utils.adjust_datetime_to_timezone(
-            timestamp_start, self.timezone.zone, pytz.utc.zone)
+            timestamp_start, self.domain_obj.default_timezone, pytz.utc.zone)
         timestamp_start = timestamp_start.replace(tzinfo=None)
         timestamp_start = json_format_datetime(timestamp_start)
 
         timestamp_end = datetime.combine(dt + timedelta(days=1), time(11, 0))
         timestamp_end = tz_utils.adjust_datetime_to_timezone(
-            timestamp_end, self.timezone.zone, pytz.utc.zone)
+            timestamp_end, self.domain_obj.default_timezone, pytz.utc.zone)
         timestamp_end = timestamp_end.replace(tzinfo=None)
         if timestamp_end > datetime.utcnow():
             return RESPONSE_NOT_APPLICABLE
