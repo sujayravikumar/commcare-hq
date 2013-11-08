@@ -250,7 +250,6 @@ HQ_APPS = (
     'dca',
     'custom.apps.gsid',
     'hsph',
-    'custom.apps.hsph.hsph_tasks',
     'mvp',
     'mvp_apps',
     'custom.opm.opm_reports',
