@@ -15,6 +15,7 @@ from django.utils.translation import ugettext_noop as _
 
 def REPORTS(project):
     from corehq.apps.reports.standard.cases.basic import CaseListReport
+    from corehq.apps.reports.standard.cases.advanced import AdvancedCaseList
     from corehq.apps.reports.standard.maps import DemoMapReport, DemoMapReport2, DemoMapCaseList
 
     reports = [
@@ -28,7 +29,7 @@ def REPORTS(project):
             monitoring.WorkerActivityTimes,
         )),
         (_("Inspect Data"), (
-            inspect.SubmitHistory, CaseListReport,
+            inspect.SubmitHistory, CaseListReport, AdvancedCaseList
         )),
         (_("Manage Deployments"), (
             deployments.ApplicationStatusReport,
