@@ -431,6 +431,19 @@ class SelectCaseOwnerField(SelectMobileWorkerField):
         self.context["groups"] = [dict(group_id=group._id, name=group.name) for group in case_sharing_groups]
 
 
+class AdvancedSelectCaseOwnerField(SelectMobileWorkerField):
+    name = ugettext_noop("Select Case Owner")
+    default_option = ugettext_noop("All Case Owners")
+
+    def update_params(self):
+        case_sharing_groups = Group.get_case_sharing_groups(self.domain)
+        case_reporting_groups = Group.get_reporting_groups(self.domain)
+        self.context["groups"] = [dict(group_id=group._id, name="%s (Sharing)" % group.name) for
+                                  group in case_sharing_groups] + [
+                                     dict(group_id=group._id, name="%s (Reporting)" % group.name)
+                                     for group in case_reporting_groups]
+
+
 class SelectFilteredMobileWorkerField(SelectMobileWorkerField):
     """
         This is a little field for use when a client really wants to filter by
