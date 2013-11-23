@@ -1,4 +1,6 @@
-from couchdbkit import ResourceNotFound
+import copy
+import logging
+from couchdbkit import ResourceNotFound, RequestFailed
 import dateutil
 from django.core import cache
 from django.core.urlresolvers import reverse, NoReverseMatch
@@ -7,8 +9,12 @@ from django.utils import html
 from django.utils.translation import ugettext as _, ugettext
 import simplejson
 from casexml.apps.case.models import CommCareCaseAction
+from corehq.apps.api.es import ReportCaseES
 from corehq.apps.groups.models import Group
+from corehq.apps.reports.api import ReportDataSource
+from corehq.apps.reports.filters.search import SearchFilter
 from corehq.apps.users.models import CommCareUser, CouchUser
+from corehq.pillows.base import restore_property_dict
 from dimagi.utils.couch.database import get_db
 from dimagi.utils.decorators.memoized import memoized
 
@@ -218,3 +224,135 @@ class CaseDisplay(CaseInfo):
             return _("No data")
         else:
             return user['name'] or self.user_not_found_display(user['id'])
+
+
+class ReportCaseDataSource(ReportDataSource):
+    slug = 'reportcase_datasource'
+
+    def __init__(self, config=None):
+        super(ReportCaseDataSource, self).__init__(config=config)
+        self.domain = self.config.get('domain', None)
+        self.es = ReportCaseES(self.domain)
+
+    def default_slugs(self):
+        return [
+            #'case_id',
+            'type',
+            'name',
+            #'detail_url',
+            'closed',
+            'opened_on',
+            'modified_on',
+            'closed_on',
+            'opened_by',
+            'owner_id',
+            'external_id',
+        ]
+
+    def slugs(self):
+        """
+        Return the various properties of the reportcase?
+        :return:
+        """
+        return self.config.get('case_properties', self.default_slugs())
+
+
+    def build_query(self, case_type=None, filters=None, status=None, owner_ids=None, search_string=None):
+        # there's no point doing filters that are like owner_id:(x1 OR x2 OR ... OR x612)
+        # so past a certain number just exclude
+        owner_ids = owner_ids or []
+        MAX_IDS = 50
+
+        def _filter_gen(key, flist):
+            if flist and len(flist) < MAX_IDS:
+                yield {"terms": {
+                    key: [item.lower() if item else "" for item in flist]
+                }}
+
+            # demo user hack
+            elif flist and "demo_user" not in flist:
+                yield {"not": {"term": {key: "demo_user"}}}
+
+        def _domain_term():
+            return {"term": {"domain.exact": self.domain}}
+
+        subterms = [_domain_term(), filters] if filters else [_domain_term()]
+        if case_type:
+            subterms.append({"term": {"type.exact": case_type}})
+
+        if status:
+            subterms.append({"term": {"closed": (status == 'closed')}})
+
+        user_filters = list(_filter_gen('owner_id', owner_ids))
+        if user_filters:
+            subterms.append({'or': user_filters})
+
+        if search_string:
+            query_block = {
+                "query_string": {"query": search_string}}  # todo, make sure this doesn't suck
+        else:
+            query_block = {"match_all": {}}
+
+        and_block = {'and': subterms} if subterms else {}
+
+        es_query = {
+            'query': {
+                'filtered': {
+                    'query': query_block,
+                    'filter': and_block
+                }
+            },
+            'from': self.config.get('start', 0),
+            'size': self.config.get('count', 50)
+        }
+        if 'sorting_block' in self.config:
+            newblock = []
+            block = self.config.get('sorting_block')
+            defaults = self.default_slugs()
+            for pair in block:
+                newpair = {}
+                for k in pair.keys():
+                    if k not in defaults:
+                        newkey = '%s.#value' % k
+                    else:
+                        newkey = k
+                    newpair[newkey] = pair[k]
+                newblock.append(newpair)
+            #es_query['sort'] = self.config.get('sorting_block')
+            es_query['sort'] = newblock
+
+        return es_query
+
+    def es_results(self):
+        case_type = self.config.get('case_type', None)
+        case_status = self.config.get('case_status', None)
+        case_owners = self.config.get('case_owners', None)
+        search_string = self.config.get('search_string', None)
+        case_filter = self.config.get('case_filter', None)
+
+        query = self.build_query(
+                        case_type=case_type,
+                        filters=case_filter,
+                        status=case_status,
+                        owner_ids=case_owners,
+                        search_string=search_string
+                    )
+
+        query_results = self.es.run_query(query)
+
+        if query_results is None or 'hits' not in query_results:
+            logging.error("ReportCaseDataSource query error: %s, yielded a result indicating a query error: %s, results: %s" % (
+                self.__class__.__name__,
+                simplejson.dumps(query),
+                simplejson.dumps(query_results)
+            ))
+            raise RequestFailed
+        return query_results
+
+    def get_data(self, slugs=None):
+        data = self.es_results()
+        for d in data['hits']['hits']:
+            if '_source' in d:
+                yield restore_property_dict(d['_source'])
+            else:
+                yield restore_property_dict(d['fields'])
