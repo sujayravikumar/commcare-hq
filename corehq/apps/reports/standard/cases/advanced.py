@@ -1,3 +1,4 @@
+from dimagi.utils.decorators.memoized import memoized
 from django.conf import settings
 from django.utils.translation import ugettext_noop
 from django.utils.translation import ugettext as _
@@ -25,6 +26,11 @@ class AdvancedCaseList(ElasticProjectInspectionReport, ProjectReport, ProjectRep
 
 
     @property
+    def shared_pagination_GET_params(self):
+        shared_params = super(AdvancedCaseList, self).shared_pagination_GET_params
+        return shared_params
+
+    @property
     def rendered_report_title(self):
         if not self.individual:
             self.name = _("%(report_name)s for %(worker_type)s") % {
@@ -40,8 +46,6 @@ class AdvancedCaseList(ElasticProjectInspectionReport, ProjectReport, ProjectRep
             return True
         else:
             return False
-
-
 
     @property
     def headers(self):
@@ -74,20 +78,27 @@ class AdvancedCaseList(ElasticProjectInspectionReport, ProjectReport, ProjectRep
         else:
             return None
 
+    @memoized
     def report_case_data(self, data_source):
         if getattr(self, 'case_data', None) is None:
             self.case_data = list(data_source.get_data())
         return self.case_data
 
     @property
-    def es_results(self):
-        pass
+    def total_records(self):
+        """
+            Override for pagination slice from ES
+            Returns an integer.
+        """
+        es_res = self.data_source.es_results()
+        if es_res is not None:
+            return es_res['hits'].get('total', 0)
+        else:
+            return 0
+
 
     @property
-    def rows(self):
-        def fmt(val, formatter=lambda k: k, default=u'\u2014'):
-            return formatter(val) if val is not None else default
-
+    def data_source(self):
         case_properties = self.case_properties()
 
         config = {
@@ -100,8 +111,16 @@ class AdvancedCaseList(ElasticProjectInspectionReport, ProjectReport, ProjectRep
             config['sorting_block'] = sorting_block
 
         data_source = ReportCaseDataSource(config)
+        return data_source
 
-        cols = data_source.slugs()
-        for row in self.report_case_data(data_source):
+
+    @property
+    def rows(self):
+        def fmt(val, formatter=lambda k: k, default=u'\u2014'):
+            return formatter(val) if val is not None else default
+        print "rows!"
+
+        cols = self.data_source.slugs()
+        for row in self.report_case_data(self.data_source):
             yield [fmt(row.get(col, '---')) for col in cols]
 

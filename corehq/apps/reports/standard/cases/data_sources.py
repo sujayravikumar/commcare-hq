@@ -237,8 +237,8 @@ class ReportCaseDataSource(ReportDataSource):
     def default_slugs(self):
         return [
             #'case_id',
-            'type',
-            'name',
+            'type.exact',
+            'name.exact',
             #'detail_url',
             'closed',
             'opened_on',
@@ -257,14 +257,13 @@ class ReportCaseDataSource(ReportDataSource):
         return self.config.get('case_properties', self.default_slugs())
 
 
-    def build_query(self, case_type=None, filters=None, status=None, owner_ids=None, search_string=None):
+    def build_query(self, case_type=None, filters=None, status=None, owner_ids=None, search_string=None, max_count=10):
         # there's no point doing filters that are like owner_id:(x1 OR x2 OR ... OR x612)
         # so past a certain number just exclude
         owner_ids = owner_ids or []
-        MAX_IDS = 50
 
         def _filter_gen(key, flist):
-            if flist and len(flist) < MAX_IDS:
+            if flist and len(flist) < max_count:
                 yield {"terms": {
                     key: [item.lower() if item else "" for item in flist]
                 }}
@@ -303,7 +302,7 @@ class ReportCaseDataSource(ReportDataSource):
                 }
             },
             'from': self.config.get('start', 0),
-            'size': self.config.get('count', 50)
+            'size': self.config.get('count', max_count)
         }
         if 'sorting_block' in self.config:
             newblock = []
@@ -323,6 +322,7 @@ class ReportCaseDataSource(ReportDataSource):
 
         return es_query
 
+    @memoized
     def es_results(self):
         case_type = self.config.get('case_type', None)
         case_status = self.config.get('case_status', None)
