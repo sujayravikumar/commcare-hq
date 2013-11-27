@@ -1,3 +1,4 @@
+from corehq.apps.reports.filters.search import SearchFilter
 from dimagi.utils.decorators.memoized import memoized
 from django.conf import settings
 from django.utils.translation import ugettext_noop
@@ -17,7 +18,7 @@ class AdvancedCaseList(ElasticProjectInspectionReport, ProjectReport, ProjectRep
 
     fields = [
         'corehq.apps.reports.fields.FilterUsersField',
-        'corehq.apps.reports.fields.AdvancedSelectCaseOwnerField',
+        'corehq.apps.reports.fields.SelectCaseOwnerField',
         'corehq.apps.reports.fields.CaseTypeField',
         'corehq.apps.reports.fields.SelectOpenCloseField',
         'corehq.apps.reports.standard.cases.filters.CaseSearchFilter',
@@ -70,7 +71,6 @@ class AdvancedCaseList(ElasticProjectInspectionReport, ProjectReport, ProjectRep
         headers.custom_sort = [[5, 'desc']]
         return headers
 
-
     def case_properties(self):
         prop_query = self.request.GET.get('property_query', '')
         if prop_query:
@@ -96,16 +96,42 @@ class AdvancedCaseList(ElasticProjectInspectionReport, ProjectReport, ProjectRep
         else:
             return 0
 
-
     @property
     def data_source(self):
+        """
+        Prepare the data source for actual use
+        :return:
+        """
         case_properties = self.case_properties()
 
-        config = {
-            'domain': self.domain,
-        }
+        config = dict(domain=self.domain)
+        raw_search_string = SearchFilter.get_value(self.request, self.domain)
+
+        if raw_search_string:
+            fixed_search = []
+            #parse it, check to see if properties being queried are whatever
+            LUCENE_TERMS = ['AND', 'OR']
+            terms = raw_search_string.split(' ')
+            for t in terms:
+                if t in LUCENE_TERMS:
+                    fixed_search.append(t)
+                else:
+                    split_term = t.split(':', 1)
+                    if len(split_term) != 2:
+                        fixed_search.append(t)
+                    else:
+                        term = split_term[0]
+                        val = split_term[1]
+                        if term in ReportCaseDataSource.default_slugs():
+                            fixed_search.append(t)
+                        else:
+                            new_term = '%s.#value' % term
+                            fixed_search.append('%s:%s' % (new_term, val))
+            config['search_string'] = ' '.join(fixed_search)
+
         if case_properties:
             config['case_properties'] = case_properties
+
         sorting_block = self.get_sorting_block()
         if sorting_block:
             config['sorting_block'] = sorting_block
@@ -113,12 +139,10 @@ class AdvancedCaseList(ElasticProjectInspectionReport, ProjectReport, ProjectRep
         data_source = ReportCaseDataSource(config)
         return data_source
 
-
     @property
     def rows(self):
         def fmt(val, formatter=lambda k: k, default=u'\u2014'):
             return formatter(val) if val is not None else default
-        print "rows!"
 
         cols = self.data_source.slugs()
         for row in self.report_case_data(self.data_source):
