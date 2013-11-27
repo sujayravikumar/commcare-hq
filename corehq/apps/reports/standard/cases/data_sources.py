@@ -234,12 +234,12 @@ class ReportCaseDataSource(ReportDataSource):
         self.domain = self.config.get('domain', None)
         self.es = ReportCaseES(self.domain)
 
-    def default_slugs(self):
+    @staticmethod
+    def default_slugs():
         return [
-            #'case_id',
+            'name',
             'type.exact',
             'name.exact',
-            #'detail_url',
             'closed',
             'opened_on',
             'modified_on',
