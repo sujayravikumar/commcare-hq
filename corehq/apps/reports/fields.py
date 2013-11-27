@@ -427,8 +427,9 @@ class SelectCaseOwnerField(SelectMobileWorkerField):
     default_option = ugettext_noop("All Case Owners")
 
     def update_params(self):
-        case_sharing_groups = Group.get_case_sharing_groups(self.domain)
-        self.context["groups"] = [dict(group_id=group._id, name=group.name) for group in case_sharing_groups]
+        all_groups = Group.by_domain(self.domain)
+        self.context["groups"] = [dict(group_id=group._id, obj=group) for group in all_groups]
+        print self.context["groups"]
 
 
 class AdvancedSelectCaseOwnerField(SelectMobileWorkerField):

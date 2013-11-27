@@ -4,7 +4,9 @@
     <select id="individual_select" name="individual" data-bind="value: selected_individual">
         <option></option>
         {% for group in groups %}
-            <option value="{{ group.group_id }}">{{ group.name }} ({% trans "Group" %})</option>
+            <option value="{{ group.group_id }}">{{ group.obj.name }}
+                ({% trans "Group" %}{% if group.obj.case_sharing %} *{% trans "Shared" %}{% endif %})
+            </option>
         {% endfor %}
         {% for user in users %}
             {% ifchanged user.is_active %}
