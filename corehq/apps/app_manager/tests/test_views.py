@@ -2,10 +2,11 @@ import os
 
 from django.core.urlresolvers import reverse
 from django.test import TestCase
+from corehq.apps.app_manager.tests import add_build
 
 from corehq.apps.domain.shortcuts import create_domain
-from corehq.apps.builds.models import CommCareBuild, BuildSpec
-from corehq.apps.app_manager.models import Application, DetailColumn, import_app, APP_V1, ApplicationBase
+from corehq.apps.app_manager.models import Application, APP_V1, Module
+
 
 class TestViews(TestCase):
     def setUp(self):
@@ -20,16 +21,12 @@ class TestViews(TestCase):
         '''
 
         app = Application.new_app(self.domain, "TestApp", application_version=APP_V1)
-        module = app.new_module("Module0", "en")
+        module = app.add_module(Module.new_module("Module0", "en"))
 
         # These builds are checked in to the repo for use in tests
         build1 = {'version': '1.2.dev', 'build_number': 7106}
         build2 = {'version': '2.7.0', 'build_number': 20655}
 
-        def add_build(version, build_number):
-            path = os.path.join(os.path.dirname(__file__), "jadjar")
-            jad_path = os.path.join(path, 'CommCare_%s_%s.zip' % (version, build_number))
-            CommCareBuild.create_from_zip(jad_path, version, build_number)
         add_build(**build1)
         add_build(**build2)
     

@@ -24,17 +24,19 @@ from unidecode import unidecode
 from django.http import HttpResponseRedirect
 from django.core.urlresolvers import reverse, RegexURLResolver
 from django.shortcuts import render
+from dimagi.utils.django.cached_object import CachedObject
 from django.utils.http import urlencode
 from django.views.decorators.http import require_GET
 from django.conf import settings
 from couchdbkit.resource import ResourceNotFound
-from corehq.apps.app_manager.const import APP_V1
+from corehq.apps.app_manager.const import APP_V1, CAREPLAN_GOAL, CAREPLAN_TASK, APP_V2
 from corehq.apps.app_manager.success_message import SuccessMessage
 from corehq.apps.app_manager.util import is_valid_case_type, get_all_case_properties, add_odk_profile_after_build, ParentCasePropertyBuilder
 from corehq.apps.app_manager.util import save_xform, get_settings_values
 from corehq.apps.domain.models import Domain
 from corehq.apps.domain.views import DomainViewMixin
 from corehq.apps.translations import system_text as st_trans
+from corehq.util.compression import decompress
 from couchexport.export import FormattedRow, export_raw
 from couchexport.models import Format
 from couchexport.shortcuts import export_response
@@ -56,12 +58,15 @@ from dimagi.utils.web import json_response, json_request
 from corehq.apps.reports import util as report_utils
 from corehq.apps.domain.decorators import login_and_domain_required, login_or_digest
 from corehq.apps.app_manager.models import Application, get_app, DetailColumn, Form, FormActions,\
-    AppError, load_case_reserved_words, ApplicationBase, DeleteFormRecord, DeleteModuleRecord, DeleteApplicationRecord, str_to_cls, validate_lang, SavedAppBuild, ParentSelect
+    AppError, load_case_reserved_words, ApplicationBase, DeleteFormRecord, DeleteModuleRecord, \
+    DeleteApplicationRecord, str_to_cls, validate_lang, SavedAppBuild, ParentSelect, Module, CareplanModule, CareplanForm, CareplanGoalForm, CareplanTaskForm
 from corehq.apps.app_manager.models import DETAIL_TYPES, import_app as import_app_util, SortElement
 from dimagi.utils.web import get_url_base
 from corehq.apps.app_manager.decorators import safe_download, no_conflict_require_POST
 from django.contrib import messages
 from toggle import toggle_enabled
+
+logger = logging.getLogger(__name__)
 
 require_can_edit_apps = require_permission(Permissions.edit_apps)
 
@@ -227,7 +232,8 @@ def import_app(req, domain, template="app_manager/import_app.html"):
     if req.method == "POST":
         _clear_app_cache(req, domain)
         name = req.POST.get('name')
-        source = req.POST.get('source')
+        compressed = req.POST.get('compressed')
+        source = decompress([chr(int(x)) if int(x) < 256 else int(x) for x in compressed.split(',')])
         source = json.loads(source)
         assert(source is not None)
         app = import_app_util(source, domain, name=name)
@@ -263,43 +269,6 @@ def import_app(req, domain, template="app_manager/import_app.html"):
             'is_superuser': req.couch_user.is_superuser
         })
 
-@require_can_edit_apps
-@no_conflict_require_POST
-def import_factory_app(req, domain):
-    factory_app = get_app('factory', req.POST['app_id'])
-    source = factory_app.export_json(dump_json=False)
-    name = req.POST.get('name')
-    if name:
-        source['name'] = name
-    cls = str_to_cls[source['doc_type']]
-    app = cls.from_source(source, domain)
-    app.save()
-    app_id = app._id
-    return back_to_main(req, domain, app_id=app_id)
-
-@require_can_edit_apps
-@no_conflict_require_POST
-def import_factory_module(req, domain, app_id):
-    fapp_id, fmodule_id = req.POST['app_module_id'].split('/')
-    fapp = get_app('factory', fapp_id)
-    fmodule = fapp.get_module(fmodule_id)
-    app = get_app(domain, app_id)
-    source = fmodule.export_json(dump_json=False)
-    app.new_module_from_source(source)
-    app.save()
-    return back_to_main(req, domain, app_id=app_id)
-
-@require_can_edit_apps
-@no_conflict_require_POST
-def import_factory_form(req, domain, app_id, module_id):
-    fapp_id, fmodule_id, fform_id = req.POST['app_module_form_id'].split('/')
-    fapp = get_app('factory', fapp_id)
-    fform = fapp.get_module(fmodule_id).get_form(fform_id)
-    source = fform.export_json(dump_json=False)
-    app = get_app(domain, app_id)
-    app.new_form_from_source(module_id, source)
-    app.save()
-    return back_to_main(req, domain, app_id=app_id, module_id=module_id)
 
 def default(req, domain):
     """
@@ -314,7 +283,7 @@ def default(req, domain):
     return view_app(req, domain)
 
 
-def get_form_view_context(request, form, langs, is_user_registration, messages=messages):
+def get_form_view_context_and_template(request, form, langs, is_user_registration, messages=messages):
     xform_questions = []
     xform = None
     form_errors = []
@@ -337,7 +306,7 @@ def get_form_view_context(request, form, langs, is_user_registration, messages=m
 
         try:
             form.validate_form()
-            xform_questions = xform.get_questions(langs)
+            xform_questions = xform.get_questions(langs, include_triggers=True)
         except etree.XMLSyntaxError as e:
             form_errors.append("Syntax Error: %s" % e)
         except AppError as e:
@@ -359,7 +328,7 @@ def get_form_view_context(request, form, langs, is_user_registration, messages=m
         try:
             form_action_errors = form.validate_for_build()
             if not form_action_errors:
-                xform.add_case_and_meta(form)
+                form.add_stuff_to_xform(xform)
                 if settings.DEBUG and False:
                     xform.validate()
         except CaseError as e:
@@ -383,23 +352,35 @@ def get_form_view_context(request, form, langs, is_user_registration, messages=m
             form_errors[i] = err[0]
         else:
             messages.error(request, err)
+
     module_case_types = [
         {'module_name': trans(module.name, langs),
          'case_type': module.case_type}
         for module in form.get_app().modules if module.case_type
     ] if not is_user_registration else None
-    return {
+
+    context = {
         'nav_form': form if not is_user_registration else '',
         'xform_languages': languages,
         "xform_questions": xform_questions,
-        'form_actions': form.actions.to_json(),
         'case_reserved_words_json': load_case_reserved_words(),
-        'is_user_registration': is_user_registration,
         'module_case_types': module_case_types,
         'form_errors': form_errors,
         'xform_validation_errored': xform_validation_errored,
-        'show_custom_ref': toggle_enabled(toggles.APP_BUILDER_CUSTOM_PARENT_REF, request.user.username),
     }
+
+    if isinstance(form, CareplanForm):
+        context.update({
+            'fixed_questions': form.get_fixed_questions(),
+            'custom_case_properties': form.custom_case_updates,
+        })
+        return "app_manager/form_view_careplan.html", context
+    else:
+        context.update({
+            'is_user_registration': is_user_registration,
+            'show_custom_ref': toggle_enabled(toggles.APP_BUILDER_CUSTOM_PARENT_REF, request.user.username),
+        })
+        return "app_manager/form_view.html", context
 
 
 def get_app_view_context(request, app):
@@ -416,7 +397,6 @@ def get_app_view_context(request, app):
         options = [option for option in options if not option.superuser_only]
     options_labels = [option.get_label() for option in options]
     options_builds = [option.build.to_string() for option in options]
-
 
     (build_spec_setting,) = filter(
         lambda x: x['type'] == 'hq' and x['id'] == 'build_spec',
@@ -516,8 +496,9 @@ def get_apps_base_context(request, domain, app):
 @login_and_domain_required
 def paginate_releases(request, domain, app_id):
     limit = request.GET.get('limit', 10)
-    start_build = json.loads(request.GET.get('start_build'))
-    if start_build:
+    start_build_param = request.GET.get('start_build')
+    if start_build_param and json.loads(start_build_param):
+        start_build = json.loads(start_build_param)
         assert isinstance(start_build, int)
     else:
         start_build = {}
@@ -595,6 +576,52 @@ def release_build(request, domain, app_id, saved_app_id):
         return HttpResponseRedirect(reverse('release_manager', args=[domain, app_id]))
 
 
+def get_module_view_context_and_template(app, module):
+    builder = ParentCasePropertyBuilder(
+        app,
+        defaults=('name', 'date-opened', 'status')
+    )
+
+    def get_parent_modules_and_save(case_type):
+        """
+        This closure is so we don't override the `module` variable
+
+        """
+        parent_types = builder.get_parent_types(case_type)
+        modules = app.modules
+        # make sure all modules have unique ids
+        if any(not module.unique_id for module in modules):
+            for module in modules:
+                module.get_or_create_unique_id()
+            app.save()
+        parent_module_ids = [module.unique_id for module in modules
+                             if module.case_type in parent_types]
+        return [{
+                    'unique_id': mod.unique_id,
+                    'name': mod.name,
+                    'is_parent': mod.unique_id in parent_module_ids,
+                } for mod in app.modules if mod.case_type != case_type and mod.unique_id != module.unique_id]
+
+    def get_sort_elements(details):
+        return [prop.values() for prop in details.sort_elements]
+
+    if isinstance(module, CareplanModule):
+        return "app_manager/module_view_careplan.html", {
+            'parent_modules': get_parent_modules_and_save(CAREPLAN_GOAL),
+            'goal_case_properties': sorted(builder.get_properties(CAREPLAN_GOAL)),
+            'task_case_properties': sorted(builder.get_properties(CAREPLAN_TASK)),
+            "goal_sortElements": json.dumps(get_sort_elements(module.goal_details.short)),
+            "task_sortElements": json.dumps(get_sort_elements(module.task_details.short)),
+        }
+    else:
+        case_type = module.case_type
+        return "app_manager/module_view.html", {
+            'parent_modules': get_parent_modules_and_save(case_type),
+            'case_properties': sorted(builder.get_properties(case_type)),
+            "sortElements": json.dumps(get_sort_elements(module.case_details.short))
+        }
+
+
 @retry_resource(3)
 def view_generic(req, domain, app_id=None, module_id=None, form_id=None, is_user_registration=False):
     """
@@ -626,7 +653,7 @@ def view_generic(req, domain, app_id=None, module_id=None, form_id=None, is_user
     except IndexError:
         return bail(req, domain, app_id)
 
-    base_context = get_apps_base_context(req, domain, app)
+    context = get_apps_base_context(req, domain, app)
     if not app:
         all_applications = ApplicationBase.view('app_manager/applications_brief',
             startkey=[domain],
@@ -650,62 +677,25 @@ def view_generic(req, domain, app_id=None, module_id=None, form_id=None, is_user
         del app['use_commcare_sense']
         app.save()
 
-    context = {}
-    if module:
-        if not form:
-            case_type = module.case_type
-            builder = ParentCasePropertyBuilder(
-                app,
-                defaults=('name', 'date-opened', 'status')
-            )
-
-            def get_parent_modules_and_save():
-                """
-                This closure is so we don't override the `module` variable
-
-                """
-                parent_types = builder.get_parent_types(case_type)
-                modules = app.modules
-                # make sure all modules have unique ids
-                if any(not module.unique_id for module in modules):
-                    for module in modules:
-                        module.get_or_create_unique_id()
-                    app.save()
-                parent_module_ids = [module.unique_id for module in modules
-                                     if module.case_type in parent_types]
-                return [{
-                    'unique_id': module.unique_id,
-                    'name': module.name,
-                    'is_parent': module.unique_id in parent_module_ids,
-                } for module in app.modules if module.case_type != case_type]
-            context.update({
-                'parent_modules': get_parent_modules_and_save(),
-                'case_properties': sorted(builder.get_properties(case_type)),
-            })
-        else:
-            context.update({
-                'case_properties': get_all_case_properties(app),
-            })
-
+    v2_app = app.application_version == APP_V2
     context.update({
-        'domain': domain,
-
-        'app': app,
+        'show_care_plan': (v2_app and toggle_enabled(toggles.APP_BUILDER_CAREPLAN, req.user.username)),
         'module': module,
         'form': form,
     })
-    context.update(base_context)
+
     if app and not module and hasattr(app, 'translations'):
         context.update({"translations": app.translations.get(context['lang'], {})})
 
     if form:
-        template = "app_manager/form_view.html"
-        context.update(get_form_view_context(req, form, context['langs'], is_user_registration))
+        template, form_context = get_form_view_context_and_template(req, form, context['langs'], is_user_registration)
+        context.update({
+            'case_properties': get_all_case_properties(app),
+        })
+        context.update(form_context)
     elif module:
-        sort_elements = [prop.values() for prop in
-                         module.get_detail('case_short').sort_elements]
-        context.update({"sortElements": json.dumps(sort_elements)})
-        template = "app_manager/module_view.html"
+        template, module_context = get_module_view_context_and_template(app, module)
+        context.update(module_context)
     else:
         template = "app_manager/app_view.html"
         if app:
@@ -796,10 +786,12 @@ def new_app(req, domain):
     cls = str_to_cls[type]
     if cls == Application:
         app = cls.new_app(domain, "Untitled Application", lang=lang, application_version=application_version)
-        app.new_module("Untitled Module", lang)
+        app.add_module(Module.new_module("Untitled Module", lang))
         app.new_form(0, "Untitled Form", lang)
     else:
         app = cls.new_app(domain, "Untitled Application", lang=lang)
+    if req.project.secure_submissions:
+        app.secure_submissions = True
     app.save()
     _clear_app_cache(req, domain)
     app_id = app.id
@@ -813,13 +805,37 @@ def new_module(req, domain, app_id):
     app = get_app(domain, app_id)
     lang = req.COOKIES.get('lang', app.langs[0])
     name = req.POST.get('name')
-    module = app.new_module(name, lang)
-    module_id = module.id
-    app.new_form(module_id, "Untitled Form", lang)
+    module_type = req.POST.get('module_type', 'case')
+    if module_type == 'case':
+        module = app.add_module(Module.new_module(name, lang))
+        module_id = module.id
+        app.new_form(module_id, "Untitled Form", lang)
+        app.save()
+        response = back_to_main(req, domain, app_id=app_id, module_id=module_id)
+        response.set_cookie('suppress_build_errors', 'yes')
+        return response
+    elif module_type == 'careplan':
+        if app.application_version == APP_V1:
+            messages.warning(req, _('Please upgrade you app to > 2.0 in order to add a Careplan module'))
+            return back_to_main(req, domain, app_id=app.id)
+        else:
+            return _new_careplan_module(req, domain, app, name, lang)
+    else:
+        logger.error('Unexpected module type for new module: "%s"' % module_type)
+        return back_to_main(req, domain, app_id=app_id)
+
+
+def _new_careplan_module(req, domain, app, name, lang):
+    from corehq.apps.app_manager.util import new_careplan_module
+    target_module_index = req.POST.get('target_module_id')
+    target_module = app.get_module(target_module_index)
+    module = new_careplan_module(app, name, lang, target_module)
     app.save()
-    response = back_to_main(req, domain, app_id=app_id, module_id=module_id)
+    response = back_to_main(req, domain, app_id=app.id, module_id=module.id)
     response.set_cookie('suppress_build_errors', 'yes')
+    messages.warning(req, 'Care Plan modules are a work in progress!')
     return response
+
 
 @no_conflict_require_POST
 @require_can_edit_apps
@@ -834,7 +850,6 @@ def new_form(req, domain, app_id, module_id):
     form_id = form.id
     response = back_to_main(req, domain, app_id=app_id, module_id=module_id,
                             form_id=form_id)
-    response.set_cookie('suppress_build_errors', 'yes')
     return response
 
 @no_conflict_require_POST
@@ -936,6 +951,7 @@ def edit_module_attr(req, domain, app_id, module_id, attr):
         'media_image': None, 'media_audio': None,
         "case_list": ('case_list-show', 'case_list-label'),
         "task_list": ('task_list-show', 'task_list-label'),
+        "parent_module": None,
     }
 
     if attr not in attributes:
@@ -966,6 +982,9 @@ def edit_module_attr(req, domain, app_id, module_id, attr):
             return HttpResponseBadRequest("case type is improperly formatted")
     if should_edit("put_in_root"):
         module["put_in_root"] = json.loads(req.POST.get("put_in_root"))
+    if should_edit("parent_module"):
+        parent_module = req.POST.get("parent_module")
+        module.parent_select.module_id = parent_module
     for attribute in ("name", "case_label", "referral_label"):
         if should_edit(attribute):
             name = req.POST.get(attribute, None)
@@ -991,35 +1010,36 @@ def edit_module_detail_screens(req, domain, app_id, module_id):
 
     """
     params = json_request(req.POST)
+    detail_type = params.get('type')
     screens = params.get('screens')
     parent_select = params.get('parent_select')
+    sort_elements = screens['sort_elements']
 
     if not screens:
         return HttpResponseBadRequest("Requires JSON encoded param 'screens'")
 
     app = get_app(domain, app_id)
     module = app.get_module(module_id)
-    detail = module.get_detail('case_short')
 
-    detail.sort_elements = []
-    if 'sort_elements' in screens:
-        for sort_element in json.load(StringIO(screens['sort_elements'])):
-            item = SortElement()
-            item.field = sort_element['field']
-            item.type = sort_element['type']
-            item.direction = sort_element['direction']
-            detail.sort_elements.append(item)
+    if detail_type == 'case':
+        detail = module.case_details
+    elif detail_type == CAREPLAN_GOAL:
+        detail = module.goal_details
+    elif detail_type == CAREPLAN_TASK:
+        detail = module.task_details
+    else:
+        return HttpResponseBadRequest("Unknown detail type '%s'" % detail_type)
 
-        del screens['sort_elements']
+    detail.short.columns = map(DetailColumn.wrap, screens['short'])
+    detail.long.columns = map(DetailColumn.wrap, screens['long'])
 
-    for detail_type in screens:
-        if detail_type not in DETAIL_TYPES:
-            return HttpResponseBadRequest("All detail types must be in %r"
-                                          % DETAIL_TYPES)
-
-    for detail_type in screens:
-        module.get_detail(detail_type).columns = \
-            [DetailColumn.wrap(c) for c in screens[detail_type]]
+    detail.short.sort_elements = []
+    for sort_element in sort_elements:
+        item = SortElement()
+        item.field = sort_element['field']
+        item.type = sort_element['type']
+        item.direction = sort_element['direction']
+        detail.short.sort_elements.append(item)
 
     module.parent_select = ParentSelect.wrap(parent_select)
     resp = {}
@@ -1106,9 +1126,6 @@ def edit_form_attr(req, domain, app_id, unique_form_id, attr):
             data_paths_dict[path.split('/')[-1]] = path
         form.data_paths = data_paths_dict
 
-    if should_edit("requires"):
-        requires = req.POST['requires']
-        form.set_requires(requires)
     if should_edit("name"):
         name = req.POST['name']
         form.name[lang] = name
@@ -1202,6 +1219,18 @@ def edit_form_actions(req, domain, app_id, module_id, form_id):
     response_json = {}
     app.save(response_json)
     response_json['propertiesMap'] = get_all_case_properties(app)
+    return json_response(response_json)
+
+@no_conflict_require_POST
+@require_can_edit_apps
+def edit_careplan_form_actions(req, domain, app_id, module_id, form_id):
+    app = get_app(domain, app_id)
+    form = app.get_module(module_id).get_form(form_id)
+    fixed_questions = json.loads(req.POST.get('fixed_questions'))
+    for question in fixed_questions:
+        setattr(form, question['name'], question['path'])
+    response_json = {}
+    app.save(response_json)
     return json_response(response_json)
 
 @require_can_edit_apps
@@ -1514,11 +1543,6 @@ def rearrange(req, domain, app_id, key):
             messages.warning(req, CASE_TYPE_CONFLICT_MSG,  extra_tags="html")
     elif "modules" == key:
         app.rearrange_modules(i, j)
-    elif "detail" == key:
-        module_id = int(req.POST['module_id'])
-        app.rearrange_detail_columns(module_id, req.POST['detail_type'], i, j)
-    elif "langs" == key:
-        app.rearrange_langs(i, j)
     app.save(resp)
     if ajax:
         return HttpResponse(json.dumps(resp))
@@ -1581,6 +1605,10 @@ def validate_form_for_build(request, domain, app_id, unique_form_id):
         raise Http404()
     errors = form.validate_for_build()
     lang, langs = get_langs(request, app)
+    if "blank form" in [error.get('type') for error in errors]:
+        return json_response({
+            "error_html": render_to_string('app_manager/partials/create_form_prompt.html')
+        })
     return json_response({
         "error_html": render_to_string('app_manager/partials/build_errors.html', {
             'app': app,
@@ -1663,9 +1691,10 @@ def download_file(req, domain, app_id, path):
         'txt': 'text/plain',
     }
     try:
-        response = HttpResponse(mimetype=mimetype_map[path.split('.')[-1]])
+        mimetype = mimetype_map[path.split('.')[-1]]
     except KeyError:
-        response = HttpResponse()
+        mimetype = None
+    response = HttpResponse(mimetype=mimetype)
 
     if path in ('CommCare.jad', 'CommCare.jar'):
         set_file_download(response, path)
@@ -1675,7 +1704,21 @@ def download_file(req, domain, app_id, path):
 
     try:
         assert req.app.copy_of
-        payload = req.app.fetch_attachment(full_path)
+        obj = CachedObject('{primary}-{secondary}:{path}'.format(
+            primary=app_id,
+            secondary=req.app._id,
+            path=full_path,
+        ))
+        if not obj.is_cached():
+            payload = req.app.fetch_attachment(full_path)
+            if type(payload) is unicode:
+                payload = payload.encode('utf-8')
+            buffer = StringIO(payload)
+            metadata = {'content_type': mimetype}
+            obj.cache_put(buffer, metadata, timeout=0)
+        else:
+            _, buffer = obj.get()
+            payload = buffer.getvalue()
         response.write(payload)
         response['Content-Length'] = len(response.content)
         return response
@@ -1959,7 +2002,7 @@ def _questions_for_form(request, form, langs):
 
     m = FakeMessages()
 
-    context = get_form_view_context(request, form, langs, None, messages=m)
+    _, context = get_form_view_context_and_template(request, form, langs, None, messages=m)
     xform_questions = context['xform_questions']
     return xform_questions, m.messages
 
@@ -2063,8 +2106,8 @@ def upload_translations(request, domain, app_id):
         trans_dict = defaultdict(dict)
         for row in translations:
             for lang in app.langs:
-               if row.get(lang):
-                   trans_dict[lang].update({row["property"]: row[lang].encode('utf8')})
+                if row.get(lang):
+                    trans_dict[lang].update({row["property"]: row[lang]})
 
         app.translations = dict(trans_dict)
         app.save()

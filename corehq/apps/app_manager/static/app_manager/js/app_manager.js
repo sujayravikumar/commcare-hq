@@ -227,6 +227,16 @@
             }
         });
 
+        $('.new-module').on('click', function(e){
+            e.preventDefault();
+            var form = $('#new-module-form');
+            if (!form.data('clicked')) {
+                form.data('clicked', 'true');
+                $('.new-module-icon').removeClass().addClass("icon-refresh icon-spin");
+                form.submit();
+            }
+        });
+
         COMMCAREHQ.app_manager.commcareVersion.subscribe(function () {
             $('.commcare-feature').each(function () {
                 var version = '' + $(this).data('since-version') || '1.1',

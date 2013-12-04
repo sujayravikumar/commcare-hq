@@ -10,7 +10,7 @@ from casexml.apps.case.models import CommCareCase
 from dimagi.utils.mixins import UnicodeMixIn
 from dimagi.utils.parsing import json_format_datetime
 from casexml.apps.case.signals import case_post_save
-from .mixin import CommCareMobileContactMixin, MobileBackend, PhoneNumberInUseException
+from .mixin import CommCareMobileContactMixin, MobileBackend, PhoneNumberInUseException, InvalidFormatException
 from corehq.apps.sms import util as smsutil
 from dimagi.utils.couch.database import SafeSaveDocument
 
@@ -38,6 +38,7 @@ class MessageLog(SafeSaveDocument, UnicodeMixIn):
     backend_id                  = StringProperty()
     billed                      = BooleanProperty(default=False)
     billing_errors              = ListProperty()
+    chat_user_id = StringProperty() # For outgoing sms only: if this sms was sent from a chat window, the _id of the CouchUser who sent this sms; otherwise None
     workflow = StringProperty() # One of the WORKFLOW_* constants above describing what kind of workflow this sms was a part of
     xforms_session_couch_id = StringProperty() # Points to the _id of an instance of corehq.apps.smsforms.models.XFormsSession that this sms is tied to
     reminder_id = StringProperty() # Points to the _id of an instance of corehq.apps.reminders.models.CaseReminder that this sms is tied to
@@ -146,6 +147,7 @@ class MessageLog(SafeSaveDocument, UnicodeMixIn):
 
 class SMSLog(MessageLog):
     text = StringProperty()
+    backend_message_id = StringProperty()
     
     @property
     def outbound_backend(self):
@@ -311,7 +313,7 @@ class CommConnectCase(CommCareCase, CommCareMobileContactMixin):
         elif contact_phone_number_is_verified:
             try:
                 self.save_verified_number(self.domain, contact_phone_number, True, contact_backend_id, ivr_backend_id=contact_ivr_backend_id, only_one_number_allowed=True)
-            except PhoneNumberInUseException:
+            except (PhoneNumberInUseException, InvalidFormatException):
                 try:
                     self.delete_verified_number()
                 except:

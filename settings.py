@@ -213,6 +213,7 @@ HQ_APPS = (
     'corehq.apps.smsforms',
     'corehq.apps.ivr',
     'corehq.apps.tropo',
+    'corehq.apps.twilio',
     'corehq.apps.kookoo',
     'corehq.apps.sislog',
     'corehq.apps.yo',
@@ -230,6 +231,7 @@ HQ_APPS = (
     'corehq.apps.cachehq',
     'corehq.couchapps',
     'custom.apps.wisepill',
+    'custom.fri',
     'fluff',
     'fluff.fluff_filter',
     'soil',
@@ -396,6 +398,7 @@ FIXTURE_GENERATORS = [
     "corehq.apps.fixtures.fixturegenerators.item_lists",
     "corehq.apps.reportfixtures.fixturegenerators.indicators",
     "custom.bihar.reports.indicators.fixtures.generator",
+    "corehq.apps.commtrack.models.product_fixture_generator",
 ]
 
 GET_URL_BASE = 'dimagi.utils.web.get_url_base'
@@ -409,22 +412,13 @@ BROKER_URL = 'django://' #default django db based
 #this is the default celery queue - for periodic tasks on a separate queue override this to something else
 CELERY_PERIODIC_QUEUE = 'celery'
 
-from celery.schedules import crontab
-# schedule options can be seen here:
-# http://docs.celeryproject.org/en/latest/reference/celery.schedules.html
-CELERYBEAT_SCHEDULE = {
-    'monthly-opm-report-snapshot': {
-        'task': 'custom.opm.opm_tasks.tasks.snapshot',
-        'schedule': crontab(hour=1, day_of_month=1),
-    },
-}
-
 SKIP_SOUTH_TESTS = True
 #AUTH_PROFILE_MODULE = 'users.HqUserProfile'
 TEST_RUNNER = 'testrunner.HqTestSuiteRunner'
 HQ_ACCOUNT_ROOT = "commcarehq.org" # this is what gets appended to @domain after your accounts
 
 XFORMS_PLAYER_URL = "http://localhost:4444/"  # touchform's setting
+OFFLINE_TOUCHFORMS_PORT = 4444
 
 ####### Couchlog config ######
 
@@ -630,7 +624,12 @@ LOGGING = {
             'handlers': ['pillowtop', 'sentry'],
             'level': 'ERROR',
             'propagate': False,
-        }
+        },
+        'pillowtop_eval': {
+            'handlers': ['sentry'],
+            'level': 'INFO',
+            'propagate': False,
+        },
     }
 }
 
@@ -724,6 +723,7 @@ COUCHDB_APPS = [
     'hqbilling',
     'couchlog',
     'wisepill',
+    'fri',
     'crs_reports',
     'grapevine',
 
@@ -810,7 +810,19 @@ SMS_LOADED_BACKENDS = [
     "corehq.apps.sms.test_backend.TestSMSBackend",
     "corehq.apps.sms.backend.test.TestBackend",
     "corehq.apps.grapevine.api.GrapevineBackend",
+    "corehq.apps.twilio.models.TwilioBackend",
 ]
+
+# These are functions that can be called to retrieve custom content in a reminder event.
+# If the function is not in here, it will not be called.
+ALLOWED_CUSTOM_CONTENT_HANDLERS = {
+    "FRI_SMS_CONTENT" : "custom.fri.api.custom_content_handler",
+}
+
+# These are custom templates which can wrap default the sms/chat.html template
+CUSTOM_CHAT_TEMPLATES = {
+    "FRI" : "fri/chat.html",
+}
 
 SELENIUM_APP_SETTING_DEFAULTS = {
     'cloudcare': {
@@ -907,15 +919,6 @@ ES_XFORM_FULL_INDEX_DOMAINS = [
     'commtrack-public-demo',
     'pact',
     'uth-rhd-test',
-    'mvp-bonsaaso',
-    'mvp-koraro',
-    'mvp-mbola',
-    'mvp-mwandama',
-    'mvp-potou',
-    'mvp-ruhiira',
-    'mvp-sada',
-    'mvp-sauri',
-    'mvp-tiby',
 ]
 
 CUSTOM_MODULES = [
@@ -936,6 +939,8 @@ DOMAIN_MODULE_MAP = {
     'cvsulive': 'custom.apps.cvsu',
     'dca-malawi': 'dca',
     'eagles-fahu': 'dca',
+    'fri': 'custom.fri.reports',
+    'fri-testing': 'custom.fri.reports',
     'gsid': 'custom.apps.gsid',
     'gsid-demo': 'custom.apps.gsid',
     'hsph-dev': 'hsph',

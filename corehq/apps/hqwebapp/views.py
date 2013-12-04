@@ -1,8 +1,15 @@
 from urlparse import urlparse
 from datetime import datetime
+import json
+import os
+import re
+import uuid
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core import cache
+from django.core.cache import InvalidCacheBackendError
 from django.template.loader import render_to_string
 from django.views.decorators.http import require_POST
 from django.contrib.auth.forms import AdminPasswordChangeForm
@@ -11,12 +18,17 @@ from django.contrib.auth.views import login as django_login, redirect_to_login
 from django.contrib.auth.views import logout as django_logout
 from django.contrib.sites.models import Site
 from django.http import HttpResponseRedirect, HttpResponse, Http404,\
-    HttpResponseServerError, HttpResponseNotFound
+    HttpResponseServerError, HttpResponseNotFound, HttpResponseBadRequest
 from django.shortcuts import redirect, render
 from django.views.generic import TemplateView
-import json
-from corehq.apps.announcements.models import Notification
+from couchdbkit import ResourceNotFound
+from django.utils.translation import ugettext as _, ugettext_noop
+from django.core.urlresolvers import reverse
+from django.core.mail.message import EmailMessage
+from django.template import loader
+from django.template.context import RequestContext
 
+from corehq.apps.announcements.models import Notification
 from corehq.apps.app_manager.models import BUG_REPORTS_DOMAIN
 from corehq.apps.app_manager.models import import_app
 from corehq.apps.domain.decorators import require_superuser,\
@@ -26,23 +38,15 @@ from corehq.apps.hqwebapp.forms import EmailAuthenticationForm, CloudCareAuthent
 from corehq.apps.receiverwrapper.models import Repeater
 from corehq.apps.users.models import CouchUser
 from corehq.apps.users.util import format_username
-from couchdbkit import ResourceNotFound
+from corehq.apps.hqwebapp.doc_info import get_doc_info
 from dimagi.utils.couch.database import get_db
 from dimagi.utils.decorators.memoized import memoized
 from dimagi.utils.logging import notify_exception
-from django.utils.translation import ugettext as _, ugettext_noop
-
 from dimagi.utils.web import get_url_base, json_response
-from django.core.urlresolvers import reverse
 from corehq.apps.domain.models import Domain
-from django.core.mail.message import EmailMessage
-from django.template import loader
-from django.template.context import RequestContext
 from couchforms.models import XFormInstance
 from soil import heartbeat
 from soil import views as soil_views
-import os
-import re
 
 
 def pg_check():
@@ -76,6 +80,26 @@ def hb_check():
     except:
         hb = False
     return hb
+
+
+def redis_check():
+    try:
+        redis = cache.get_cache('redis')
+        return redis.set('serverup_check_key', 'test')
+    except (InvalidCacheBackendError, ValueError):
+        return True  # redis not in use, ignore
+    except:
+        return False
+
+
+def memcached_check():
+    try:
+        memcached = cache.get_cache('default')
+        uuid_val = uuid.uuid1()
+        memcached.set('serverup_check_key', uuid_val)
+        return memcached.get('serverup_check_key') == uuid_val
+    except:
+        return False
 
 
 def server_error(request, template_name='500.html'):
@@ -192,6 +216,16 @@ def server_up(req):
             "always_check": True,
             "message": "* couch has issues",
             "check_func": couch_check
+        },
+        "redis": {
+            "always_check": True,
+            "message": "* redis has issues",
+            "check_func": redis_check
+        },
+        "memcached": {
+            "always_check": True,
+            "message": "* memcached has issues",
+            "check_func": memcached_check
         }
     }
 
@@ -300,6 +334,7 @@ def bug_report(req):
         'url',
         'message',
         'app_id',
+        'cc'
     )])
 
     report['user_agent'] = req.META['HTTP_USER_AGENT']
@@ -330,6 +365,8 @@ def bug_report(req):
         u"Message:\n\n"
         u"{message}\n"
         ).format(**report)
+    cc = report['cc'].strip().split(",")
+    cc = filter(None, cc)
 
     if full_name and not any([c in full_name for c in '<>"']):
         reply_to = u'"{full_name}" <{username}>'.format(**report)
@@ -347,7 +384,8 @@ def bug_report(req):
         subject=subject,
         body=message,
         to=settings.BUG_REPORT_RECIPIENTS,
-        headers={'Reply-To': reply_to}
+        headers={'Reply-To': reply_to},
+        cc=cc
     )
 
     # only fake the from email if it's an @dimagi.com account
@@ -758,52 +796,20 @@ class CRUDPaginatedViewMixin(object):
 def quick_find(request):
     query = request.GET.get('q')
     redirect = request.GET.get('redirect') != 'false'
-
-    def _deal_with_couch_doc(doc):
-        domain = doc.get('domain')
-        doc_type = doc.get('doc_type')
-        doc_id = doc.get('_id')
-        simple = {
-            '_id': doc_id,
-            'domain': domain,
-            'doc_type': doc_type
-        }
-        if request.couch_user.is_superuser or (domain and request.couch_user.is_domain_admin(domain)):
-            if not redirect:
-                return simple
-
-            if doc_type in ('Application', 'RemoteApp'):
-                if doc.get('copy_of'):
-                    return _('Application Build'), reverse(
-                        'corehq.apps.app_manager.views.download_index',
-                        args=[domain, doc_id],
-                    )
-                else:
-                    return _('Application'), reverse(
-                        'corehq.apps.app_manager.views.view_app',
-                        args=[domain, doc_id],
-                    )
-            if doc_type in ('CommCareCase',):
-                return _('Case'), reverse(
-                    'case_details',
-                    args=[domain, doc_id],
-                )
-            if doc_type in ('XFormInstance',):
-                return _('Form'), reverse(
-                    'render_form_data',
-                    args=[domain, doc_id],
-                )
-            return simple
-        raise Http404()
+    if not query:
+        return HttpResponseBadRequest('GET param "q" must be provided')
 
     def deal_with_couch_doc(doc):
-        x = _deal_with_couch_doc(doc)
-        try:
-            type_text, url = x
-        except ValueError:
-            return json_response(x)
-        messages.info(request, _("We've redirected you to the %s matching your query") % type_text)
-        return HttpResponseRedirect(url)
+        domain = doc.get('domain') or doc.get('domains', [None])[0]
+        if request.couch_user.is_superuser or (domain and request.couch_user.is_domain_admin(domain)):
+            doc_info = get_doc_info(doc, domain_hint=domain)
+        else:
+            raise Http404()
+        if redirect and doc_info.link:
+            messages.info(request, _("We've redirected you to the %s matching your query") % doc_info.type_display)
+            return HttpResponseRedirect(doc_info.link)
+        else:
+            return json_response(doc_info)
 
     try:
         doc = get_db().get(query)

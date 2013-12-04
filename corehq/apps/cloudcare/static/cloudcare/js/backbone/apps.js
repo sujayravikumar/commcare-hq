@@ -20,7 +20,7 @@ cloudCare.AppNavigation = Backbone.Router.extend({
         "view/:app/:module/:form/case/:case":        "app:module:form:case",
         "view/:app/:module/:form/case/:case/enter/": "app:module:form:case:enter",
         "":                                          "clear"
-    },
+    }
 
 });
 
@@ -41,7 +41,7 @@ cloudCare.AppSummaryView = Selectable.extend({
 });
 
 cloudCare.AppList = Backbone.Collection.extend({
-    model: cloudCare.AppSummary,
+    model: cloudCare.AppSummary
 });
 
 cloudCare.AppListView = Backbone.View.extend({
@@ -104,7 +104,7 @@ cloudCare.App = LocalizableModel.extend({
     initialize: function () {
         var self = this;
         self.constructor.__super__.initialize.apply(self, [self.options]);
-        _.bindAll(self, "updateModules", "url", "urlRoot", "getSubmitId");
+        _.bindAll(self, "updateModules", "url", "urlRoot", "getSubmitUrl");
 
         self.updateModules();
         self.on("change", function () {
@@ -120,8 +120,8 @@ cloudCare.App = LocalizableModel.extend({
     urlRoot: function () {
         return this.get("urlRoot");
     },
-    getSubmitId: function () {
-        return this.get("copy_of") || this.id
+    getSubmitUrl: function () {
+        return this.get('post_url');
     },
     updateModules: function () {
         var self = this;
@@ -162,16 +162,10 @@ cloudCare.FormView = Selectable.extend({
 cloudCare.Module = LocalizableModel.extend({
     initialize: function () {
         this.constructor.__super__.initialize.apply(this, [this.options]);
-        _.bindAll(this, 'updateForms', 'getDetail');
+        _.bindAll(this, 'updateForms');
         this.updateForms();
         this.on("change", function () {
             this.updateForms();
-        });
-    },
-
-    getDetail: function (type) {
-        return _(this.get("details")).find(function (elem) {
-            return elem.type === type;
         });
     },
 
@@ -443,8 +437,14 @@ cloudCare.AppView = Backbone.View.extend({
                 url += "&task-list=true";
             }
         }
-        return url;
 
+        // superhacky
+        if ($('#use-offline').is(':checked')) {
+            url += (url.indexOf('?') != -1 ? '&' : '?');
+            url += "offline=true"
+        }
+
+        return url;
     },
     playForm: function (module, form, caseModel) {
         // go play the form. this is a little sketchy
@@ -452,7 +452,7 @@ cloudCare.AppView = Backbone.View.extend({
         cloudCare.dispatch.trigger("form:enter", form, caseModel);
         var formUrl = self.getFormUrl(module, form, caseModel);
         var selectedModule = self.formListView.model;
-        var submitUrl = getSubmitUrl(self.options.submitUrlRoot, self.model.getSubmitId());
+        var submitUrl = self.model.getSubmitUrl();
 
         // clear current case information
         self._clearCaseView();
@@ -464,7 +464,7 @@ cloudCare.AppView = Backbone.View.extend({
             dataType: "json"
         });
         resp.done(function (data) {
-            data["onsubmit"] = function (xml) {
+            data.onsubmit = function (xml) {
                 // post to receiver
                 $.ajax({
                     type: 'POST',
@@ -477,16 +477,22 @@ cloudCare.AppView = Backbone.View.extend({
                     }
                 });
             };
-            data["onerror"] = function (resp) {
+            data.onerror = function (resp) {
                 showError(resp.message, $("#cloudcare-notifications"));
                 cloudCare.dispatch.trigger("form:error", form, caseModel);
             };
-            data["onload"] = function (adapter, resp) {
+            data.onload = function (adapter, resp) {
                 cloudCare.dispatch.trigger("form:ready", form, caseModel);
             }
-            var sess = new WebFormSession(data);
-            // TODO: probably shouldn't hard code these divs
-            sess.load($('#webforms'), $('#loading'), self.options.language);
+            var loadSession = function() {
+                var sess = new WebFormSession(data);
+                // TODO: probably shouldn't hard code these divs
+                sess.load($('#webforms'), $('#loading'), self.options.language);
+            };
+            var promptForOffline = function(show) {
+                $('#offline-prompt')[show ? 'show' : 'hide']();
+            };
+            touchformsInit(data.xform_url, loadSession, promptForOffline);
         });
     },
     selectForm: function (form) {
@@ -504,8 +510,8 @@ cloudCare.AppView = Backbone.View.extend({
 	            self.playForm(module, form);
             } else if (form.get("requires") === "case") {
                 cloudCare.dispatch.trigger("form:selected:caselist", form);
-	            var listDetails = formListView.model.getDetail("case_short");
-	            var summaryDetails = formListView.model.getDetail("case_long");
+	            var listDetails = formListView.model.get("case_details").short;
+	            var summaryDetails = formListView.model.get("case_details").long;
 	            formListView.caseView = new cloudCare.CaseMainView({
 	                el: $("#cases"),
 	                listDetails: listDetails,

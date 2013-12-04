@@ -3,15 +3,11 @@ import datetime, logging
 from celery.task import periodic_task
 from celery.schedules import crontab
 from django.conf import settings
-from django.core.mail import send_mail
 
-from dimagi.utils.web import get_url_base
-from dimagi.utils.couch.database import get_db
 from corehq.apps.groups.models import Group
 from couchforms.models import XFormInstance
 
 from .models import LegacyWeeklyReport
-from .reports import LegacyReportView
 from .constants import *
 
 
@@ -19,13 +15,21 @@ class Site(object):
     def __init__(self, group, date):
         self.name = group.name
         self.week = self.get_m_to_f(date)
-        self.str_week = [str(d) for d in self.week]
         self.strategy = [0] * 5
         self.game = [0] * 5
         self.individual = {}
         self.emails = []
+        self.last_week = LegacyWeeklyReport.by_site(group,
+                date=self.week[0] - datetime.timedelta(days=2))
         for user in group.get_users():
             self.process_user(user)
+        try:
+            self.weekly_totals = self.last_week.weekly_totals
+        except (LookupError, AttributeError):
+            self.weekly_totals = []
+        self.weekly_totals.append(
+            [self.week[0].strftime('%b %d'), sum([d for d in self.strategy if d>0])]
+        )
 
     def get_m_to_f(self, date):
         """
@@ -40,16 +44,28 @@ class Site(object):
 
     def process_user(self, user):
         username = user.raw_username
+        # initialize
         if username not in self.individual:
             self.emails.append(user.email)
             self.individual[username] = {
                 'strategy': [0] * 5,
                 'game': [0] * 5,
             }
+        # process this week's forms
         for form in XFormInstance.get_forms_by_user(
                 user, self.week[0], self.week[-1]):
             if form.xmlns == DAILY_DATA_XMLNS:
                 self.process_form(form, username)
+        # get and extend weekly totals
+        try:
+            weekly_totals = self.last_week.individual[username]['weekly_totals']
+        except (LookupError, AttributeError):
+            weekly_totals = []
+        weekly_totals.append([
+            self.week[0].strftime('%b %d'),
+            sum([d for d in self.individual[username]['strategy'] if d>0])
+        ])
+        self.individual[username]['weekly_totals'] = weekly_totals
 
 
     def process_form(self, form, username):
@@ -84,11 +100,8 @@ def save_report(date=None):
     """
     if date is None:
         date = datetime.date.today()
-    # exclude = []
-    # for group in [g for g in Group.by_domain(DOMAIN) if g not in exclude]:
 
-    # This is a temporary fix while the app is on the mikesproject domain
-    for group in [g for g in Group.by_domain(DOMAIN) if "Afterschool" in g.name]:
+    for group in Group.by_domain(DOMAIN):
         site = Site(group, date)
         report = LegacyWeeklyReport(
             domain=DOMAIN,
@@ -97,19 +110,11 @@ def save_report(date=None):
             site_strategy=site.strategy,
             site_game=site.game,
             individual=site.individual,
+            weekly_totals=site.weekly_totals,
         )
         report.save()
         msg = "Saving legacy group %s to doc %s" % (group.name, report._id)
         logging.info(msg)
-        
-        # send an email to each site
-        report_link = get_url_base() + LegacyReportView.get_url(DOMAIN)
-        send_mail(
-            "This week's Legacy report is available",
-            "You can view your report here:\n{link}".format(link=report_link),
-            settings.SERVER_EMAIL,
-            site.emails
-        )
 
 
 @periodic_task(

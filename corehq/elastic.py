@@ -1,6 +1,8 @@
+import copy
 from urllib import unquote
 import rawes
 from django.conf import settings
+from corehq.pillows.mappings.app_mapping import APP_INDEX
 from corehq.pillows.mappings.case_mapping import CASE_INDEX
 from corehq.pillows.mappings.domain_mapping import DOMAIN_INDEX
 from corehq.pillows.mappings.sms_mapping import SMS_INDEX
@@ -23,6 +25,7 @@ ES_URLS = {
     "cases": CASE_INDEX + '/case/_search',
     "users": USER_INDEX + '/user/_search',
     "domains": DOMAIN_INDEX + '/hqdomain/_search',
+    "apps": APP_INDEX + '/app/_search',
     "sms": SMS_INDEX + '/sms/_search',
     "tc_sms": TCSMS_INDEX + '/tc_sms/_search',
 }
@@ -35,6 +38,7 @@ ADD_TO_ES_FILTER = {
     ],
     "users": [
         {"term": {"doc_type": "CommCareUser"}},
+        {"term": {"base_doc": "couchuser"}},
         {"term": {"is_active": True}},
     ],
 }
@@ -53,7 +57,7 @@ ES_MAX_CLAUSE_COUNT = 1024  #  this is what ES's maxClauseCount is currently set
 
 def get_stats_data(domains, histo_type, datespan, interval="day"):
     histo_data = dict([(d['display_name'],
-                        es_histogram(histo_type, d["names"], datespan.startdate_display, datespan.enddate_display))
+                        es_histogram(histo_type, d["names"], datespan.startdate_display, datespan.enddate_display, interval=interval))
                         for d in domains])
 
     def _total_until_date(histo_type, doms=None):
@@ -115,22 +119,28 @@ def es_histogram(histo_type, domains=None, startdate=None, enddate=None, tz_diff
 
 
 SIZE_LIMIT = 1000000
-def es_query(params=None, facets=None, terms=None, q=None, es_url=None, start_at=None, size=None, dict_only=False, fields=None):
-    """
-        Any filters you include in your query should an and filter
-        todo: intelligently deal with preexisting filters
-    """
+def es_query(params=None, facets=None, terms=None, q=None, es_url=None, start_at=None, size=None, dict_only=False,
+             fields=None, facet_size=None):
     if terms is None:
         terms = []
     if q is None:
         q = {}
+    else:
+        q = copy.deepcopy(q)
     if params is None:
         params = {}
 
     q["size"] = size if size is not None else q.get("size", SIZE_LIMIT)
     q["from"] = start_at or 0
-    q["filter"] = q.get("filter", {})
-    q["filter"]["and"] = q["filter"].get("and", [])
+
+    def get_or_init_anded_filter_from_query_dict(qdict):
+        and_filter = qdict.get("filter", {}).pop("and", [])
+        filter = qdict.pop("filter", None)
+        if filter:
+            and_filter.append(filter)
+        return {"and": and_filter}
+
+    filter = get_or_init_anded_filter_from_query_dict(q)
 
     def convert(param):
         #todo: find a better way to handle bools, something that won't break fields that may be 'T' or 'F' but not bool
@@ -143,26 +153,22 @@ def es_query(params=None, facets=None, terms=None, q=None, es_url=None, start_at
     for attr in params:
         if attr not in terms:
             attr_val = [convert(params[attr])] if not isinstance(params[attr], list) else [convert(p) for p in params[attr]]
-            q["filter"]["and"].append({"terms": {attr: attr_val}})
-
-    def facet_filter(facet):
-        return [clause for clause in q["filter"]["and"] if facet not in clause.get("terms", [])]
+            filter["and"].append({"terms": {attr: attr_val}})
 
     if facets:
         q["facets"] = q.get("facets", {})
         for facet in facets:
-            q["facets"][facet] = {"terms": {"field": facet, "size": SIZE_LIMIT}}
+            q["facets"][facet] = {"terms": {"field": facet, "size": facet_size or SIZE_LIMIT}}
 
-    if q.get('facets') and q.get("filter", {}).get("and"):
-        for facet in q["facets"]:
-            if "facet_filter" not in q["facets"][facet]:
-                q["facets"][facet]["facet_filter"] = {"and": []}
-            q["facets"][facet]["facet_filter"]["and"].extend(facet_filter(facet))
-            if not q["facets"][facet]["facet_filter"]["and"]:
-                del q["facets"][facet]["facet_filter"]["and"]
+    if filter["and"]:
+        query = q.pop("query", {})
+        q["query"] = {
+            "filtered": {
+                "filter": filter,
+            }
+        }
+        q["query"]["filtered"]["query"] = query if query else {"match_all": {}}
 
-    if not q['filter']['and']:
-        del q["filter"]
 
     if fields:
         q["fields"] = q.get("fields", [])
