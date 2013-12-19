@@ -1,12 +1,14 @@
 from collections import namedtuple
+from distutils.version import LooseVersion
 from django.core.urlresolvers import reverse
 from eulxml.xmlmap.fields import StringListField
 from lxml import etree
 from eulxml.xmlmap import StringField, XmlObject, IntegerField, NodeListField, NodeField
+from corehq.apps.app_manager.templatetags.xforms_extras import trans
 from corehq.apps.app_manager.const import CAREPLAN_GOAL, CAREPLAN_TASK
 from corehq.apps.hqmedia.models import HQMediaMapItem
 from .exceptions import MediaResourceError, ParentModuleReferenceError, SuiteValidationError
-from corehq.apps.app_manager.util import split_path, create_temp_sort_column
+from corehq.apps.app_manager.util import split_path, create_temp_sort_column, languages_mapping
 from corehq.apps.app_manager.xform import SESSION_CASE_ID, autoset_owner_id_for_open_case, autoset_owner_id_for_subcase
 from dimagi.utils.decorators.memoized import memoized
 from dimagi.utils.web import get_url_base
@@ -77,6 +79,7 @@ class AbstractResource(OrderedXmlObject):
 
     version = IntegerField('resource/@version')
     id = StringField('resource/@id')
+    descriptor = StringField('resource/@descriptor')
 
 
 class XFormResource(AbstractResource):
@@ -364,7 +367,8 @@ class IdStrings(object):
         )
 
     def menu(self, module):
-        return u"m{module.id}".format(module=module)
+        put_in_root = getattr(module, 'put_in_root', False)
+        return 'root' if put_in_root else u"m{module.id}".format(module=module)
 
     def module_locale(self, module):
         return module.get_locale_id()
@@ -447,18 +451,27 @@ class SuiteGenerator(object):
         first = []
         last = []
         for form_stuff in self.app.get_forms(bare=False):
+            form = form_stuff["form"]
             if form_stuff['type'] == 'module_form':
                 path = './modules-{module.id}/forms-{form.id}.xml'.format(**form_stuff)
                 this_list = first
             else:
                 path = './user_registration.xml'
                 this_list = last
-            this_list.append(XFormResource(
-                id=self.id_strings.xform_resource(form_stuff['form']),
-                version=form_stuff['form'].get_version(),
+            resource = XFormResource(
+                id=self.id_strings.xform_resource(form),
+                version=form.get_version(),
                 local=path,
                 remote=path,
-            ))
+            )
+            if form_stuff['type'] == 'module_form' and LooseVersion(self.app.build_spec.version) >= '2.9':
+                resource.descriptor = u"Form: (Module {module_name}) - {form_name}".format(
+                    module_name=trans(form_stuff["module"]["name"], langs=[self.app.default_language]),
+                    form_name=trans(form["name"], langs=[self.app.default_language])
+                )
+            elif path == './user_registration.xml':
+                resource.descriptor=u"User Registration Form"
+            this_list.append(resource)
         for x in first:
             yield x
         for x in last:
@@ -468,13 +481,17 @@ class SuiteGenerator(object):
     def locale_resources(self):
         for lang in ["default"] + self.app.build_langs:
             path = './{lang}/app_strings.txt'.format(lang=lang)
-            yield LocaleResource(
+            resource = LocaleResource(
                 language=lang,
                 id=self.id_strings.locale_resource(lang),
                 version=self.app.version,
                 local=path,
                 remote=path,
             )
+            if LooseVersion(self.app.build_spec.version) >= '2.9':
+                unknown_lang_txt = u"Unknown Language (%s)" % lang
+                resource.descriptor = u"Translations: %s" % languages_mapping().get(lang, [unknown_lang_txt])[0]
+            yield resource
 
     @property
     def media_resources(self):
@@ -704,10 +721,6 @@ class SuiteGenerator(object):
                     e.datums.append(session_datum('case_id_goal', CAREPLAN_GOAL, 'parent', 'case_id'))
             elif form.case_type == CAREPLAN_TASK:
                 if form.mode == 'create':
-                    e.datums.append(SessionDatum(
-                        id='new_task_id',
-                        function='uuid()'
-                    ))
                     e.datums.append(session_datum('case_id_goal', CAREPLAN_GOAL, 'parent', 'case_id'))
                 elif form.mode == 'update':
                     e.datums.append(session_datum('case_id_goal', CAREPLAN_GOAL, 'parent', 'case_id'))
@@ -718,7 +731,7 @@ class SuiteGenerator(object):
                         'index/goal', session_var('case_id_goal'), quote=False
                     ).select('@status', 'open').count()
                     frame = CreateFrame(
-                        if_clause='{count} = 1'.format(count=count)
+                        if_clause='{count} >= 1'.format(count=count)
                     )
                     frame.add_command(self.id_strings.menu(parent_module))
                     frame.add_datum(StackDatum(id='case_id', value=session_var('case_id')))
@@ -799,7 +812,7 @@ class SuiteGenerator(object):
                 yield update_menu
             else:
                 menu = Menu(
-                    id='root' if module.put_in_root else self.id_strings.menu(module),
+                    id=self.id_strings.menu(module),
                     locale_id=self.id_strings.module_locale(module),
                     media_image=module.media_image,
                     media_audio=module.media_audio,

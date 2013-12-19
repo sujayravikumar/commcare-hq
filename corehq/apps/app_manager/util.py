@@ -1,7 +1,10 @@
 import functools
+import json
+import itertools
 from corehq.apps.app_manager.xform import XForm, XFormError, parse_xml
 import re
 from dimagi.utils.decorators.memoized import memoized
+from django.core.cache import cache
 
 
 def get_app_id(form):
@@ -89,7 +92,7 @@ class ParentCasePropertyBuilder(object):
     def get_parent_types(self, case_type):
         parent_types, _ = \
             self.get_parent_types_and_contributed_properties(case_type)
-        return parent_types
+        return set(p[0] for p in parent_types)
 
     @memoized
     def get_properties(self, case_type, already_visited=()):
@@ -110,8 +113,8 @@ class ParentCasePropertyBuilder(object):
             self.get_parent_types_and_contributed_properties(case_type)
         case_properties.update(contributed_properties)
         for parent_type in parent_types:
-            for property in get_properties_recursive(parent_type):
-                case_properties.add('parent/%s' % property)
+            for property in get_properties_recursive(parent_type[0]):
+                case_properties.add('%s/%s' % (parent_type[1], property))
 
         return case_properties
 
@@ -131,7 +134,7 @@ def get_case_properties(app, case_types, defaults=()):
 def get_all_case_properties(app):
     return get_case_properties(
         app,
-        set(m.case_type for m in app.modules),
+        set(itertools.chain.from_iterable(m.get_case_types() for m in app.modules)),
         defaults=('name',)
     )
 
@@ -237,3 +240,13 @@ def new_careplan_module(app, name, lang, target_module):
 
     return module
 
+
+def languages_mapping():
+    mapping = cache.get('__languages_mapping')
+    if not mapping:
+        with open('submodules/langcodes/langs.json') as langs_file:
+            lang_data = json.load(langs_file)
+            mapping = dict([(l["two"], l["names"]) for l in lang_data])
+        mapping["default"] = ["Default Language"]
+        cache.set('__languages_mapping', mapping, 12*60*60)
+    return mapping
