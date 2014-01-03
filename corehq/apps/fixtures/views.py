@@ -202,6 +202,7 @@ def groups(request, domain):
 
 @require_can_edit_fixtures
 def users(request, domain):
+    print "*"*40, 'ESOE: fixtures.views.users', "*"*40
     users = CommCareUser.by_domain(domain)
     return json_response(map(prepare_user, users))
 

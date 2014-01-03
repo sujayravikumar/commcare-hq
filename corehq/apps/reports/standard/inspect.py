@@ -35,6 +35,7 @@ class ProjectInspectionReport(ProjectInspectionReportParamsMixin, GenericTabular
 class SubmitHistory(ElasticProjectInspectionReport, ProjectReport, ProjectReportParametersMixin, MultiFormDrilldownMixin, DatespanMixin):
     name = ugettext_noop('Submit History')
     slug = 'submit_history'
+    # this appears to be the problem.  We don't need all these fields!"
     fields = [
               'corehq.apps.reports.fields.CombinedSelectUsersField',
               'corehq.apps.reports.filters.forms.FormsByApplicationFilter',

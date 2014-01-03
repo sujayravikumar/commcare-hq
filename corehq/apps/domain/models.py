@@ -494,11 +494,12 @@ class Domain(Document, HQBillingDomainMixin, SnapshotMixin):
                 if settings.DEBUG:
                     raise
                 else:
-                    notify_exception(None, '%r is not a valid domain name' % name)
+                    notify_exception(None, '%r is not a valid  name' % name)
                     return None
         extra_args = {'stale': settings.COUCH_STALE_QUERY} if not strict else {}
 
         db = cls.get_db()
+        # print "*"*40, 'ESOE: get_by_name', name, strict, "*"*40
         res = cache_core.cached_view(db, "domain/domains", key=name, reduce=False,
                                      include_docs=True, wrapper=cls.wrap, force_invalidate=strict,
                                      **extra_args)

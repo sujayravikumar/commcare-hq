@@ -42,8 +42,10 @@ class CustomProjectReport(ProjectReport):
 
 class CommCareUserMemoizer(object):
 
+    # problem area
     @memoized
     def by_domain(self, domain, is_active=True):
+        print "*"*40, 'ESOE: CommCareUserMemoizer', "*"*40
         users = CommCareUser.by_domain(domain, is_active=is_active)
         for user in users:
             # put users in the cache for get_by_user_id
@@ -137,6 +139,7 @@ class ProjectReportParametersMixin(object):
             cache_str = "mw_ids:%s" % self.domain
             ids = cache.get(cache_str)
             if not ids:
+                print "*"*40, 'ESOE: mobile_worker_ids', "*"*40
                 cc_users = CommCareUser.by_domain(self.domain)
                 if self.include_inactive:
                     cc_users += CommCareUser.by_domain(self.domain, is_active=False)

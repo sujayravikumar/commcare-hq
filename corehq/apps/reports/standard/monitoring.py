@@ -804,6 +804,8 @@ class WorkerActivityReport(WorkerMonitoringReportTableBase, DatespanMixin):
     def users_to_iterate(self):
         if '_all' in self.group_ids:
             from corehq.apps.groups.models import Group
+            # problem area
+            print "*"*40, 'ESOE: users_to_iterate', "*"*40
             ret = [util._report_user_dict(u) for u in list(CommCareUser.by_domain(self.domain))]
             for r in ret:
                 r["group_ids"] = Group.by_user(r["user_id"], False)

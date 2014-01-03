@@ -399,6 +399,9 @@ class DomainMetadataForm(DomainGlobalSettingsForm, SnapshotSettingsMixin):
 
         if domain is not None:
             groups = Group.get_case_sharing_groups(domain)
+            # PROBLEM!!!
+            # not too hard to replace, either
+            print "*"*40, 'ESOE: DomainMetadataForm', "*"*40
             users = CommCareUser.by_domain(domain)
 
             domain_group_choices = [(group._id, group.name) for group in groups]

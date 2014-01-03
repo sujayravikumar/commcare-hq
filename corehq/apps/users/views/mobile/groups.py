@@ -81,6 +81,7 @@ class EditGroupMembersView(BaseGroupsView):
     @property
     @memoized
     def all_users(self):
+        print "*"*40, 'ESOE: EditGroupMembersView', "*"*40
         return sorted(CommCareUser.by_domain(self.domain), key=lambda user: user.username)
 
     @property

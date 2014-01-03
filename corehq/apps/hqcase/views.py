@@ -73,6 +73,7 @@ def explode_cases(request, domain, template="hqcase/explode_cases.html"):
                     submit_case_blocks(case_block, domain)
             messages.success(request, "All of %s's cases were exploded by a factor of %d" % (user.raw_username, factor))
 
+    print "*"*40, 'ESOE: explode_cases', "*"*40
     return render(request, template, {
         'domain': domain,
         'users': CommCareUser.by_domain(domain),

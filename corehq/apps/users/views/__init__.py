@@ -698,6 +698,7 @@ def user_domain_transfer(request, domain, prescription, template="users/domain_t
         # apps from the *target* domain
         apps = VersionedDoc.view('app_manager/applications_brief', startkey=[target_domain], endkey=[target_domain, {}])
         # users from the *originating* domain
+        print "*"*40, 'ESOE: user_domain_transfer', "*"*40
         users = list(CommCareUser.by_domain(domain))
         users.extend(CommCareUser.by_domain(domain, is_active=False))
         context = _users_context(request, domain)

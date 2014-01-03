@@ -848,6 +848,7 @@ class CouchUser(Document, DjangoUserMixin, IsMemberOfMixin, UnicodeMixIn, EulaMi
 
     @classmethod
     def by_domain(cls, domain, is_active=True, reduce=False, limit=None, skip=0, strict=False, doc_type=None):
+        print "*"*40, 'ESOE: user by_domain', "*"*40
         flag = "active" if is_active else "inactive"
         doc_type = doc_type or cls.__name__
         if cls.__name__ == "CouchUser":

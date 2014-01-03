@@ -160,6 +160,8 @@ class SelectMobileWorkerFilter(BaseSingleOptionTypeaheadFilter):
 
     @property
     def options(self):
+        # switch this to use ES
+        print "*"*40, 'SelectMobileWorkerFilter' + "*"*40
         users = util.user_list(self.domain)
         return [(user.user_id,
                  "%s%s" % (user.username_in_report, "" if user.is_active else " (Inactive)"))

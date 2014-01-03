@@ -329,6 +329,7 @@ class AsyncListCommCareUsersView(ListCommCareUsersView):
                 skip=self.users_list_skip
             )
         else:
+            print "*"*40, 'ESOE: AsyncListCommCareUsersView', "*"*40
             users = CommCareUser.by_domain(
                 self.domain,
                 is_active=not self.show_inactive,

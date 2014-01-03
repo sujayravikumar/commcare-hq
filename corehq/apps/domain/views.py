@@ -164,6 +164,12 @@ class BaseEditProjectInfoView(BaseAdminProjectSettingsView):
         return context
 
 
+# Possible problem view:
+    # [couchdbkit] Couch VIEW 6
+    # [couchdbkit] view_path: users/by_domain, duration: 3963.6, offset: 1, rows: 11015, total_rows: 9928, result_cached: False, include_docs: True
+    # [couchdbkit] /home/ethan/Dimagi/commcare-hq/corehq/apps/users/models.py:871
+# The issue is the DomainMetadataForm
+
 class EditBasicProjectInfoView(BaseEditProjectInfoView):
     template_name = 'domain/admin/info_basic.html'
     urlname = 'domain_basic_info'

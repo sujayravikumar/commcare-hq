@@ -66,9 +66,11 @@ def all_xmlns_in_domain(domain):
     return [d['key'][-1] for d in domain_xmlns if d['key'][-1] is not None]
 
 
+# Possible problem area
 def user_list(domain):
     #todo cleanup
     #referenced in fields -> SelectMobileWorkerField
+    print "*"*40, 'ESOE: user_list', "*"*40
     users = list(CommCareUser.by_domain(domain))
     users.extend(CommCareUser.by_domain(domain, is_active=False))
     users.sort(key=lambda user: (not user.is_active, user.username))
@@ -94,14 +96,18 @@ def get_group_params(domain, group='', users=None, user_id_only=False, **kwargs)
     else:
         users = users or []
         if user_id_only:
+            # super easy one
+            print "*"*40, 'ESOE: get_group_params (easy)', "*"*40
             users = users or [user.user_id for user in CommCareUser.by_domain(domain)]
         else:
+            print "*"*40, 'ESOE: get_group_params', "*"*40
             users = [CommCareUser.get_by_user_id(userID) for userID in users] or CommCareUser.by_domain(domain)
     if not user_id_only:
         users = sorted(users, key=lambda user: user.user_id)
     return group, users
 
 
+# Definitely problem area
 def get_all_users_by_domain(domain=None, group=None, user_ids=None,
                             user_filter=None, simplified=False, CommCareUser=None, include_inactive=False):
     """
@@ -109,6 +115,7 @@ def get_all_users_by_domain(domain=None, group=None, user_ids=None,
         Returns a list of CommCare Users based on domain, group, and user 
         filter (demo_user, admin, registered, unknown)
     """
+    print "*"*40, 'ESOE: get_all_users_by_domain', "*"*40
     user_ids = user_ids if user_ids and user_ids[0] else None
     if not CommCareUser:
         from corehq.apps.users.models import CommCareUser
@@ -197,6 +204,7 @@ def get_username_from_forms(domain, user_id):
     return username
 
 
+# possible case for switching to ES?
 def _report_user_dict(user):
     user_report_attrs = ['user_id', 'username_in_report', 'raw_username', 'is_active']
     return dict([(attr, getattr(user, attr)) for attr in user_report_attrs])

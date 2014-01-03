@@ -244,6 +244,7 @@ def _cacheable_domain_activity_report(request):
     domains = [{'name': domain.name, 'display_name': domain.display_name()} for domain in Domain.get_all()]
 
     for domain in domains:
+        print "*"*40, 'ESOE: _cacheable_domain_activity_report', "*"*40
         domain['users'] = dict([(user.user_id, {'raw_username': user.raw_username}) for user in CommCareUser.by_domain(domain['name'])])
         if not domain['users']:
             continue

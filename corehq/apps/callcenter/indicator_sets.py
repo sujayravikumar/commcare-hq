@@ -164,6 +164,8 @@ class CallCenter(SqlIndicatorSet):
     @property
     @memoized
     def keys(self):
+        # Oh wow, definitely reduce this one
+        print "*"*40, 'ESOE: CallCenter', "*"*40
         results = CommCareUser.by_domain(self.domain.name)
         return [[r.get_id] for r in results]
 

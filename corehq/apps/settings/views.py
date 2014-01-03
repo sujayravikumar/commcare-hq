@@ -34,10 +34,13 @@ def project_id_mapping(request, domain):
     from corehq.apps.users.models import CommCareUser
     from corehq.apps.groups.models import Group
 
+    # Easy to replace with ES
+    print "*"*40, 'ESOE: project_id_mapping (easy)', "*"*40
     users = CommCareUser.by_domain(domain)
     groups = Group.by_domain(domain)
 
     return json_response({
+        # user.user_id is the same as user._id
         'users': dict([(user.raw_username, user.user_id) for user in users]),
         'groups': dict([(group.name, group.get_id) for group in groups]),
     })

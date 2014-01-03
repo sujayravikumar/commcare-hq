@@ -394,6 +394,7 @@ class SelectMobileWorkerField(SelectMobileWorkerMixin, ReportField):
         self.user_filter, _ = self.filter_users_field_class.get_user_filter(self.request)
         self.individual = self.request.GET.get('individual', '')
         self.default_option = self.get_default_text(self.user_filter)
+        print "*"*40, 'SelectMobileWorkerField' + "*"*40
         self.users = util.user_list(self.domain)
 
         self.update_params()
@@ -416,6 +417,7 @@ class MultiSelectMobileWorkerField(SelectMobileWorkerMixin, ReportMultiSelectFie
     @property
     def options(self):
         self.user_filter, _ = self.filter_users_field_class.get_user_filter(self.request)
+        print "*"*40, 'MultiSelectMobileWorkerField' + "*"*40
         self.users = util.user_list(self.domain)
         opts = [dict(val=u.get_id, text=u.raw_username + (' "%s"' % u.full_name if u.full_name else '')) for u in self.users]
         default_text = 'All Mobile Workers'

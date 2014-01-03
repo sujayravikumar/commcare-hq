@@ -374,6 +374,7 @@ def dump_users_and_groups(response, domain):
     file = StringIO()
     writer = Excel2007ExportWriter()
 
+    print "*"*40, 'ESOE: dump_users_and_groups', "*"*40
     users = CommCareUser.by_domain(domain)
     user_data_keys = set()
     user_groups_length = 0
