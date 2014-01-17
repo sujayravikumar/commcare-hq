@@ -546,13 +546,28 @@ class StockTransaction(Document):
             'commtrack/stock_transactions', domain, location_id,
             skip=skip, limit=limit)]
 
+    """
     @classmethod
     def by_product(cls, product_case, start_date, end_date):
         q = CommCareCase.get_db().view('commtrack/stock_transactions_by_product',
                                        startkey=[product_case, start_date],
                                        endkey=[product_case, end_date, {}])
         return [StockTransaction.force_wrap(row['value']) for row in q]
-    """
+
+    @classmethod
+    def force_wrap(cls, data):
+        data = copy(data)
+        for property in cls.properties().values():
+            transform = {
+                IntegerProperty: force_int,
+                BooleanProperty: force_bool,
+                DateProperty: force_empty_string_to_null,
+                DateTimeProperty: force_empty_string_to_null,
+            }.get(property.__class__, lambda x: x)
+            data[property.name] = transform(data.get(property.name))
+        print data
+        return super(StockTransaction, cls).wrap(data)
+
 
     def __init__(self, **kwargs):
         def _action_def(val):
