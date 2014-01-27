@@ -3,6 +3,7 @@ from xml.etree import ElementTree
 from casexml.apps.case.mock import CaseBlock
 from casexml.apps.case.tests import delete_all_cases, delete_all_xforms
 from casexml.apps.case.xml import V2
+from casexml.apps.stock.models import StockReport, StockTransaction
 from corehq.apps.commtrack import const
 from corehq.apps.groups.models import Group
 from corehq.apps.hqcase.utils import submit_case_blocks
@@ -17,6 +18,9 @@ from corehq.apps.commtrack.helpers import make_supply_point,\
 from corehq.apps.commtrack.models import Product
 from couchforms.models import XFormInstance
 from dimagi.utils.couch.database import get_safe_write_kwargs
+from casexml.apps.phone.restore import generate_restore_payload
+from casexml.apps.phone.models import SyncLog
+from lxml import etree
 
 TEST_DOMAIN = 'commtrack-test'
 TEST_LOCATION_TYPE = 'location'
@@ -74,8 +78,8 @@ def bootstrap_domain(domain_name=TEST_DOMAIN, requisitions_enabled=False):
     # a default config and a location
     domain_obj = create_domain(domain_name)
     domain_obj.commtrack_enabled = True
-    domain_obj.save(**get_safe_write_kwargs())
     bootstrap_commtrack_settings_if_necessary(domain_obj, requisitions_enabled)
+    domain_obj.save(**get_safe_write_kwargs())
 
     return domain_obj
 
@@ -135,6 +139,8 @@ class CommTrackTest(TestCase):
         # might as well clean house before doing anything
         delete_all_xforms()
         delete_all_cases()
+        StockReport.objects.all().delete()
+        StockTransaction.objects.all().delete()
 
         self.backend = test.bootstrap(TEST_BACKEND, to_console=True)
         self.domain = bootstrap_domain(requisitions_enabled=self.requisitions_enabled)
@@ -157,8 +163,7 @@ class CommTrackTest(TestCase):
         self.group.save()
         self.sp.owner_id = self.group._id
         self.sp.save()
-
-        self.products = Product.by_domain(self.domain.name)
+        self.products = sorted(Product.by_domain(self.domain.name), key=lambda p: p._id)
         self.assertEqual(3, len(self.products))
         self.spps = {}
         for p in self.products:
@@ -177,3 +182,10 @@ class CommTrackTest(TestCase):
             reduce=False,
             include_docs=True
         )
+
+def get_ota_balance_xml(user):
+    xml = generate_restore_payload(user.to_casexml_user(), version=V2)
+    balance_blocks = etree.fromstring(xml).findall('{http://commtrack.org/stock_report}balance')
+    if balance_blocks:
+        return [etree.tostring(bb) for bb in balance_blocks]
+    return []

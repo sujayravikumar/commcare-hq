@@ -2,48 +2,39 @@ import uuid
 from xml.etree import ElementTree
 from couchdbkit.exceptions import ResourceNotFound
 from couchdbkit.ext.django.schema import *
+from django.db import transaction
 from django.utils.translation import ugettext as _
 from casexml.apps.case.mock import CaseBlock
+from casexml.apps.case.models import CommCareCase
+from casexml.apps.stock import const as stockconst
+from casexml.apps.stock.consumption import ConsumptionConfiguration
+from casexml.apps.stock.models import StockReport as DbStockReport, StockTransaction as DbStockTransaction
 from casexml.apps.case.xml import V2
 from corehq import Domain
-
 from corehq.apps.commtrack import const
+from corehq.apps.consumption.shortcuts import get_default_consumption
 from corehq.apps.hqcase.utils import submit_case_blocks
 from corehq.apps.users.models import CommCareUser
 from dimagi.utils.couch.loosechange import map_reduce
 from couchforms.models import XFormInstance
 from dimagi.utils import parsing as dateparse
+from dimagi.utils.dates import force_to_date, force_to_datetime
 from datetime import datetime
-from casexml.apps.case.models import CommCareCase
 from copy import copy
 from django.dispatch import receiver
 from corehq.apps.locations.signals import location_created, location_edited
 from corehq.apps.locations.models import Location
-from corehq.apps.commtrack.const import RequisitionActions, RequisitionStatus, USER_LOCATION_OWNER_MAP_TYPE
+from corehq.apps.commtrack.const import StockActions, RequisitionActions, RequisitionStatus, USER_LOCATION_OWNER_MAP_TYPE
+from corehq.apps.commtrack.xmlutil import XML
 from corehq.apps.commtrack.exceptions import LinkedSupplyPointNotFoundError
 
 from dimagi.utils.decorators.memoized import memoized
 
-# these are the allowable stock transaction types, listed in the
-# default ordering in which they are processed. processing order
-# may be customized per domain
-ACTION_TYPES = [
-    # indicates the product has been stocked out for N days
-    # prior to the reporting date, including today ('0' does
-    # not trigger an immediate stock-out)
-    'stockedoutfor',
-
-    # additions to stock
-    'receipts',
-
-    # subtractions from stock
-    'consumption',
-
-    # indicates the current stock on hand
-    'stockonhand',
-
-    # immediately indicates that product is stocked out right now
-    'stockout',
+STOCK_ACTION_ORDER = [
+    StockActions.RECEIPTS,
+    StockActions.CONSUMPTION,
+    StockActions.STOCKONHAND,
+    StockActions.STOCKOUT,
 ]
 
 REQUISITION_ACTION_TYPES = [
@@ -103,11 +94,19 @@ class Product(Document):
     domain = StringProperty()
     name = StringProperty()
     unit = StringProperty()
-    code = StringProperty()
+    code_ = StringProperty()
     description = StringProperty()
     category = StringProperty()
     program_id = StringProperty()
     cost = DecimalProperty()
+
+    @property
+    def code(self):
+        return self.code_
+
+    @code.setter
+    def code(self, val):
+        self.code_ = val.lower() if val else None
 
     @classmethod
     def get_by_code(cls, domain, code):
@@ -174,34 +173,49 @@ def product_fixture_generator(user, version, last_sync):
 
 
 class CommtrackActionConfig(DocumentSchema):
-    action_type = StringProperty() # a value in ACTION_TYPES (could be converted to enum?)
-    keyword = StringProperty()
-    multiaction_keyword = StringProperty() # defaults to single-action keyword
-    name = StringProperty() # defaults to action_type
-    caption = StringProperty()
+    action = StringProperty() # one of the base stock action types (see StockActions enum)
+    subaction = StringProperty() # (optional) to further distinguish different kinds of the base action
+        # (i.e., separately tracking consumption as 'dispensed' or 'lost'). note that when the system
+        # infers consumption/receipts from reported stock, it will be marked here as a subaction
+    _keyword = StringProperty() # sms code
+    caption = StringProperty() # display title
+
+    @classmethod
+    def wrap(cls, data):
+        if 'action_type' in data:
+            data['action'] = data['action_type']
+            del data['action_type']
+
+        if 'name' in data:
+            if data['name'] == 'lost':
+                data['subaction'] = 'loss'
+
+            del data['name']
+
+        return super(CommtrackActionConfig, cls).wrap(data)
 
     def __repr__(self):
-        return '{action_type}: {caption} ({keyword})'.format(**self._doc)
-
-    def _keyword(self, multi):
-        if multi:
-            k = self.multiaction_keyword or self.keyword
-        else:
-            k = self.keyword
-        return k.lower()
+        return '{action} ({subaction}): {caption} ({_keyword})'.format(**self._doc)
 
     @property
-    def action_name(self):
-        return self.name or self.action_type
+    def keyword(self):
+        return self._keyword
+
+    @keyword.setter
+    def keyword(self, val):
+        self._keyword = val.lower() if val else None
+
+    @property
+    def name(self):
+        return ':'.join(filter(None, [self.action, self.subaction]))
 
     @property
     def is_stock(self):
-        # NOTE: assumes ACTION_TYPES and REQUISITION_ACTION_TYPES don't overlap
-        return self.action_type in ACTION_TYPES
+        return self.action in STOCK_ACTION_ORDER
 
     @property
     def is_requisition(self):
-        return self.action_type in REQUISITION_ACTION_TYPES
+        return self.action in REQUISITION_ACTION_TYPES
 
 class LocationType(DocumentSchema):
     name = StringProperty()
@@ -240,6 +254,7 @@ class ConsumptionConfig(DocumentSchema):
     min_transactions = IntegerProperty(default=2)
     min_window = IntegerProperty(default=10)
     optimal_window = IntegerProperty()
+    use_supply_point_type_default_consumption = BooleanProperty(default=False)
 
 
 class StockLevelsConfig(DocumentSchema):
@@ -270,19 +285,21 @@ class AlertConfig(DocumentSchema):
     stock_out_rates = BooleanProperty(default=False)
     non_report = BooleanProperty(default=False)
 
+class StockRestoreConfig(DocumentSchema):
+
+    section_to_consumption_types = DictProperty()
 
 class CommtrackConfig(Document):
 
     domain = StringProperty()
 
     # supported stock actions for this commtrack domain
-    # listed in the order they are processed
+    # listed in the order they are processed -- TODO support for this custom ordering might go away
     actions = SchemaListProperty(CommtrackActionConfig)
     # TODO must catch ambiguous action lists (two action configs with the same 'name')
 
     multiaction_enabled = BooleanProperty()
-    multiaction_keyword = StringProperty() # if None, will attempt to parse
-    # all messages as multi-action
+    multiaction_keyword_ = StringProperty()
 
     location_types = SchemaListProperty(LocationType)
     supply_point_types = SchemaListProperty(SupplyPointType)
@@ -296,6 +313,15 @@ class CommtrackConfig(Document):
     use_auto_consumption = BooleanProperty(default=False)
     consumption_config = SchemaProperty(ConsumptionConfig)
     stock_levels_config = SchemaProperty(StockLevelsConfig)
+    ota_restore_config = SchemaProperty(StockRestoreConfig)
+
+    @property
+    def multiaction_keyword(self):
+        return self.multiaction_keyword_
+
+    @multiaction_keyword.setter
+    def multiaction_keyword(self, val):
+        self.multiaction_keyword_ = val.lower() if val else None
 
     # configured on Subscribe Sms page
     alert_config = SchemaProperty(AlertConfig)
@@ -307,16 +333,51 @@ class CommtrackConfig(Document):
                           include_docs=True).first()
         return result
 
+    @property
     def all_actions(self):
+        return self.actions + (self.requisition_config.actions if self.requisitions_enabled else [])
+
+    def action_by_keyword(self, keyword):
+        def _action(action, type):
+            action.type = type
+            return action
+        actions = [_action(a, 'stock') for a in self.actions]
         if self.requisitions_enabled:
-            return self.actions + self.requisition_config.actions
-        return self.actions
+            actions += [_action(a, 'req') for a in self.requisition_config.actions]
+        return dict((a.keyword, a) for a in actions).get(keyword)
 
-    def _keywords(self, action_list, multi):
-        return dict((action_config._keyword(multi), action_config.action_name) \
-                    for action_config in action_list)
+    def get_consumption_config(self):
+        def _default_consumption_function(case_id, product_id):
+            # note: for now as an optimization hack, per-supply point type is not supported
+            # unless explicitly configured, because it will require looking up the case
+            facility_type = None
+            if self.consumption_config.use_supply_point_type_default_consumption:
+                try:
+                    supply_point = SupplyPointCase.get(case_id)
+                    facility_type = supply_point.location.location_type
+                except ResourceNotFound:
+                    pass
+            return get_default_consumption(self.domain, product_id, facility_type, case_id)
 
-    def keywords(self, multi=False):
+        return ConsumptionConfiguration(
+            min_periods=self.consumption_config.min_transactions,
+            min_window=self.consumption_config.min_window,
+            max_window=self.consumption_config.optimal_window,
+            default_consumption_function=_default_consumption_function,
+        )
+
+    def get_ota_restore_settings(self):
+        # for some reason it doesn't like this import
+        from casexml.apps.phone.restore import StockSettings
+        return StockSettings(
+            section_to_consumption_types=self.ota_restore_config.section_to_consumption_types,
+            consumption_config=self.get_consumption_config(),
+        )
+
+
+    """
+    @property
+    def keywords(self):
         return self._keywords(self.actions, multi)
 
     # TODO clean all this up
@@ -345,6 +406,7 @@ class CommtrackConfig(Document):
 
     def get_action_by_type(self, action_type):
         return self.all_actions_by_type[action_type]
+    """
 
     @property
     def known_supply_point_types(self):
@@ -446,20 +508,70 @@ class StockStatus(StringDataSchema):
             skip=skip, limit=limit)]
 
 
-class StockTransaction(StringDataSchema):
+class NewStockReport(object):
+    """
+    Intermediate class for dealing with stock XML
+    """
+    # todo: fix name, remove old stock report class
+    def __init__(self, form, timestamp, tag, transactions):
+        self._form = form
+        self.form_id = form._id
+        self.timestamp = timestamp
+        self.tag = tag
+        self.transactions = transactions
+
+    @classmethod
+    def from_xml(cls, form, config, elem):
+        tag = elem.tag
+        tag = tag[tag.find('}')+1:] # strip out ns
+        timestamp = force_to_datetime(elem.attrib.get('date', form.received_on))
+        products = elem.findall('./{%s}entry' % const.COMMTRACK_REPORT_XMLNS)
+        transactions = [t for prod_entry in products for t in
+                        StockTransaction.from_xml(config, timestamp, tag, elem, prod_entry)]
+
+        return cls(form, timestamp, tag, transactions)
+
+    @transaction.commit_on_success
+    def create_models(self):
+        # todo: this function should probably move to somewhere in casexml.apps.stock
+        report = DbStockReport.objects.create(form_id=self.form_id, date=self.timestamp, type=self.tag)
+        for txn in self.transactions:
+            db_txn = DbStockTransaction(
+                report=report,
+                case_id=txn.case_id,
+                section_id=txn.section_id,
+                product_id=txn.product_id,
+            )
+            previous_transaction = db_txn.get_previous_transaction()
+            db_txn.type = txn.action
+            db_txn.subtype = txn.subaction
+            if self.tag == 'balance':
+                db_txn.stock_on_hand = txn.quantity
+                db_txn.quantity = 0
+            else:
+                assert self.tag == 'transfer'
+                db_txn.quantity = txn.relative_quantity
+                db_txn.stock_on_hand = (previous_transaction.stock_on_hand if previous_transaction else 0) + db_txn.quantity
+            db_txn.save()
+
+
+class StockTransaction(Document):
     """
     wrapper/helper for transactions
     """
-
-    value = IntegerProperty()
+    # todo: why is this a Document?
+    domain = StringProperty()
+    timestamp = DateTimeProperty()
+    location_id = StringProperty()  # location record id
+    case_id = StringProperty()
+    section_id = StringProperty()
+    product_id = StringProperty()
     action = StringProperty()
-    location_id = StringProperty()
-    product = StringProperty()
-    product_entry = StringProperty()
-    received_on = DateTimeProperty()
-    inferred = BooleanProperty(name='@inferred', default=False)
-    processing_order = IntegerProperty(name='@order')
+    subaction = StringProperty()
+    quantity = DecimalProperty()
+    processing_order = IntegerProperty()
 
+    """
     @classmethod
     def by_domain(cls, domain, skip=0, limit=100):
         return [StockTransaction.force_wrap(row["value"]) for row in _view_shared(
@@ -477,6 +589,144 @@ class StockTransaction(StringDataSchema):
                                        startkey=[product_case, start_date],
                                        endkey=[product_case, end_date, {}])
         return [StockTransaction.force_wrap(row['value']) for row in q]
+    """
+
+    def __init__(self, **kwargs):
+        def _action_def(val):
+            return {
+                'action': val.action,
+                'subaction': val.subaction,
+            }
+        def _product(val):
+            # FIXME want to store product in memory object (but not persist to couch...
+            # is this possible in jsonobject?)
+            #self.product = val
+            return {
+                'product_id': val._id,
+            }
+        def _inferred(val):
+            return {
+                'subaction': stockconst.TRANSACTION_SUBTYPE_INFERRED,
+            }
+        def _config(val):
+            ret = {
+                'processing_order': STOCK_ACTION_ORDER.index(kwargs['action']),
+            }
+            if not kwargs.get('domain'):
+                ret['domain'] = val.domain
+            return ret
+
+        for name, var in locals().iteritems():
+            if hasattr(var, '__call__') and name.startswith('_'):
+                attr = name[1:]
+                if kwargs.get(attr):
+                    val = kwargs[attr]
+                    del kwargs[attr]
+                    kwargs.update(var(val))
+
+        super(StockTransaction, self).__init__(**kwargs)
+
+    @property
+    def relative_quantity(self):
+        """
+        Gets the quantity of this transaction as a positive or negative number
+        depending on the action/context
+        """
+        if self.action == const.StockActions.CONSUMPTION:
+            return -self.quantity
+        else:
+            return self.quantity
+
+    def action_config(self, commtrack_config):
+        action = CommtrackActionConfig(action=self.action, subaction=self.subaction)
+        for a in commtrack_config.all_actions:
+            if a.name == action.name:
+                return a
+        return None
+
+    @classmethod
+    def from_xml(cls, config, timestamp, action_tag, action_node, product_node):
+        action_type = action_node.attrib.get('type')
+        subaction = action_type
+        quantity = float(product_node.attrib.get('quantity'))
+        def _txn(action, case_id, section_id):
+            data = {
+                'timestamp': timestamp,
+                'product_id': product_node.attrib.get('id'),
+                'quantity': quantity,
+                'action': action,
+                'case_id': case_id,
+                'section_id': section_id,
+                'subaction': subaction if subaction and subaction != action else None
+                # note: no location id
+            }
+            return cls(config=config, **data)
+
+        DEFAULT_SECTION_ID = 'stock'
+        if action_tag == 'balance':
+            yield _txn(
+                action=const.StockActions.STOCKONHAND if quantity > 0 else const.StockActions.STOCKOUT,
+                case_id=action_node.attrib['entity-id'],
+                section_id=action_node.attrib.get('section-id', DEFAULT_SECTION_ID),
+            )
+        elif action_tag == 'transfer':
+            src, dst = [action_node.attrib.get(k) for k in ('src', 'dest')]
+            assert src or dst
+            if src is not None:
+                yield _txn(action=const.StockActions.CONSUMPTION, case_id=src,
+                           section_id=action_node.attrib.get('section-id', DEFAULT_SECTION_ID))
+            if dst is not None:
+                yield _txn(action=const.StockActions.RECEIPTS, case_id=dst,
+                           section_id=action_node.attrib.get('section-id', DEFAULT_SECTION_ID))
+
+    def to_xml(self, E=None, **kwargs):
+        if not E:
+            E = XML()
+
+        tx_type = 'balance' if self.action in (
+            StockActions.STOCKONHAND,
+            StockActions.STOCKOUT,
+        ) else 'transfer'
+
+        attr = {}
+        if self.timestamp:
+            attr['date'] = dateparse.json_format_datetime(self.timestamp)
+
+        attr['section-id'] = 'stock'
+        if tx_type == 'balance':
+            attr['entity-id'] = self.case_id
+        elif tx_type == 'transfer':
+            here, there = ('dest', 'src') if self.action == StockActions.RECEIPTS else ('src', 'dest')
+            attr[here] = self.case_id
+            # no 'there' for now
+            if self.subaction:
+                attr['type'] = self.subaction
+
+        return getattr(E, tx_type)(
+            E.entry(
+                id=self.product_id,
+                quantity=str(self.quantity if self.action != StockActions.STOCKOUT else 0),
+            ),
+            **attr
+        )
+
+    @property
+    def category(self):
+        return 'stock'
+
+    def fragment(self):
+        """
+        A short string representation of this to be used in sms correspondence
+        """
+        if self.quantity is not None:
+            quant = int(self.quantity) if self.quantity == int(self.quantity) else self.quantity
+        else:
+            quant = ''
+        # FIXME product fetch here is inefficient
+        return '%s%s' % (Product.get(self.product_id).code.lower(), quant)
+
+    def __repr__(self):
+        return '{action} ({subaction}): {quantity} (loc: {location_id}, product: {product_id})'.format(**self._doc)
 
 
 def _get_single_index(case, identifier, type, wrapper=None):
@@ -490,14 +740,6 @@ def _get_single_index(case, identifier, type, wrapper=None):
     return None
 
 
-def get_case_wrapper(data):
-    return {
-        const.SUPPLY_POINT_CASE_TYPE: SupplyPointCase,
-        const.SUPPLY_POINT_PRODUCT_CASE_TYPE: SupplyPointProductCase,
-        const.REQUISITION_CASE_TYPE: RequisitionCase
-    }.get(data.get('type'))
-
-
 class SupplyPointCase(CommCareCase):
     """
     A wrapper around CommCareCases to get more built in functionality
@@ -506,7 +748,7 @@ class SupplyPointCase(CommCareCase):
 
     # TODO move location_ property from CommCareCase
 
-    class Meta: 
+    class Meta:
         # This is necessary otherwise syncdb will confuse this app with casexml
         app_label = "commtrack"
 
@@ -577,6 +819,13 @@ class SupplyPointCase(CommCareCase):
         else:
             return self
 
+    def get_product_subcases(self):
+        product_subcase_uuids = [ix.referenced_id for ix in self.reverse_indices if ix.identifier == const.PARENT_CASE_REF]
+        return SupplyPointProductCase.view('_all_docs', keys=product_subcase_uuids, include_docs=True)
+
+    def get_product_subcase(self, product_id):
+        filtered = filter(lambda spp: spp.product == product_id, self.get_product_subcases())
+        return filtered[0] if filtered else None
 
     def to_full_dict(self):
         data = super(SupplyPointCase, self).to_full_dict()
@@ -652,6 +901,7 @@ OVERSTOCK_THRESHOLD = 2. # months
 
 DEFAULT_CONSUMPTION = 10. # per month
 
+# TODO eliminate this
 class SupplyPointProductCase(CommCareCase):
     """
     A wrapper around CommCareCases to get more built in functionality
@@ -660,13 +910,14 @@ class SupplyPointProductCase(CommCareCase):
     See
     https://confluence.dimagi.com/display/ctinternal/Data+Model+Documentation
     """
-    class Meta: 
+    class Meta:
         # This is necessary otherwise syncdb will confuse this app with casexml
         app_label = "commtrack"
 
     # can flesh this out more as needed
-    product = StringProperty() # would be nice if this was product_id but is grandfathered in
-    current_stock = StringProperty()
+    product = StringProperty()  # would be nice if this was product_id but is grandfathered in
+    current_stock = DecimalProperty()
+    stocked_out_since = StringProperty()
 
     @memoized
     def get_product(self):
@@ -682,7 +933,7 @@ class SupplyPointProductCase(CommCareCase):
 
     @property
     def current_stock_level(self):
-        return int(self.current_stock) if self.current_stock is not None else None
+        return float(self.current_stock) if self.current_stock is not None else None
 
     @property
     @memoized
@@ -728,8 +979,9 @@ class SupplyPointProductCase(CommCareCase):
     @property
     def stockout_duration_in_months(self):
         if self.stocked_out_since:
+            sos = datetime.strptime(self.stocked_out_since, '%Y-%m-%d').date()
             today = datetime.today().date()
-            return (today - self.stocked_out_since).days / DAYS_PER_MONTH
+            return (today - sos).days / DAYS_PER_MONTH
         else:
             return None
 
@@ -769,6 +1021,10 @@ class SupplyPointProductCase(CommCareCase):
             thresholds=self.stock_thresholds
         )
 
+    def get_last_reported_date(self):
+        last_reported = getattr(self, 'last_reported', None)
+        return force_to_date(last_reported)
+
     def to_full_dict(self):
         def roundif(k, digits):
             return round(k, digits) if k is not None else None
@@ -779,7 +1035,7 @@ class SupplyPointProductCase(CommCareCase):
 
         data['supply_point_name'] = self.get_supply_point_case()['name']
         data['product_name'] = self.get_product()['name']
-        
+
         #data['emergency_level'] = None
         #data['max_level'] = None
 
@@ -858,20 +1114,18 @@ class SupplyPointProductCase(CommCareCase):
         return super(SupplyPointProductCase, self).get_index_map(reversed)
 
 
+
 class RequisitionCase(CommCareCase):
     """
     A wrapper around CommCareCases to get more built in functionality
     specific to requisitions.
     """
-    class Meta: 
+    class Meta:
         # This is necessary otherwise syncdb will confuse this app with casexml
         app_label = "commtrack"
 
     # supply_point = StringProperty() # todo, if desired
     requisition_status = StringProperty()
-
-    # NOTE: this is redundant with the supply point product case and is an optimization
-    product_id = StringProperty()
 
     # this second field is added for auditing purposes
     # the status can change, but once set - this one will not
@@ -885,57 +1139,19 @@ class RequisitionCase(CommCareCase):
     packed_by = StringProperty()
     received_by = StringProperty()
 
-    # NOTE: should these be strings or ints or decimals?
-    amount_requested = StringProperty()
-    # these two fields are unnecessary with no ability to
-    # approve partial resupplies in the current system, but is
-    # left in the models for possible use down the road
-    amount_approved = StringProperty()
-    amount_packed = StringProperty()
-    amount_received = StringProperty()
-
     @memoized
     def get_location(self):
         if self.location_:
             return Location.get(self.location_[-1])
 
     @memoized
-    def get_supply_point_case(self):
-        product_case = self.get_product_case()
-        if product_case:
-            return product_case.get_supply_point_case()
-        return None
-
-    @memoized
-    def get_product(self):
-        return Product.get(self.product_id)
-
-    @memoized
-    def get_product_case(self):
-        return _get_single_index(self, const.PARENT_CASE_REF,
-                                 const.SUPPLY_POINT_PRODUCT_CASE_TYPE,
-                                 wrapper=SupplyPointProductCase)
-
-    def get_product_case_id(self):
-        return _get_single_index(self, const.PARENT_CASE_REF,
-                                 const.SUPPLY_POINT_PRODUCT_CASE_TYPE)
-
-    @memoized
     def get_requester(self):
         return CommCareUser.get(self.requested_by)
 
-
-    def get_default_value(self):
-        """get how much the default is. this is dependent on state."""
-        property_map = {
-            RequisitionStatus.REQUESTED: 'amount_requested',
-            RequisitionStatus.APPROVED: 'amount_approved',
-            RequisitionStatus.PACKED: 'amount_packed',
-        }
-        return getattr(self, property_map.get(self.requisition_status, 'amount_requested'))
-
     def sms_format(self):
-        return '%s:%s' % (self.get_product().code, self.get_default_value())
+        # TODO needs fixed
+        # return '%s:%s' % (self.get_product().code, self.get_default_value())
+        raise NotImplementedError()
 
     def get_next_action(self):
         req_config = CommtrackConfig.for_domain(self.domain).requisition_config
@@ -956,29 +1172,17 @@ class RequisitionCase(CommCareCase):
         )
         return [r['id'] for r in results]
 
-
-    @classmethod
-    def open_for_product_case(cls, domain, location, product_case_id):
-        """
-        For a given product case, return the IDs of all open requisitions at that location.
-        """
-        startkey = [domain, location, 'open', product_case_id]
-        results = cls.get_db().view('commtrack/requisitions',
-            endkey=startkey, # yes this is confusing, but i blame couch's descending=true rules
-            startkey=startkey + [{}],
-            descending=True,
-            reduce=False,
-        )
-        return [r['id'] for r in results]
-
     def to_full_dict(self):
-        data = super(RequisitionCase, self).to_full_dict()
-        sp = self.get_supply_point_case()
-        product = self.get_product_case()
-        data['supply_point_name'] = sp['name'] if sp else ''
-        data['product_name'] = product['name'] if product else ''
-        data['balance'] = self.get_default_value()
-        return data
+        # TODO verify if this needs fixed or just deleted
+        raise NotImplementedError()
+
+        #data = super(RequisitionCase, self).to_full_dict()
+        #sp = self.get_supply_point_case()
+        #product = self.get_product_case()
+        #data['supply_point_name'] = sp['name'] if sp else ''
+        #data['product_name'] = product['name'] if product else ''
+        #data['balance'] = self.get_default_value()
+        #return data
 
     @classmethod
     def get_by_external_id(cls, domain, external_id):
@@ -1021,7 +1225,7 @@ class RequisitionCase(CommCareCase):
             },
             {
                 "layout": [
-                    [ 
+                    [
                         {
                             "name": _("Amount Requested"),
                             "expr": "amount_requested",

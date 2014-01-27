@@ -16,10 +16,10 @@ def is_timely(case, limit=0):
     return num_periods_late(case, REPORTING_PERIOD, *REPORTING_PERIOD_ARGS) <= limit
 
 def reporting_status(case, start_date, end_date):
-    last_reported = getattr(case, 'last_reported', None)
-    if last_reported and last_reported.date() < start_date:
+    last_reported = case.get_last_reported_date()
+    if last_reported and last_reported < start_date:
         return 'ontime'
-    elif last_reported and start_date <= last_reported.date() <= end_date:
+    elif last_reported and start_date <= last_reported <= end_date:
         return 'late'
     else:
         return 'nonreporting'
@@ -94,6 +94,9 @@ class StockStatusDataSource(ReportDataSource, CommtrackDataSourceMixin):
     SLUG_CURRENT_STOCK = 'current_stock'
     SLUG_LOCATION_ID = 'location_id'
     SLUG_LOCATION_LINEAGE = 'location_lineage'
+    SLUG_STOCKOUT_SINCE = 'stockout_since'
+    SLUG_STOCKOUT_DURATION = 'stockout_duration'
+    SLUG_LAST_REPORTED = 'last_reported'
 
     SLUG_CATEGORY = 'category'
     _slug_attrib_map = {
@@ -105,6 +108,9 @@ class StockStatusDataSource(ReportDataSource, CommtrackDataSourceMixin):
         SLUG_CONSUMPTION: 'monthly_consumption',
         SLUG_MONTHS_REMAINING: 'months_until_stockout',
         SLUG_CATEGORY: 'current_stock_category',
+        SLUG_STOCKOUT_SINCE: 'stocked_out_since',
+        SLUG_STOCKOUT_DURATION: 'stockout_duration_in_months',
+        SLUG_LAST_REPORTED: 'last_reported',
     }
 
     def slugs(self):
@@ -129,7 +135,7 @@ class StockStatusDataSource(ReportDataSource, CommtrackDataSourceMixin):
                 if callable(attrib):
                     output[slug] = attrib(product)
                 else:
-                    output[slug] = getattr(product, attrib)
+                    output[slug] = getattr(product, attrib, '')
 
         for product in product_cases:
             out = {}
@@ -223,7 +229,7 @@ class ReportingStatusDataSource(ReportDataSource, CommtrackDataSourceMixin):
             product_cases = filter(lambda c: Product.get(c.product).program_id == self.program_id, product_cases)
         def latest_case(cases):
             # getting last report date should probably be moved to a util function in a case wrapper class
-            return max(cases, key=lambda c: getattr(c, 'last_reported', datetime(2000, 1, 1)).date())
+            return max(cases, key=lambda c: c.get_last_reported_date() or datetime(2000, 1, 1).date())
         cases_by_site = map_reduce(lambda c: [(tuple(c.location_),)],
                                    lambda v: reporting_status(latest_case(v), self.start_date, self.end_date),
                                    data=product_cases, include_docs=True)
