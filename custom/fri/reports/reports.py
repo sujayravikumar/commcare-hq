@@ -351,6 +351,17 @@ class SurveyResponsesReport(FRIReport):
                                    key=[self.domain, "participant"],
                                    include_docs=True,
                                    reduce=False).all()
+        local_now = tz_utils.adjust_datetime_to_timezone(
+            datetime.utcnow(), pytz.utc.zone, self.domain_obj.default_timezone)
+        local_date = local_now.date()
+
+        def filter_function(case):
+            registration_date = case.get_case_property("registration_date")
+            first_tuesday = self.get_first_tuesday(registration_date)
+            end_date = first_tuesday + timedelta(days=56)
+            return end_date >= local_date
+
+        result = filter(filter_function, result)
         return result
 
     def get_first_survey_response(self, case, dt):
