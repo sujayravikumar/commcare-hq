@@ -10,6 +10,13 @@ import djcelery
 
 djcelery.setup_loader()
 
+try:
+    import psycopg2
+except ImportError:
+    # Fall back to psycopg2-ctypes
+    from psycopg2ct import compat
+    compat.register()
+
 CACHE_BACKEND = 'memcached://127.0.0.1:11211/'
 
 DEBUG = True

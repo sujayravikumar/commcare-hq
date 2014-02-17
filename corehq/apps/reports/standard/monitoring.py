@@ -4,7 +4,6 @@ from urllib import urlencode
 import dateutil
 from django.core.urlresolvers import reverse
 import math
-import numpy
 import operator
 import pytz
 from corehq.apps.reports import util
@@ -468,6 +467,7 @@ class FormCompletionTimeReport(WorkerMonitoringReportTableBase, DatespanMixin):
 
     @property
     def rows(self):
+        import numpy
         rows = []
         if self.selected_xmlns['xmlns'] is None:
             rows.append([_("You must select a specific form to view data.")])
@@ -531,6 +531,7 @@ class FormCompletionTimeReport(WorkerMonitoringReportTableBase, DatespanMixin):
         return rows
 
     def get_user_data(self, user_id):
+        import numpy
         key = make_form_couch_key(self.domain, by_submission_time=False, user_id=user_id,
             xmlns=self.selected_xmlns['xmlns'], app_id=self.selected_xmlns['app_id'])
         data = get_db().view("reports_forms/all_forms",

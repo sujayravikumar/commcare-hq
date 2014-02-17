@@ -2,7 +2,6 @@ import logging
 import calendar
 import copy
 import dateutil
-import numpy
 import datetime
 from couchdbkit.ext.django.schema import Document, StringProperty, IntegerProperty, DateTimeProperty
 from couchdbkit.schema.base import DocumentSchema
@@ -509,6 +508,7 @@ class MedianCouchIndicatorDef(NoGroupCouchIndicatorDefBase):
     """
 
     def get_value(self, user_ids, datespan=None):
+        import numpy
         results = self.get_raw_results(user_ids, datespan)
         values = [item.get('value', 0) for item in results if item.get('value')]
         return numpy.median(values) if values else None
