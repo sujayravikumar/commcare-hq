@@ -1140,6 +1140,8 @@ class WorkerActivityReport(WorkerMonitoringReportTableBase, DatespanMixin):
             """
             cl_url = reverse('project_report_dispatcher', args=(self.domain, 'case_list'))
             url_args = ExpandedMobileWorkerFilter.for_user(owner_id)
+            if self.case_type:
+                url_args.update({"case_type": self.case_type})
 
             start_date, end_date = dates_for_linked_reports(case_list=True)
             start_date_sub1 = self.datespan.startdate - datetime.timedelta(days=1)
