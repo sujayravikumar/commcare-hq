@@ -950,16 +950,22 @@ class WorkerActivityReport(WorkerMonitoringReportTableBase, DatespanMixin):
         CASE_TYPE_MSG = "The case type filter doesn't affect this column."
         by_group = self.view_by == 'groups'
         columns = [DataTablesColumn(_("Group"))] if by_group else [DataTablesColumn(_("User"))]
-        columns.append(DataTablesColumnGroup(_("Form Data"),
-            DataTablesColumn(_("# Forms Submitted"), sort_type=DTSortType.NUMERIC,
-                help_text=_("Number of forms submitted in chosen date range. %s" % CASE_TYPE_MSG)),
-            DataTablesColumn(_("Avg # Forms Submitted"), sort_type=DTSortType.NUMERIC,
-                help_text=_("Average number of forms submitted in the last three date ranges of the same length. %s" % CASE_TYPE_MSG)),
-            DataTablesColumn(_("Last Form Submission"),
-                help_text=_("Date of last form submission in time period.  Total row displays proportion of users submitting forms in date range")) \
-            if not by_group else DataTablesColumn(_("# Active Users"), sort_type=DTSortType.NUMERIC,
-                help_text=_("Proportion of users in group who submitted forms in date range."))
-        ))
+        if by_group:
+            columns.append(DataTablesColumnGroup(_("Form Data"),
+                DataTablesColumn(_("# Forms Submitted"), sort_type=DTSortType.NUMERIC,
+                    help_text=_("Number of forms submitted in chosen date range. %s" % CASE_TYPE_MSG)),
+                DataTablesColumn(_("Avg # Forms Submitted"), sort_type=DTSortType.NUMERIC,
+                    help_text=_("Average number of forms submitted in the last three date ranges of the same length. %s" % CASE_TYPE_MSG)),
+                DataTablesColumn(_("# Active Users"), sort_type=DTSortType.NUMERIC,
+                    help_text=_("Proportion of users in group who submitted forms in date range."))
+            ))
+        else:
+            columns.append(DataTablesColumnGroup(_("Form Data"),
+                DataTablesColumn(_("# Forms Submitted"), sort_type=DTSortType.NUMERIC,
+                    help_text=_("Number of forms submitted in chosen date range. %s" % CASE_TYPE_MSG)),
+                DataTablesColumn(_("Avg # Forms Submitted"), sort_type=DTSortType.NUMERIC,
+                    help_text=_("Average number of forms submitted in the last three date ranges of the same length. %s" % CASE_TYPE_MSG)),
+            ))
         columns.append(DataTablesColumnGroup(_("Case Data"),
             DataTablesColumn(_("# Cases Created"), sort_type=DTSortType.NUMERIC,
                 help_text=_("Number of cases created in the date range.")),
@@ -998,27 +1004,6 @@ class WorkerActivityReport(WorkerMonitoringReportTableBase, DatespanMixin):
         q["filter"] = {"and": ADD_TO_ES_FILTER["forms"][:]}
         facets = ['form.meta.userID']
         return es_query(q=q, facets=facets, es_url=XFORM_INDEX + '/xform/_search', size=1, dict_only=dict_only)
-
-    def es_last_submissions(self, datespan=None, dict_only=False):
-        """
-            Creates a dict of userid => date of last submission
-        """
-        datespan = datespan or self.datespan
-        def es_q(user_id):
-            q = {"query": {
-                    "bool": {
-                        "must": [
-                            {"match": {"domain.exact": self.domain}},
-                            {"match": {"form.meta.userID": user_id}},
-                            {"range": {
-                                "form.meta.timeEnd": {
-                                    "from": datespan.startdate_param,
-                                    "to": datespan.enddate_param,
-                                    "include_upper": True}}}
-                        ]}},
-                "sort": {"form.meta.timeEnd" : {"order": "desc"}}}
-            results = es_query(q=q, es_url=XFORM_INDEX + '/xform/_search', size=1, dict_only=dict_only)['hits']['hits']
-            return results[0]['_source']['form']['meta']['timeEnd'] if results else None
 
         DATE_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
         def convert_date(date):
@@ -1102,8 +1087,6 @@ class WorkerActivityReport(WorkerMonitoringReportTableBase, DatespanMixin):
         if self.view_by == 'groups':
             active_users_by_group = dict([(g, len(filter(lambda u: submissions_by_user.get(u['user_id']), users)))
                                           for g, users in self.users_by_group.iteritems()])
-        else:
-            last_form_by_user = self.es_last_submissions()
 
         case_creation_data = self.es_case_queries('opened_on', 'opened_by')
         creations_by_user = dict([(t["term"].lower(), t["count"])
@@ -1203,7 +1186,6 @@ class WorkerActivityReport(WorkerMonitoringReportTableBase, DatespanMixin):
             )
 
         rows = []
-        NO_FORMS_TEXT = _('None')
         if self.view_by == 'groups':
             for group, users in self.users_by_group.iteritems():
                 group_name, group_id = tuple(group.split('|'))
@@ -1246,7 +1228,6 @@ class WorkerActivityReport(WorkerMonitoringReportTableBase, DatespanMixin):
                                         submissions_by_user.get(user["user_id"], 0),
                                         type='user'),
                     util.numcell(int(avg_submissions_by_user.get(user["user_id"], 0)) / self.num_avg_intervals),
-                    last_form_by_user.get(user["user_id"]) or NO_FORMS_TEXT,
                     int(creations_by_user.get(user["user_id"].lower(),0)),
                     int(closures_by_user.get(user["user_id"].lower(), 0)),
                     util.numcell(active_cases) if not today_or_tomorrow(self.datespan.enddate) else active_cases,
@@ -1255,7 +1236,7 @@ class WorkerActivityReport(WorkerMonitoringReportTableBase, DatespanMixin):
                 ]))
 
         self.total_row = [_("Total")]
-        summing_cols = [1, 2, 4, 5, 6, 7]
+        summing_cols = [1, 2, 4, 5, 6, 7] if self.view_by == 'groups' else [1, 2, 4, 5, 6]
         for col in range(1, len(self.headers)):
             if col in summing_cols:
                 self.total_row.append(sum(filter(lambda x: not math.isnan(x), [row[col].get('sort_key', 0) for row in rows])))
@@ -1274,8 +1255,5 @@ class WorkerActivityReport(WorkerMonitoringReportTableBase, DatespanMixin):
                 return num + result_tuple[0], denom + result_tuple[1]
 
             self.total_row[3] = '%s / %s' % reduce(add, [row[3]["html"] for row in rows], (0, 0))
-        else:
-            num = len(filter(lambda row: row[3] != NO_FORMS_TEXT, rows))
-            self.total_row[3] = '%s / %s' % (num, len(rows))
 
         return rows
