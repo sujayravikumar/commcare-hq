@@ -2,8 +2,7 @@ from __future__ import absolute_import
 import json
 import re
 import urllib
-from corehq.apps.accounting.decorators import requires_privilege_alert
-import toggle
+from corehq.apps.accounting.decorators import requires_privilege_with_fallback
 from django.utils.decorators import method_decorator
 from corehq import Domain, toggles, privileges
 from corehq.apps.domain.views import BaseDomainView
@@ -198,8 +197,8 @@ class BaseEditUserView(BaseUserSettingsView):
 
     def post(self, request, *args, **kwargs):
         if self.request.POST['form_type'] == "commtrack":
-            self.editable_user.location_id = self.request.POST['supply_point']
-            self.editable_user.program_id = self.request.POST['program_id']
+            self.editable_user.get_domain_membership(self.domain).location_id = self.request.POST['supply_point']
+            self.editable_user.get_domain_membership(self.domain).program_id = self.request.POST['program_id']
             self.editable_user.save()
         elif self.request.POST['form_type'] == "update-user":
             if self.form_user_update.is_valid():
@@ -355,11 +354,10 @@ class ListWebUsersView(BaseUserSettingsView):
 
     @property
     def can_edit_roles(self):
-        if toggle.shortcuts.toggle_enabled(toggles.ACCOUNTING_PREVIEW, self.couch_user.username):
-            try:
-                ensure_request_has_privilege(self.request, privileges.ROLE_BASED_ACCESS)
-            except PermissionDenied:
-                return False
+        try:
+            ensure_request_has_privilege(self.request, privileges.ROLE_BASED_ACCESS)
+        except PermissionDenied:
+            return False
         return self.couch_user.is_domain_admin
 
     @property
@@ -419,7 +417,7 @@ def undo_remove_web_user(request, domain, record_id):
 # to change the permissions of your own role such that you could do anything, and would thus be equivalent to having
 # domain admin permissions.
 @domain_admin_required
-@method_decorator(requires_privilege_alert(privileges.ROLE_BASED_ACCESS))
+@method_decorator(requires_privilege_with_fallback(privileges.ROLE_BASED_ACCESS))
 @require_POST
 def post_user_role(request, domain):
     role_data = json.loads(request.raw_post_data)
@@ -465,8 +463,8 @@ class UserInvitationView(InvitationView):
         user.add_domain_membership(domain=self.domain)
         user.set_role(self.domain, invitation.role)
         if project.commtrack_enabled and not project.location_restriction_for_users:
-            user.location_id = invitation.supply_point
-            user.program_id = invitation.program
+            user.get_domain_membership(self.domain).location_id = invitation.supply_point
+            user.get_domain_membership(self.domain).program_id = invitation.program
         user.save()
 
 

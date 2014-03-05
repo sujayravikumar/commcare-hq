@@ -11,7 +11,6 @@ from casexml.apps.stock import const as stockconst
 from casexml.apps.stock.consumption import ConsumptionConfiguration
 from casexml.apps.stock.models import StockReport as DbStockReport, StockTransaction as DbStockTransaction
 from casexml.apps.case.xml import V2
-from corehq import Domain
 from corehq.apps.commtrack import const
 from corehq.apps.consumption.shortcuts import get_default_consumption
 from corehq.apps.hqcase.utils import submit_case_blocks
@@ -162,38 +161,6 @@ class Product(Document):
         return [row['id'] for row in view_results]
 
 
-def product_fixture_generator(user, version, last_sync):
-    if not user.domain:
-        return []
-    domain = Domain.get_by_name(user.domain)
-    if not domain or not Domain.get_by_name(user.domain).commtrack_enabled:
-        return []
-
-    root = ElementTree.Element('fixture',
-                               attrib={'id': 'commtrack:products',
-                                       'user_id': user.user_id})
-    products = ElementTree.Element('products')
-    root.append(products)
-    for product_data in Product.by_domain(user.domain):
-        product = (ElementTree.Element('product',
-                                       {'id': product_data.get_id}))
-        products.append(product)
-        product_fields = ['name',
-                          'unit',
-                          'code',
-                          'description',
-                          'category',
-                          'program_id',
-                          'cost']
-        for product_field in product_fields:
-            field = ElementTree.Element(product_field)
-            val = getattr(product_data, product_field, None)
-            field.text = unicode(val if val is not None else '')
-            product.append(field)
-
-    return [root]
-
-
 class CommtrackActionConfig(DocumentSchema):
     # one of the base stock action types (see StockActions enum)
     action = StringProperty()
@@ -341,6 +308,8 @@ class CommtrackConfig(Document):
     # configured on Advanced Settings page
     use_auto_emergency_levels = BooleanProperty(default=False)
 
+    sync_location_fixtures = BooleanProperty(default=False)
+    sync_consumption_fixtures = BooleanProperty(default=False)
     use_auto_consumption = BooleanProperty(default=False)
     consumption_config = SchemaProperty(ConsumptionConfig)
     stock_levels_config = SchemaProperty(StockLevelsConfig)
@@ -1028,6 +997,12 @@ class RequisitionCase(CommCareCase):
                 ]
             }
         ]
+
+
+class RequisitionTransaction(StockTransaction):
+    @property
+    def category(self):
+        return 'requisition'
 
 
 class StockReport(object):
