@@ -1,9 +1,6 @@
-from collections import deque
-from casexml.apps.case.models import CommCareCase
 from corehq.apps.api.es import CaseES
 from corehq.apps.commtrack.psi_hacks import is_psi_domain
-from corehq.apps.commtrack.util import supply_point_type_categories
-from corehq.apps.reports.commtrack.data_sources import StockStatusDataSource, ReportingStatusDataSource, is_timely
+from corehq.apps.reports.commtrack.data_sources import StockStatusDataSource, ReportingStatusDataSource
 from corehq.apps.reports.generic import GenericTabularReport
 from corehq.apps.reports.datatables import DataTablesHeader, DataTablesColumn
 from corehq.apps.commtrack.models import Product, CommtrackConfig, CommtrackActionConfig
@@ -221,14 +218,24 @@ class AggregateStockStatusReport(GenericTabularReport, CommtrackReportMixin):
 
     @property
     def headers(self):
-        return DataTablesHeader(*(DataTablesColumn(text) for text in [
-                    _('Product'),
-                    _('Total SOH'),
-                    _('Total AMC'),
-                    _('Remaining MOS'),
-                    _('Stock Status'),
-                    _('Resupply Quantity Suggested'),
-                ]))
+        columns = [
+            DataTablesColumn(_('Product')),
+            DataTablesColumn(_('Stock on Hand'),
+                help_text=_('Total stock on hand for all locations matching the filters.')),
+            DataTablesColumn(_('Monthly Consumption'),
+                help_text=_('Total average monthly consumption for all locations matching the filters.')),
+            DataTablesColumn(_('Months of Stock'),
+                help_text=_('Number of months of stock remaining for all locations matching the filters. \
+                            Computed by calculating stock on hand divided by monthly consumption.')),
+            DataTablesColumn(_('Stock Status'),
+                help_text=_('Stock status prediction made using calculated consumption \
+                            or project specific default values. "No Data" means that \
+                            there is not enough data to compute consumption and default \
+                            values have not been uploaded yet.')),
+            # DataTablesColumn(_('Resupply Quantity Suggested')),
+        ]
+
+        return DataTablesHeader(*columns)
 
     @property
     def product_data(self):
@@ -265,7 +272,7 @@ class AggregateStockStatusReport(GenericTabularReport, CommtrackReportMixin):
                     fmt(row[StockStatusDataSource.SLUG_CONSUMPTION], int),
                     fmt(row[StockStatusDataSource.SLUG_MONTHS_REMAINING], lambda k: '%.1f' % k),
                     fmt(row[StockStatusDataSource.SLUG_CATEGORY], lambda k: statuses.get(k, k)),
-                    fmt(row[StockStatusDataSource.SLUG_RESUPPLY_QUANTITY_NEEDED])
+                    # fmt(row[StockStatusDataSource.SLUG_RESUPPLY_QUANTITY_NEEDED])
                 ]
 
 

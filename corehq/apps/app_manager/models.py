@@ -9,7 +9,6 @@ import random
 import json
 import types
 import re
-import toggle
 from collections import defaultdict
 from datetime import datetime
 from functools import wraps
@@ -2100,7 +2099,7 @@ class ApplicationBase(VersionedDoc, SnapshotMixin):
     admin_password_charset = StringProperty(choices=['a', 'n', 'x'], default='n')
 
     # This is here instead of in Application because it needs to be available in stub representation
-    application_version = StringProperty(default=APP_V1, choices=[APP_V1, APP_V2], required=False)
+    application_version = StringProperty(default=APP_V2, choices=[APP_V1, APP_V2], required=False)
 
     langs = StringListProperty()
     # only the languages that go in the build
