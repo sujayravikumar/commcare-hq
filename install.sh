@@ -20,7 +20,7 @@ COUCHDB_DB="foodb"
 
 ## Misc settings
 
-ES_VERSION=0.20.5
+ES_VERSION=1.1.0
 MINIMAL_INSTALL=
 JDK=1
 
