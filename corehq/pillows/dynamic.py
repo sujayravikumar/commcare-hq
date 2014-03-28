@@ -55,10 +55,9 @@ def type_exact_match_string(prop_name, dual=True):
     """
     if dual:
         return {
-            "type": "multi_field",
+            "type": "string",
             "fields": {
-                prop_name: {"type": "string", "index": "analyzed"},
-                "exact": {"type": "string", "index": "not_analyzed"}
+                "exact": {"index": "not_analyzed"}
             }
         }
     else:

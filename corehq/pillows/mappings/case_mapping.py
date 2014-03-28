@@ -1,6 +1,5 @@
 from corehq.pillows.core import DATE_FORMATS_ARR, DATE_FORMATS_STRING
-CASE_INDEX="hqcases_7a8d2b81335e0a8cef1de718313a23b9"
-
+CASE_INDEX="hqcases_nv2gj2451892i000pvrr68o2x53365oi"
 
 CASE_MAPPING = {
         'date_detection': False,
@@ -8,7 +7,7 @@ CASE_MAPPING = {
         'dynamic': False,
         '_meta': {
             'comment': '',
-            'created': '2013-09-19 @dmyung'
+            'created': 'Modified by Ethan 2014-03-28 for ElasticSearch 1.x syntax'
             },
         'properties': {
             'actions': {
@@ -49,17 +48,11 @@ CASE_MAPPING = {
                 'format': DATE_FORMATS_STRING,
                 'type': 'date'},
             'doc_type': {'index': 'not_analyzed', 'type': 'string'},
-            'domain': {'fields': {'domain': {'index': 'analyzed',
+            'domain': {'fields': {'exact': {'index': 'not_analyzed'}},
                 'type': 'string'},
-                'exact': {'index': 'not_analyzed',
-                    'type': 'string'}},
-                'type': 'multi_field'},
             'export_tag': {'type': 'string'},
-            'external_id': {'fields': {'exact': {'index': 'not_analyzed',
+            'external_id': {'fields': {'exact': {'index': 'not_analyzed'}},
                 'type': 'string'},
-                'external_id': {'index': 'analyzed',
-                    'type': 'string'}},
-                'type': 'multi_field'},
             'indices': {'dynamic': False,
                 'properties': {'doc_type': {'index': 'not_analyzed',
                     'type': 'string'},
@@ -72,11 +65,8 @@ CASE_MAPPING = {
                                'modified_on': {
                                        'format': DATE_FORMATS_STRING,
                                        'type': 'date'},
-                               'name': {'fields': {'exact': {'index': 'not_analyzed',
+                               'name': {'fields': {'exact': {'index': 'not_analyzed'}},
                                    'type': 'string'},
-                                   'name': {'index': 'analyzed',
-                                       'type': 'string'}},
-                                   'type': 'multi_field'},
                                'opened_by': {'type': 'string'},
                                'opened_on': {
                                        'format': DATE_FORMATS_STRING,
@@ -86,11 +76,8 @@ CASE_MAPPING = {
                                'server_modified_on': {
                                        'format': DATE_FORMATS_STRING,
                                        'type': 'date'},
-                               'type': {'fields': {'exact': {'index': 'not_analyzed',
+                               'type': {'fields': {'exact': {'index': 'not_analyzed'}},
                                    'type': 'string'},
-                                   'type': {'index': 'analyzed',
-                                       'type': 'string'}},
-                                   'type': 'multi_field'},
                                'user_id': {'type': 'string'},
                                'version': {'type': 'string'},
                                'xform_ids': {'index': 'not_analyzed', 'type': 'string'},

@@ -1,6 +1,6 @@
 from corehq.pillows.core import DATE_FORMATS_STRING, DATE_FORMATS_ARR
 
-XFORM_INDEX="xforms_6xx892jdu629mm9uj39rd95b8g2sd9hu"
+XFORM_INDEX="xforms_3kmrj98bacd5lw16mv99z336tkdzy761"
 
 
 XFORM_MAPPING = {
@@ -9,25 +9,23 @@ XFORM_MAPPING = {
     'ignore_malformed': True,
     'dynamic': False,
     "_meta": {
-        "created": '2013-08-13', #record keeping on the index.
+        "created": 'Modified by Ethan 2014-03-28 for ElasticSearch 1.x syntax', #record keeping on the index.
     },
     "properties": {
         'doc_type': {'type': 'string'},
         "domain": {
-            "type": "multi_field",
+            "type": "string",
             "fields": {
-                "domain": {"type": "string", "index": "analyzed"},
-                "exact": {"type": "string", "index": "not_analyzed"}
+                "exact": {"index": "not_analyzed"}
                 #exact is full text string match - hyphens get parsed in standard
                 # analyzer
                 # in queries you can access by domain.exact
             }
         },
         "xmlns": {
-            "type": "multi_field",
+            "type": "string",
             "fields": {
-                "xmlns": {"type": "string", "index": "analyzed"},
-                "exact": {"type": "string", "index": "not_analyzed"}
+                "exact": {"index": "not_analyzed"}
             }
         },
         '@uiVersion': {"type": "string"},

@@ -1,4 +1,4 @@
-GROUP_INDEX = "hqgroups_htj2o87ep2eug2g3k46hh2a67tn0r8d9"
+GROUP_INDEX = "hqgroups_4o68yn4x87uo2u88e5i27zhl1vhh29uq"
 GROUP_MAPPING = {
     "date_formats": [
         "yyyy-MM-dd",
@@ -16,7 +16,7 @@ GROUP_MAPPING = {
     ],
     "dynamic": False,
     "_meta": {
-        "comment": "Ethan created on 2014-02-11",
+        "comment": "Modified by Ethan 2014-03-28 for ElasticSearch 1.x syntax",
         "created": None
     },
     "date_detection": False,
@@ -27,30 +27,20 @@ GROUP_MAPPING = {
         },
         "domain": {
             "fields": {
-                "domain": {
-                    "index": "analyzed",
-                    "type": "string"
-                },
                 "exact": {
-                    "index": "not_analyzed",
-                    "type": "string"
+                    "index": "not_analyzed"
                 }
             },
-            "type": "multi_field"
+            "type": "string"
         },
         "name": {
             "fields": {
                 "exact": {
                     "index": "analyzed",
-                    "type": "string",
                     "analyzer": "sortable_exact"
-                },
-                "name": {
-                    "index": "analyzed",
-                    "type": "string"
                 }
             },
-            "type": "multi_field"
+            "type": "string"
         },
         "reporting": {"type": "boolean"},
         "path": {"type": "string"},

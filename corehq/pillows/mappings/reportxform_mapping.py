@@ -1,9 +1,10 @@
 from corehq.pillows.core import DATE_FORMATS_STRING, DATE_FORMATS_ARR
-REPORT_XFORM_INDEX="report_xforms_f2c1d12974356f337b97915c0d68df91"
+REPORT_XFORM_INDEX="report_xforms_36pb6ptpoq2sj99f6pevug5g587956v4"
 
 
 
 CASE_MAPPING_FRAGMENT = {
+    '_meta': {'comment': 'Modified by Ethan 2014-03-28 for ElasticSearch 1.x syntax'},
     'type': 'nested',
     'dynamic': False,
     'properties': {
@@ -75,20 +76,18 @@ REPORT_XFORM_MAPPING = {
     "properties": {
         'doc_type': {'type': 'string'},
         "domain": {
-            "type": "multi_field",
+            "type": "string",
             "fields": {
-                "domain": {"type": "string", "index": "analyzed"},
-                "exact": {"type": "string", "index": "not_analyzed"}
+                "exact": {"index": "not_analyzed"}
                 #exact is full text string match - hyphens get parsed in standard
                 # analyzer
                 # in queries you can access by domain.exact
             }
         },
         "xmlns": {
-            "type": "multi_field",
+            "type": "string",
             "fields": {
-                "xmlns": {"type": "string", "index": "analyzed"},
-                "exact": {"type": "string", "index": "not_analyzed"}
+                "exact": {"index": "not_analyzed"}
             }
         },
         '@uiVersion': {"type": "string"},
