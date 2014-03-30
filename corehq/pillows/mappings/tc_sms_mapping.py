@@ -25,7 +25,7 @@ TCSMS_MAPPING={'_meta': {'comment': 'Modified by Ethan 2014-03-28 for ElasticSea
                          'type': 'date'},
                 'direction': {'type': 'string'},
                 'doc_type': {'index': 'not_analyzed', 'type': 'string'},
-                'domain': {'fields': {'exact': {'index': 'not_analyzed'}},
+                'domain': {'fields': {'exact': {'index': 'not_analyzed', 'type': 'string'}},
                            'type': 'string'},
                 'phone_number': {'type': 'string'},
                 'reminder_id': {'type': 'string'},

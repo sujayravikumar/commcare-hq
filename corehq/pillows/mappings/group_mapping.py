@@ -28,7 +28,8 @@ GROUP_MAPPING = {
         "domain": {
             "fields": {
                 "exact": {
-                    "index": "not_analyzed"
+                    "index": "not_analyzed",
+                    "type": "string"
                 }
             },
             "type": "string"
@@ -37,7 +38,8 @@ GROUP_MAPPING = {
             "fields": {
                 "exact": {
                     "index": "analyzed",
-                    "analyzer": "sortable_exact"
+                    "analyzer": "sortable_exact",
+                    "type": "string"
                 }
             },
             "type": "string"

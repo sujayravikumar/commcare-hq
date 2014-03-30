@@ -48,10 +48,10 @@ CASE_MAPPING = {
                 'format': DATE_FORMATS_STRING,
                 'type': 'date'},
             'doc_type': {'index': 'not_analyzed', 'type': 'string'},
-            'domain': {'fields': {'exact': {'index': 'not_analyzed'}},
+            'domain': {'fields': {'exact': {'index': 'not_analyzed', 'type': 'string'}},
                 'type': 'string'},
             'export_tag': {'type': 'string'},
-            'external_id': {'fields': {'exact': {'index': 'not_analyzed'}},
+            'external_id': {'fields': {'exact': {'index': 'not_analyzed', 'type': 'string'}},
                 'type': 'string'},
             'indices': {'dynamic': False,
                 'properties': {'doc_type': {'index': 'not_analyzed',
@@ -65,7 +65,7 @@ CASE_MAPPING = {
                                'modified_on': {
                                        'format': DATE_FORMATS_STRING,
                                        'type': 'date'},
-                               'name': {'fields': {'exact': {'index': 'not_analyzed'}},
+                               'name': {'fields': {'exact': {'index': 'not_analyzed', 'type': 'string'}},
                                    'type': 'string'},
                                'opened_by': {'type': 'string'},
                                'opened_on': {
@@ -76,7 +76,7 @@ CASE_MAPPING = {
                                'server_modified_on': {
                                        'format': DATE_FORMATS_STRING,
                                        'type': 'date'},
-                               'type': {'fields': {'exact': {'index': 'not_analyzed'}},
+                               'type': {'fields': {'exact': {'index': 'not_analyzed', 'type': 'string'}},
                                    'type': 'string'},
                                'user_id': {'type': 'string'},
                                'version': {'type': 'string'},

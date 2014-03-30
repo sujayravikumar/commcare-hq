@@ -16,7 +16,7 @@ XFORM_MAPPING = {
         "domain": {
             "type": "string",
             "fields": {
-                "exact": {"index": "not_analyzed"}
+                "exact": {"index": "not_analyzed", "type": "string"}
                 #exact is full text string match - hyphens get parsed in standard
                 # analyzer
                 # in queries you can access by domain.exact
@@ -25,7 +25,7 @@ XFORM_MAPPING = {
         "xmlns": {
             "type": "string",
             "fields": {
-                "exact": {"index": "not_analyzed"}
+                "exact": {"index": "not_analyzed", "type": "string"}
             }
         },
         '@uiVersion': {"type": "string"},
