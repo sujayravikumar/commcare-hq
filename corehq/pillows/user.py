@@ -84,8 +84,8 @@ class GroupToUserPillow(BulkPillow):
         user_ids = changes_dict["doc"].get("users", [])
         q = {"filter": {"and": [{"terms": {"_id": user_ids}}]}}
         for user_source in stream_es_query(es_url=ES_URLS["users"], q=q, fields=["__group_ids", "__group_names"]):
-            group_ids = set(user_source.get('fields', {}).get("__group_ids", []))
-            group_names = set(user_source.get('fields', {}).get("__group_names", []))
+            group_ids = set(user_source.get('_source', {}).get("__group_ids", []))
+            group_names = set(user_source.get('_source', {}).get("__group_names", []))
             if changes_dict["doc"]["name"] not in group_names or changes_dict["doc"]["_id"] not in group_ids:
                 group_ids.add(changes_dict["doc"]["_id"])
                 group_names.add(changes_dict["doc"]["name"])

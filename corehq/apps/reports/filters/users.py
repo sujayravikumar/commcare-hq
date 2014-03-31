@@ -264,7 +264,7 @@ class ExpandedMobileWorkerFilter(BaseMultipleOptionFilter):
                 q=q,
                 fields=['_id', 'name'],
             )
-            selected += [group_tuple(hit['fields']) for hit in res['hits']['hits']]
+            selected += [group_tuple(hit['_source']) for hit in res['hits']['hits']]
         if user_ids:
             q = {"query": {"filtered": {"filter": {
                 "ids": {"values": user_ids}
@@ -274,7 +274,7 @@ class ExpandedMobileWorkerFilter(BaseMultipleOptionFilter):
                 q=q,
                 fields = ['_id', 'username', 'first_name', 'last_name'],
             )
-            selected += [user_tuple(hit['fields']) for hit in res['hits']['hits']]
+            selected += [user_tuple(hit['_source']) for hit in res['hits']['hits']]
 
         known_ids = dict(selected)
         return [{'id': id, 'text': known_ids[id]}

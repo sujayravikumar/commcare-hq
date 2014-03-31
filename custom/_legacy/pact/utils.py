@@ -109,7 +109,7 @@ def get_patient_display_cache(case_ids):
         return {}
     case_es = ReportCaseES(PACT_DOMAIN)
     query = {
-        "fields": [
+        "_source": [
             "_id",
             "name",
         ],
@@ -143,8 +143,8 @@ def get_patient_display_cache(case_ids):
     ret = {}
     if res is not None:
         for entry in res['hits']['hits']:
-            case_id = entry['fields']['case_id']
-            ret[case_id] = entry['fields']
+            case_id = entry['_source']['case_id']
+            ret[case_id] = entry['_source']
             ret[case_id]['url'] = PactPatientInfoReport.get_url(*['pact']) + "?patient_id=%s" % case_id
     return ret
 
@@ -176,7 +176,7 @@ REPORT_XFORM_MISSING_DOTS_QUERY = {
             }
         },
     },
-    "fields": [],
+    "_source": [],
     "sort": {
         "received_on": "asc"
     },

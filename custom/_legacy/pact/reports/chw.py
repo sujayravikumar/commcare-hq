@@ -52,7 +52,7 @@ class PactCHWProfileReport(PactDrilldownReportMixin, PactElasticTabularReportMix
 
         case_query['filter']['and'].append({'not': {'term': {'hp_status.#value': 'discharged'}}})
         chw_patients_res = self.case_es.run_query(case_query)
-        assigned_patients = [x['fields'] for x in chw_patients_res['hits']['hits']]
+        assigned_patients = [x['_source'] for x in chw_patients_res['hits']['hits']]
 
         for x in assigned_patients:
             x['info_url'] = self.pact_case_link(x['_id'])
@@ -158,4 +158,4 @@ class PactCHWProfileReport(PactDrilldownReportMixin, PactElasticTabularReportMix
                 pass
             else:
                 for result in res['hits']['hits']:
-                    yield list(_format_row(result['fields']))
+                    yield list(_format_row(result['_source']))

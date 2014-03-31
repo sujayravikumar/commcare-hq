@@ -180,8 +180,8 @@ def es_query(params=None, facets=None, terms=None, q=None, es_url=None, start_at
 
 
     if fields is not None:
-        q["fields"] = q.get("fields", [])
-        q["fields"].extend(fields)
+        q["_source"] = q.get("_source", [])
+        q["_source"].extend(fields)
 
     if dict_only:
         return q
@@ -258,10 +258,8 @@ def es_wrapper(index, domain=None, q=None, doc_type=None, fields=None,
     if 'error' in res:
         msg = res['error']
         raise ESError(msg)
-    if fields is not None:
-        hits = [r['fields'] for r in res['hits']['hits']]
-    else:
-        hits = [r['_source'] for r in res['hits']['hits']]
+
+    hits = [r['_source'] for r in res['hits']['hits']]
 
     if return_count:
         total = res['hits']['total']

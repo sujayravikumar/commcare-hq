@@ -147,7 +147,7 @@ class PactPatientInfoReport(PactDrilldownReportMixin, PactElasticTabularReportMi
                     "query": {"match_all": {}}
                 }
             },
-            "fields": [
+            "_source": [
                 "_id",
                 "received_on",
                 "form.meta.timeEnd",
@@ -184,7 +184,7 @@ class PactPatientInfoReport(PactDrilldownReportMixin, PactElasticTabularReportMi
                 pass
             else:
                 for result in res['hits']['hits']:
-                    yield list(_format_row(result['fields']))
+                    yield list(_format_row(result['_source']))
 
 
 

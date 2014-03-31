@@ -173,24 +173,24 @@ def get_schedule_tally(username, total_interval, override_date=None):
             submissions = search_results['hits']['hits']
             if len(submissions) > 0:
                 #calculate if pillbox checked
-                pillbox_check_str = submissions[0]['fields']['pillbox_check']
+                pillbox_check_str = submissions[0]['_source']['pillbox_check']
                 if len(pillbox_check_str) > 0:
                     pillbox_check_data = simplejson.loads(pillbox_check_str)
                     anchor_date = dp.parse(pillbox_check_data.get('anchor'))
                 else:
                     pillbox_check_data = {}
                     anchor_date = datetime.min
-                encounter_date = dp.parse(submissions[0]['fields']['encounter_date'])
-                submissions[0]['fields']['has_pillbox_check'] = 'Yes' if anchor_date.date() == encounter_date.date() else 'No'
+                encounter_date = dp.parse(submissions[0]['_source']['encounter_date'])
+                submissions[0]['_source']['has_pillbox_check'] = 'Yes' if anchor_date.date() == encounter_date.date() else 'No'
 
-                visited.append(submissions[0]['fields'])
+                visited.append(submissions[0]['_source'])
                 total_visited += 1
             else:
                 #ok, so no submission from this chw, let's see if there's ANY from anyone on this day.
                 search_results = dots_submissions_by_case(case_id, visit_date)
                 other_submissions = search_results['hits']['hits']
                 if len(other_submissions) > 0:
-                    visited.append(other_submissions[0]['fields'])
+                    visited.append(other_submissions[0]['_source'])
                     total_visited += 1
                 else:
                     visited.append(None)

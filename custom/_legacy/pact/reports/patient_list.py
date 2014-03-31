@@ -81,10 +81,10 @@ class PatientListDashboardReport(PactElasticTabularReportMixin):
         domain = PACT_DOMAIN
         query = self.case_es.base_query(start=0, size=None)
 
-        query['fields'] = ['_id', 'name', 'pactid.#value']
+        query['_source'] = ['_id', 'name', 'pactid.#value']
         results = self.case_es.run_query(query)
         for res in results['hits']['hits']:
-            yield res['fields']
+            yield res['_source']
 
     @property
     def headers(self):
@@ -143,7 +143,7 @@ class PatientListDashboardReport(PactElasticTabularReportMixin):
             #hack, do a facet query here
             facet_dict = self.case_submits_facet_dict(self.es_results['hits']['total'])
             for result in res['hits']['hits']:
-                yield list(_format_row(result['fields']))
+                yield list(_format_row(result['_source']))
 
 
     @property

@@ -204,7 +204,7 @@ def _check_es_rev(index, doc_id, couch_rev):
         "filter": {
             "ids": {"values": [doc_id]}
         },
-        "fields": ["_id", "_rev"]
+        "_source": ["_id", "_rev"]
     }
 
     try:
@@ -218,7 +218,7 @@ def _check_es_rev(index, doc_id, couch_rev):
                 #if doc doesn't exist it's def. not in sync
                 message = "Not in sync %s" % index
             elif 'hits' in res['hits']:
-                fields = res['hits']['hits'][0]['fields']
+                fields = res['hits']['hits'][0]['_source']
                 if fields['_rev'] == couch_rev:
                     status = True
                     message = "%s OK" % index

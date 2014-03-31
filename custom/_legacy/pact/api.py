@@ -116,7 +116,7 @@ class PactFormAPI(DomainAPI):
             },
             "sort": {"received_on": "asc"},
             "size": limit_count,
-            "fields": ['_id']
+            "_source": ['_id']
         }
         query['script_fields'] = {}
         query['script_fields'].update(pact_script_fields())
@@ -143,7 +143,7 @@ class PactFormAPI(DomainAPI):
         def return_iterator():
             yield "<restoredata>"
             for result in res['hits']['hits']:
-                data_row = result['fields']
+                data_row = result['_source']
 
 #                if data_row['script_case_id'] not in active_patients:
 #                    continue

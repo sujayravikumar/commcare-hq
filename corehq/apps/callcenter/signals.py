@@ -37,7 +37,7 @@ def catch_signal(app, **kwargs):
                 print(msg, file=sys.stderr)
 
         try:
-            q = {'fields': ['name']}
+            q = {'_source': ['name']}
             result = es_query(params={
                 'internal.using_call_center': True,
                 'is_active': True,

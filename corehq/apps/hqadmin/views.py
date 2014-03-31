@@ -839,7 +839,7 @@ def stats_data(request):
 
     if params:
         domain_results = es_domain_query(params, fields=["name"], size=99999, show_stats=False)
-        domains = [d["fields"]["name"] for d in domain_results["hits"]["hits"]]
+        domains = [d["_source"]["name"] for d in domain_results["hits"]["hits"]]
 
         if len(domains) <= individual_domain_limit:
             domain_info = [{"names": [d], "display_name": d} for d in domains]

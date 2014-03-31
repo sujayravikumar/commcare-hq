@@ -39,7 +39,7 @@ class EmwfOptionsView(LoginAndDomainMixin, JSONResponseMixin, View):
             self.user_query = {"bool": {"must": [
                 {"query_string": {
                     "query": q,
-                    "fields": ["first_name", "last_name", "username"],
+                    "_source": ["first_name", "last_name", "username"],
                 }} for q in queries
             ]}}
             self.group_query = {"bool": {"must": [

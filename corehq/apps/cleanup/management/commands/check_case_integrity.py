@@ -38,8 +38,8 @@ def iter_forms_with_cases(domain, since, chunksize=500):
     for form_list in chunked(forms_with_cases(domain, since), chunksize):
         case_id_mapping = case_ids_by_xform_id([f["_id"] for f in form_list])
         for form in form_list:
-            form_id, f_case_ids, f_domain = form["_id"], form["fields"]["__retrieved_case_ids"], form["fields"]["domain"]
-            received_on = form["fields"]["received_on"]
+            form_id, f_case_ids, f_domain = form["_id"], form["_source"]["__retrieved_case_ids"], form["_source"]["domain"]
+            received_on = form["_source"]["received_on"]
             for case_id in f_case_ids:
                 yield form_id, received_on, case_id, case_id in case_id_mapping.get(form_id, []), f_domain
 

@@ -101,12 +101,12 @@ class ESView(View):
         """
 
         logging.info("ESlog: [%s.%s] ESquery: %s" % (self.__class__.__name__, self.domain, simplejson.dumps(es_query)))
-        if 'fields' in es_query or 'script_fields' in es_query:
+        if '_source' in es_query or 'script_fields' in es_query:
             #nasty hack to add domain field to query that does specific fields.
             #do nothing if there's no field query because we get everything
-            fields = es_query.get('fields', [])
+            fields = es_query.get('_source', [])
             fields.append('domain')
-            es_query['fields'] = fields
+            es_query['_source'] = fields
 
         es_base = self.es[self.index] if es_type is None else self.es[self.index][es_type]
         es_results = es_base.get('_search', data=es_query)
@@ -131,10 +131,7 @@ class ESView(View):
 
         hits = []
         for res in es_results['hits']['hits']:
-            if '_source' in res:
-                res_domain = res['_source'].get('domain', None)
-            elif 'fields' in res:
-                res_domain = res['fields'].get('domain', None)
+            res_domain = res['_source'].get('domain', None)
 
             # security check
             if res_domain == self.domain:
@@ -150,7 +147,7 @@ class ESView(View):
         The standard query to run across documents of a certain index.
         domain = exact match domain string
         terms = k,v pairs of terms you want to match against. you can dive down into properties like form.foo for an xform, like { "username": "foo", "type": "bar" } - this will make it into a term: k: v dict
-        fields = field properties to report back in the results['fields'] array. if blank, you will need to read the _source
+        fields = filter the fields returned in the _source. Defaults to all.
         start = where to start the results from
         size = default size in ES is 10, also explicitly set here.
         """
@@ -168,7 +165,7 @@ class ESView(View):
         use_terms = terms or {}
 
         if len(fields) > 0:
-            query['fields'] = fields
+            query['_source'] = fields
         for k, v in use_terms.items():
             query['filter']['and'].append({"term": {k: v}})
         return query
@@ -273,12 +270,12 @@ class UserES(ESView):
     index = "hqusers"
 
     def validate_query(self, query):
-        if 'password' in query['fields']:
+        if 'password' in query['_source']:
             raise ESUserError("You cannot include password in the results")
 
     def run_query(self, es_query, es_type=None):
         """
-        Must be called with a "fields" parameter
+        Must be called with a "_source" parameter
         Returns the raw query json back, or None if there's an error
         """
 
@@ -299,10 +296,7 @@ class UserES(ESView):
 
         hits = []
         for res in es_results['hits']['hits']:
-            if '_source' in res:
-                raise ESUserError(
-                    "This query does not support full document lookups")
-            res_domain = res['fields'].get('domain_membership.domain', None)
+            res_domain = res['_source'].get('domain_membership.domain', None)
 
             # security check
             if res_domain == self.domain:
