@@ -43,3 +43,6 @@ ptop*.json
 docs/_build
 celerybeat-schedule
 staging.yaml
+
+# Node
+node_modules/
