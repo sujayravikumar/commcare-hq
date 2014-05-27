@@ -25,6 +25,7 @@ from corehq.apps.app_manager.exceptions import (
     ConflictingCaseTypeError,
     RearrangeError,
 )
+from corehq.apps.hqmedia.controller import MultimediaIconUploadController
 from corehq.apps.hqmedia.models import MULTIMEDIA_PREFIX
 from corehq.apps.app_manager.forms import CopyApplicationForm
 from corehq.apps.app_manager import id_strings
@@ -867,6 +868,14 @@ def view_generic(req, domain, app_id=None, module_id=None, form_id=None, is_user
     # Pass form for Copy Application to template:
     context.update({
         'copy_app_form': copy_app_form if copy_app_form is not None else CopyApplicationForm(app_id)
+    })
+
+    from corehq.apps.hqmedia.views import ProcessImageFileUploadView
+    context.update({
+        'icon_uploader': MultimediaIconUploadController(
+            "hqicon",
+            reverse(ProcessImageFileUploadView.name,
+                    args=[domain, app_id])),
     })
 
     response = render(req, template, context)
