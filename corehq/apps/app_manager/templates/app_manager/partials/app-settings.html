@@ -38,6 +38,13 @@
     </span>
 </script>
 
+<script type="text/html" id="CommcareSettings.widgets.image_uploader">
+    <div>
+        <a data-toggle="modal" data-target="#image_uploader_modal" href="#image_uploader_modal">Upload</a>
+    </div>
+    {% include 'hqmedia/partials/multimedia_uploader.html' with media_type="Icon" slug="image_uploader_modal" %}
+</script>
+
 <script type="text/html" id="CommcareSettings.widgets.text">
     <span data-bind="visible: $root.edit">
         <input type="text" class="span6" data-bind="

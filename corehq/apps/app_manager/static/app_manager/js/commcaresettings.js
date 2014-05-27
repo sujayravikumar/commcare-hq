@@ -372,6 +372,8 @@ CommcareSettings.widgets.build_spec = function (self, settingsIndex) {
     });
 };
 
+CommcareSettings.widgets.image_uploader = CommcareSettings.widgets.bool;
+
 $(function () {
     ko.bindingHandlers.passwordSetter = {
         init: function (element, valueAccessor) {

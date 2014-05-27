@@ -71,6 +71,11 @@
   value_names: ["Alphanumeric", "Numeric"]
   default: "n"
 
+- name: "Logo"
+  description: "Upload a file to serve as a logo for Java phones"
+  id: "logo_java"
+  widget: "image_uploader"
+
 - disabled: true
   name: "Server User Registration"
   description: "Whether users registered on the phone need to be registered with the submission server."
