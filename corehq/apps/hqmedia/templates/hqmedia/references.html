@@ -118,7 +118,7 @@
     </script>
 
     {% for uploader in uploaders %}
-        {% include 'hqmedia/partials/multimedia_uploader.html' %}
+        {% include 'hqmedia/partials/multimedia_uploader.html' with slug=uploader.slug media_type=uploader.media_type|title %}
     {% endfor %}
 
     <div id="jquery_jplayer"></div>
