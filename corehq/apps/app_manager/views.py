@@ -877,6 +877,9 @@ def view_generic(req, domain, app_id=None, module_id=None, form_id=None, is_user
             reverse(ProcessImageFileUploadView.name,
                     args=[domain, app_id])),
     })
+    context.update({
+        'uploaders': [context.get("icon_uploader")],
+    })
 
     response = render(req, template, context)
     response.set_cookie('lang', _encode_if_unicode(context['lang']))
