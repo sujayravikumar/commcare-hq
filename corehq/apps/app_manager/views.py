@@ -878,6 +878,7 @@ def view_generic(req, domain, app_id=None, module_id=None, form_id=None, is_user
                     args=[domain, app_id])),
     })
     context.update({
+        "sessionid": req.COOKIES.get('sessionid'),
         'uploaders': [context.get("icon_uploader")],
     })
 
