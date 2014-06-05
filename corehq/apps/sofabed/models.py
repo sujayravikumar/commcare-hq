@@ -25,6 +25,7 @@ class FormData(models.Model):
     user_id = models.CharField(max_length=255, null=True, db_index=True)
     username = models.CharField(max_length=255, null=True)
     app_id = models.CharField(max_length=255, null=True, db_index=True)
+    build_id = models.CharField(max_length=255, null=True, db_index=True)
     xmlns = models.CharField(max_length=1000, null=True, db_index=True)
 
     def __unicode__(self):
@@ -81,6 +82,7 @@ class FormData(models.Model):
         self.user_id = instance.metadata.userID
         self.username = instance.metadata.username
         self.app_id = instance.app_id or MISSING_APP_ID
+        self.build_id = instance.build_id
         self.xmlns = instance.xmlns
 
     def matches_exact(self, instance):
@@ -95,7 +97,8 @@ class FormData(models.Model):
             self.username == instance.metadata.username and
             self.xmlns == instance.xmlns and
             self.received_on == instance.received_on and
-            self.app_id == (instance.app_id or MISSING_APP_ID)
+            self.app_id == (instance.app_id or MISSING_APP_ID) and
+            self.build_id == instance.build_id
         )
 
     @classmethod
