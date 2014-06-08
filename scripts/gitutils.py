@@ -2,6 +2,21 @@ import sh
 from sh_verbose import ShVerbose
 
 
+def memoized_property(fn):
+    import functools
+
+    @functools.wraps(fn)
+    def inner(self):
+        cache_attr = '_%s_cache' % fn.func_name
+        try:
+            return getattr(self, cache_attr)
+        except (KeyError, AttributeError):
+            x = fn(self)
+            setattr(self, cache_attr, x)
+            return x
+    return property(inner)
+
+
 def get_git(path=None):
     return sh.git.bake(_tty_out=False, _cwd=path)
 
@@ -112,6 +127,16 @@ def print_one_way_merge_details(branch1, branch2, git):
 def print_merge_details(branch1, branch2, git):
     print_one_way_merge_details(branch1, branch2, git)
     print_one_way_merge_details(branch2, branch1, git)
+
+
+class Commit(object):
+    def __init__(self, commit_id, git=None):
+        self.id = commit_id
+        self.git = git or get_git()
+
+    @memoized_property
+    def author_email(self):
+        return self.git.log(self.id, '-n', 1, format='format:%ae')
 
 
 if __name__ == '__main__':
