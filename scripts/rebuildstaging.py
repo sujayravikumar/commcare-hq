@@ -127,9 +127,13 @@ def sync_local_copies(config):
         print "All branches up-to-date."
 
 
-def check_merges(config, print_details=True):
-    merge_conflicts = []
-    not_found = []
+def get_merge_results(config):
+    """
+    yields (path, config, branch), result
+    where result is False for a failed merge, True for successful merge
+    and None if the branch did not exist
+
+    """
     base_config = config
     for path, config in base_config.span_configs():
         git = get_git(path)
@@ -139,25 +143,39 @@ def check_merges(config, print_details=True):
             for branch in config.branches:
                 if not has_local(git, branch):
                     branch = origin(branch)
-                print "  [{cwd}] {trunk} => {branch}".format(
-                    cwd=format_cwd(path),
-                    trunk=trunk,
-                    branch=branch,
-                ),
                 try:
                     git.checkout(branch)
                 except sh.ErrorReturnCode_1 as e:
                     assert (
                         "error: pathspec '%s' did not "
                         "match any file(s) known to git." % branch) in e.stderr, e.stderr
-                    not_found.append((path, branch))
-                    print "NOT FOUND"
-                    continue
-                if not git_check_merge(config.name, branch, git=git):
-                    merge_conflicts.append((path, origin(config.trunk), branch))
-                    print "FAIL"
+                    result = None
                 else:
-                    print "ok"
+                    if not git_check_merge(config.name, branch, git=git):
+                        result = False
+                    else:
+                        result = True
+                yield (path, config, branch), result
+
+
+def check_merges(config, print_details=True):
+    merge_conflicts = []
+    not_found = []
+    base_config = config
+    for (path, config, branch), result in get_merge_results(base_config):
+        print "  [{cwd}] {trunk} => {branch}".format(
+            cwd=format_cwd(path),
+            trunk=origin(config.trunk),
+            branch=branch,
+        ),
+        if result is None:
+            not_found.append((path, branch))
+            print "NOT FOUND"
+        elif not result:
+            merge_conflicts.append((path, origin(config.trunk), branch))
+            print "FAIL"
+        else:
+            print "ok"
     if not_found:
         print "You must remove the following branches before rebuilding:"
         for cwd, branch in not_found:
