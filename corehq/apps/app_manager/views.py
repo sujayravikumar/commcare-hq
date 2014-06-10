@@ -870,11 +870,11 @@ def view_generic(req, domain, app_id=None, module_id=None, form_id=None, is_user
     })
 
     from corehq.apps.hqmedia.controller import MultimediaIconUploadController
-    from corehq.apps.hqmedia.views import ProcessImageFileUploadView
+    from corehq.apps.hqmedia.views import ProcessIconFileUploadView
     context.update({
         'icon_uploader': MultimediaIconUploadController(
             "hqicon",
-            reverse(ProcessImageFileUploadView.name,
+            reverse(ProcessIconFileUploadView.name,
                     args=[domain, app_id])),
     })
     context.update({
