@@ -49,6 +49,7 @@
             ko.applyBindings(COMMCAREHQ.appView.settings, $('#success-message').get(0));
             {% endif %}
 
+            // TODO - don't duplicate this block of code
             var HQMediaUploaders = {};  // This will be referenced by the media references
             (function () {
                 var sessionid = {{ sessionid|JSON }};
