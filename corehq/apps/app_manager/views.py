@@ -873,7 +873,7 @@ def view_generic(req, domain, app_id=None, module_id=None, form_id=None, is_user
     from corehq.apps.hqmedia.views import ProcessJavaIconFileUploadView
     context.update({
         'java_icon_uploader': MultimediaIconUploadController(
-            "hq_java_icon",
+            "hq_logo_java",
             reverse(ProcessJavaIconFileUploadView.name,
                     args=[domain, app_id])),
     })
