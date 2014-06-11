@@ -870,16 +870,16 @@ def view_generic(req, domain, app_id=None, module_id=None, form_id=None, is_user
     })
 
     from corehq.apps.hqmedia.controller import MultimediaIconUploadController
-    from corehq.apps.hqmedia.views import ProcessIconFileUploadView
+    from corehq.apps.hqmedia.views import ProcessJavaIconFileUploadView
     context.update({
-        'icon_uploader': MultimediaIconUploadController(
-            "hqicon",
-            reverse(ProcessIconFileUploadView.name,
+        'java_icon_uploader': MultimediaIconUploadController(
+            "hq_java_icon",
+            reverse(ProcessJavaIconFileUploadView.name,
                     args=[domain, app_id])),
     })
     context.update({
         "sessionid": req.COOKIES.get('sessionid'),
-        'uploaders': [context.get("icon_uploader")],
+        'uploaders': [context.get("java_icon_uploader")],
     })
 
     response = render(req, template, context)

@@ -374,12 +374,26 @@ class ProcessImageFileUploadView(BaseProcessFileUploadView):
         return ['image']
 
 
-class ProcessIconFileUploadView(ProcessImageFileUploadView):
-    name = "hqmedia_uploader_icon"
-
+class ProcessIconFileUploadMixin(object):
     @property
     def form_path(self):
-        return "jr://file/commcare/image/logo_icon%s" % self.file_ext
+        return ("jr://file/commcare/image/%s%s"
+                % (self.filename, self.file_ext))
+
+    @property
+    def filename(self):
+        raise NotImplementedError
+
+
+class ProcessJavaIconFileUploadView(
+    ProcessIconFileUploadMixin,
+    ProcessImageFileUploadView,
+):
+    name = "hqmedia_uploader_java_icon"
+
+    @property
+    def filename(self):
+        return "java_icon"
 
 
 class ProcessAudioFileUploadView(BaseProcessFileUploadView):
