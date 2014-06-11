@@ -59,6 +59,7 @@
     - properties.cc-show-saved
     - properties.cc-show-incomplete
     - properties.cc-resize-images
+    - properties.logo_android  # Logo
 
 - title: 'Advanced'
   id: app-settings-advanced

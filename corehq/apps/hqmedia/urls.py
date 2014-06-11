@@ -10,6 +10,7 @@ from corehq.apps.hqmedia.views import (
     ProcessAudioFileUploadView,
     ProcessVideoFileUploadView,
     ProcessJavaIconFileUploadView,
+    ProcessAndroidIconFileUploadView,
 )
 
 urlpatterns = patterns('corehq.apps.hqmedia.views',
@@ -24,6 +25,8 @@ application_urls = patterns('corehq.apps.hqmedia.views',
     url(r'^uploaded/image/$', ProcessImageFileUploadView.as_view(), name=ProcessImageFileUploadView.name),
     url(r'^uploaded/java_icon/$', ProcessJavaIconFileUploadView.as_view(),
         name=ProcessJavaIconFileUploadView.name),
+    url(r'^uploaded/android_icon/$', ProcessAndroidIconFileUploadView.as_view(),
+        name=ProcessAndroidIconFileUploadView.name),
     url(r'^uploaded/audio/$', ProcessAudioFileUploadView.as_view(), name=ProcessAudioFileUploadView.name),
     url(r'^uploaded/video/$', ProcessVideoFileUploadView.as_view(), name=ProcessVideoFileUploadView.name),
     url(r'^map/$', MultimediaReferencesView.as_view(), name=MultimediaReferencesView.name),

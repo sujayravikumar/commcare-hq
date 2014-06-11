@@ -396,6 +396,17 @@ class ProcessJavaIconFileUploadView(
         return "java_icon"
 
 
+class ProcessAndroidIconFileUploadView(
+    ProcessIconFileUploadMixin,
+    ProcessImageFileUploadView,
+):
+    name = "hqmedia_uploader_android_icon"
+
+    @property
+    def filename(self):
+        return "android_icon"
+
+
 class ProcessAudioFileUploadView(BaseProcessFileUploadView):
     media_class = CommCareAudio
     name = "hqmedia_uploader_audio"
