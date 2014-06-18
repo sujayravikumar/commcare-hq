@@ -5,8 +5,9 @@ from crispy_forms.layout import Layout, Fieldset, ButtonHolder, Submit
 
 from corehq.apps.commtrack.models import Product, Program
 from corehq.apps.commtrack.util import all_sms_codes
-from corehq.apps.consumption.shortcuts import set_default_consumption_for_product, get_default_consumption
+from corehq.apps.consumption.shortcuts import set_default_consumption_for_product, get_default_monthly_consumption
 from django.core.urlresolvers import reverse
+import json
 
 
 class CurrencyField(forms.DecimalField):
@@ -77,6 +78,10 @@ class ProductForm(forms.Form):
 
         for field in ('name', 'code', 'program_id', 'unit', 'description', 'cost'):
             setattr(product, field, self.cleaned_data[field])
+
+        product_data = self.data.get('product_data')
+        if product_data:
+            product.product_data = json.loads(product_data)
 
         if commit:
             product.save()
@@ -184,7 +189,7 @@ class ConsumptionForm(forms.Form):
             self.fields[field_name] = forms.DecimalField(
                 label=display,
                 required=False,
-                initial=get_default_consumption(
+                initial=get_default_monthly_consumption(
                     self.domain,
                     p._id,
                     None,

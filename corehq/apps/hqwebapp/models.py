@@ -22,7 +22,6 @@ from corehq.apps.reports.dispatcher import (ProjectReportDispatcher,
     CustomProjectReportDispatcher)
 from corehq.apps.adm.dispatcher import (ADMAdminInterfaceDispatcher,
     ADMSectionDispatcher)
-from hqbilling.dispatcher import BillingInterfaceDispatcher
 from corehq.apps.announcements.dispatcher import (
     HQAnnouncementAdminInterfaceDispatcher)
 
@@ -657,7 +656,11 @@ class MessagingTab(UITab):
 
         can_use_survey = can_use_survey_reminders(self._request)
         if can_use_survey:
-            from corehq.apps.reminders.views import KeywordsListView
+            from corehq.apps.reminders.views import (
+                KeywordsListView, AddNormalKeywordView,
+                AddStructuredKeywordView, EditNormalKeywordView,
+                EditStructuredKeywordView,
+            )
             if toggles.REMINDERS_UI_PREVIEW.enabled(self.couch_user.username):
                 keyword_list_url = reverse(KeywordsListView.urlname, args=[self.domain])
             else:
@@ -666,14 +669,30 @@ class MessagingTab(UITab):
                 'title': _("Keywords"),
                 'url': keyword_list_url,
                 'subpages': [
-                {
-                    'title': keyword_subtitle,
-                    'urlname': 'edit_keyword'
-                },
-                {
-                    'title': _("New Keyword"),
-                    'urlname': 'add_keyword',
-                },
+                    {
+                        'title': keyword_subtitle,
+                        'urlname': 'edit_keyword'
+                    },
+                    {
+                        'title': _("New Keyword"),
+                        'urlname': 'add_keyword',
+                    },
+                    {
+                        'title': AddNormalKeywordView.page_title,
+                        'urlname': AddNormalKeywordView.urlname,
+                    },
+                    {
+                        'title': AddStructuredKeywordView.page_title,
+                        'urlname': AddStructuredKeywordView.urlname,
+                    },
+                    {
+                        'title': EditNormalKeywordView.page_title,
+                        'urlname': EditNormalKeywordView.urlname,
+                    },
+                    {
+                        'title': EditStructuredKeywordView.page_title,
+                        'urlname': EditStructuredKeywordView.urlname,
+                    },
                 ],
             })
 
@@ -1194,16 +1213,6 @@ class GlobalADMConfigTab(UITab):
         return self.couch_user and self.couch_user.is_superuser
 
 
-class BillingTab(UITab):
-    title = ugettext_noop("Billing")
-    view = "billing_default"
-    dispatcher = BillingInterfaceDispatcher
-
-    @property
-    def is_viewable(self):
-        return self.couch_user and self.couch_user.is_superuser
-
-
 class AccountingTab(UITab):
     title = ugettext_noop("Accounting")
     view = "accounting_default"
@@ -1297,7 +1306,6 @@ class AdminTab(UITab):
     subtab_classes = (
         AdminReportsTab,
         GlobalADMConfigTab,
-        BillingTab,
         SMSAdminTab,
         AnnouncementsTab,
         AccountingTab,
