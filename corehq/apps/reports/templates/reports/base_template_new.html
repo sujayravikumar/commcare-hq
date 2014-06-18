@@ -46,7 +46,7 @@
                 {# ]; #}
             {# }, #}
             ajaxParams: function() {
-                return $('#report-filters').serialize();
+                return $('#report-filters').serializeArray();
             },
 
             {% if report_table.left_col.is_fixed %}
@@ -55,23 +55,24 @@
                 fixColsWidth: {{ report_table.left_col.fixed.width }},
             {% endif %}
         });
+        reportTables.render();
         $('#report-filters').submit(function(event) {
-            var postData = $(this).serialize();
-            console.log(postData);
-            $.ajax({
-                url: $(this).attr("action"),
-                type: $(this).attr("method"),
-                data: postData,
-                headers: {'HTTP_X_REQUESTED_WITH': 'XMLHttpRequest'},
-                success: function(data, textStatus, jqXHR) {
-                    console.log("submit successful");
-                    reportTables.render();
-                },
-                error: function(jqXHR, textStatus, errorThrown) {
-                    console.log("wah waaaah");
-                }
-            });
+            {# var postData = $(this).serialize(); #}
+            {# console.log(postData); #}
+            {# $.ajax({ #}
+                {# url: $(this).attr("action"), #}
+                {# type: $(this).attr("method"), #}
+                {# data: postData, #}
+                {# headers: {'HTTP_X_REQUESTED_WITH': 'XMLHttpRequest'}, #}
+                {# success: function(data, textStatus, jqXHR) { #}
+                    {# console.log("submit successful"); #}
+                {# }, #}
+                {# error: function(jqXHR, textStatus, errorThrown) { #}
+                    {# console.log("wah waaaah"); #}
+                {# } #}
+            {# }); #}
             event.preventDefault();
+            reportTables.refresh();
         });
     });
     </script>
