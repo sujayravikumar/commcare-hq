@@ -75,22 +75,20 @@ def is_valid_case_type(case_type):
 
 
 class ParentCasePropertyBuilder(object):
-    def __init__(self, app, defaults=()):
-        self.app = app
+    def __init__(self, apps, defaults=()):
+        self.apps = apps
         self.defaults = defaults
 
     @property
     @memoized
     def forms_info(self):
-        # unfortunate, but biggest speed issue is accessing couchdbkit properties
-        # so compute them once
-
         forms_info = []
-        if self.app.doc_type == 'RemoteApp':
-            return forms_info
-        for module in self.app.get_modules():
-            for form in module.get_forms():
-                forms_info.append((module.case_type, form))
+        for app in apps:
+            if app.doc_type == 'RemoteApp':
+                continue
+            for module in app.get_modules():
+                for form in module.get_forms():
+                    forms_info.append((module.case_type, form))
         return forms_info
 
     @memoized
@@ -145,16 +143,25 @@ class ParentCasePropertyBuilder(object):
 
 
 def get_case_properties(app, case_types, defaults=()):
-    builder = ParentCasePropertyBuilder(app, defaults)
+    builder = ParentCasePropertyBuilder([app], defaults)
     return builder.get_case_property_map(case_types)
 
 
 def get_all_case_properties(app):
     return get_case_properties(
         app,
-        set(itertools.chain.from_iterable(m.get_case_types() for m in app.modules)),
+        case_types=set(itertools.chain.from_iterable(m.get_case_types() for m in app.modules)),
         defaults=('name',)
     )
+
+
+def get_all_case_properties_for_domain(domain, defaults=('name',)):
+    apps = list(all_apps_by_domain(domain))
+    builder = ParentCasePropertyBuilder(apps, defaults)
+    case_types = set(itertools.chain.from_iterable(
+        m.get_case_types() for app in apps for m in app.modules)
+    )
+    return builder.get_case_property_map(case_types)
 
 
 def get_settings_values(app):
