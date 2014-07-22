@@ -197,8 +197,9 @@ class DuplicateConditionsMet(object):
         birth_spacing_prompt = []
         child_birth_weight_taken = None # None - condition n/a, True - condition met, False - condition not met
         child_excusive_breastfed = None
+        self.forms = case_obj.get_forms()
         if self.status == 'mother':
-            forms = case_obj.get_forms()
+            forms = self.forms
             for form in forms:
                 if 'birth_spacing_prompt' in form.form:
                     birth_spacing_prompt.append(form.form['birth_spacing_prompt'])  

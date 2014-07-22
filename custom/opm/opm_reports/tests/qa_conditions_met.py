@@ -17,17 +17,18 @@ PREGNANCY_APP_CMR = {
 }
 
 MOTHER_APP_CMR = {
-	1: "window4_child1",
-	2: "window5_child1",
-	3: "window6_child1",
-	4: "window7_child1",
-	5: "window8_child1",
-	6: "window9_child1",
-	7: "window10_child1",
-	8: "window11_child1",
-	9: "window12_child1",
-	10: "window13_child1",
-	11: "window14_child1",
+	1: "window3_child1",
+	2: "window4_child1",
+	3: "window5_child1",
+	4: "window6_child1",
+	5: "window7_child1",
+	6: "window8_child1",
+	7: "window9_child1",
+	8: "window10_child1",
+	9: "window11_child1",
+	10: "window12_child1",
+	11: "window13_child1",
+	12: "window14_child1",
 }
 
 def prepare_case_index():
@@ -48,7 +49,6 @@ class AppCMR(DuplicateConditionsMet):
 		self.app_cmr_matches = False
 		self.window_name = None
 		self.case = case
-		self.forms = case.get_forms()
 
 	def cmr_from_form(self, window_x_y):
 		forms = self.forms
