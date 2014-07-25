@@ -1,8 +1,9 @@
 import datetime
 from dimagi.utils.dates import months_between
 from django.utils.translation import ugettext_lazy as _
+from django.core.urlresolvers import reverse
 from corehq.apps.users.models import CommCareCase
-from custom.opm.opm_reports.constants import InvalidRow
+from custom.opm.opm_reports.constants import InvalidRow, DOMAIN
 
 EMPTY_FIELD = "---"
 M_ATTENDANCE_Y = 'attendance_vhnd_y.png'
@@ -130,7 +131,7 @@ class ConditionsMet(object):
         def get_property_from_forms(forms, met_properties):
             for form in forms:
                 for k, v in met_properties.iteritems():
-                    if k in ['child1_suffer_diarrhea', 'child1_growthmon_calc', 'prev_child1_growthmon_calc']:
+                    if k in ('child1_suffer_diarrhea'):
                         if 'child_1' in form.form and k in form.form['child_1']:
                             met_properties[k] = form.form['child_1'][k]
                     else:
@@ -146,7 +147,7 @@ class ConditionsMet(object):
         self.owner_id = case_property('owner_id', '')
         self.closed = case_property('closed', False)
 
-        self.name = case_property('name', EMPTY_FIELD)
+        self.name = "<a href='%s'>%s</a>" % (reverse("case_details", args=[DOMAIN, case_property('_id', '')]), case_property('name', EMPTY_FIELD))
         self.awc_name = case_property('awc_name', EMPTY_FIELD)
         self.husband_name = case_property('husband_name', EMPTY_FIELD)
 
@@ -211,10 +212,9 @@ class ConditionsMet(object):
                 child_birth_weight_taken = '1' in birth_weight
             if self.child_age == 6:
                 prev_forms = [form for form in forms if report.datespan.startdate - datetime.timedelta(180) <= form.received_on <= report.datespan.enddate]
-                excl_key = "child1_child_excbreastfed"
-                child_forms = [form.form["child_1"] for form in prev_forms if "child_1" in form.form]
-                exclusive_breastfed = [child[excl_key] for child in child_forms if excl_key in child]
-                child_excusive_breastfed = exclusive_breastfed == ['1', '1', '1', '1', '1', '1']
+                excl_key = "child1_excl_breastfeed_calc"
+                exclusive_breastfed = [form.form[excl_key] for form in prev_forms if excl_key in form.form]
+                child_excusive_breastfed = exclusive_breastfed == ['received', 'received', 'received', 'received', 'received', 'received']
             get_property_from_forms(filtered_forms, met)
 
         vhnd_attendance = {
