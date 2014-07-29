@@ -10,7 +10,8 @@
     <script src="{% static 'hqwebapp/js/lib/jquery.history.js' %}"></script>
     <script src="{% static 'hqwebapp/js/lib/knockout.mapping.js' %}"></script>
     <script src="{% static 'hqwebapp/js/knockout-bindings.js' %}"></script>
-    <script src="{% static 'reports/javascripts/datepicker.js' %}"></script>
+    <script type="text/javascript"
+            src="{% static 'reports/javascripts/datepicker.js' %}"></script>
     <script src="{% static 'reports/javascripts/reports.config.js' %}"></script>
     <script src="{% static 'reports/javascripts/reports.async.js' %}"></script>
     {% endblock %}
@@ -54,6 +55,7 @@
             placement: 'right',
             trigger: 'hover'
         });
+        console.log("here");
     </script>
 {% endblock %}
 {% endblock %}

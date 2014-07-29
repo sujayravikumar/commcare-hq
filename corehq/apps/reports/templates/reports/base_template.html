@@ -3,6 +3,7 @@
 {% load i18n %}
 {% block js %}{{ block.super }}
 <script src="{% static 'reports/ko/saved_reports.js' %}"></script>
+    <script src="{% static 'hqwebapp/js/lib/jquery-ui-datepicker/jquery-ui-1.8.17.custom.datepicker.min.js' %}"></script>
 {% endblock %}
 
 {% block reports-js-inline %}{{ block.super }}
@@ -45,6 +46,22 @@
                 html: true,
                 title: "You can email a saved version<br />of this report."
             });
+
+            //$("#nick").datepicker();
+            $("#nick").datepicker({
+                changeMonth: true,
+                changeYear: true,
+                showButtonPanel: true,
+                dateFormat: 'yy-mm-dd',
+                maxDate: '0',
+                numberOfMonths: 2
+                /*onClose: function(dateText, inst) {
+                    var month = $("#ui-datepicker-div .ui-datepicker-month :selected").val();
+                    var year = $("#ui-datepicker-div .ui-datepicker-year :selected").val();
+                    $(this).datepicker('setDate', new Date(year, month, 1));
+                }*/
+            });
+            console.log("applied datepicker to nick");
         });
     </script>
 {% endblock %}

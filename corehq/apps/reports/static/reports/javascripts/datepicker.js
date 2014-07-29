@@ -34,4 +34,5 @@ $(function() {
         e.preventDefault();
         shiftDates(7);
     });
+    console.log("configure date-picker");
 });
