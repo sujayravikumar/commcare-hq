@@ -235,7 +235,8 @@ class ConditionsMet(object):
                     met_three = case_property('ifa_tri_1', 0) == 'received'
             if self.preg_month == 9:
                 met_two = 'received' in [case_property('weight_tri_1', 0), case_property('prev_weight_tri_1', 0)]         
-            
+                if self.case_id == "f3b2d923-f369-4834-a603-c6521ee2e86b":
+                    import pdb; pdb.set_trace()
             self.one = condition_image(M_ATTENDANCE_Y, M_ATTENDANCE_N, met_one)
             self.two = condition_image(M_WEIGHT_Y, M_WEIGHT_N, met_two)
             self.three = condition_image(IFA_Y, IFA_N, met_three)
