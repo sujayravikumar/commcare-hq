@@ -853,8 +853,9 @@ class MetReport(BaseReport):
         vhnd_service = {}
         for case in vhnd_cases:
             owner_id = case.owner_id
-            forms = [form for form in case.get_forms() if form.xmlns == VHND_XMLNS and self.datespan.startdate_utc < form.received_on < self.datespan.enddate_utc]
-            vhnd_service[owner_id] = len(forms) > 0
+            dates = [form.form["date_vhnd_held"] for form in case.get_forms() if "date_vhnd_held" in form.form]
+            vhnd_date = [date for date in dates if type(date) == datetime.date and self.datespan.startdate_utc.date() <= date <= self.datespan.enddate_utc.date()]
+            vhnd_service[owner_id] = len(vhnd_date) > 0
         return vhnd_service
 
 def _unformat_row(row):
