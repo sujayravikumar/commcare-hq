@@ -30,6 +30,7 @@ GRADE_NORMAL_Y = 'grade_normal_y.png'
 GRADE_NORMAL_N = 'grade_normal_n.png'
 SPACING_PROMPT_Y = 'birth_spacing_prompt_y.png'
 SPACING_PROMPT_N = 'birth_spacing_prompt_n.png'
+VHND_NO = 'VHND_no.png'
 
 
 class ConditionsMet(object):
@@ -283,6 +284,15 @@ class ConditionsMet(object):
                 self.cash = '<span style="color: green;">Rs. 3000</span>'
 
         met_or_not = not False in [met_one, met_two, met_three, met_four, met_five]
+        if case_obj.owner_id not in report.vhnd_availability:
+            raise InvalidRow
+        vhnd_availability = report.vhnd_availability[case_obj.owner_id]
+        
+        if not vhnd_availability:
+            met_or_not = True
+            self.one = img_elem % VHND_NO
+            self.two, self.three, self.four, self.five = '','','',''
+        
         block = report.block.lower()
         year_end_condition = '1' in birth_spacing_prompt if block is 'wazirganj' else met['interpret_grade_1'] is 'normal'
         year_end_condition_img_Y = (SPACING_PROMPT_Y if block is 'wazirganj' else GRADE_NORMAL_Y)

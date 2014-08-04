@@ -19,6 +19,7 @@ from sqlagg.base import AliasColumn
 from sqlagg.columns import SimpleColumn, SumColumn
 from corehq.apps.reports.cache import request_cache
 from django.http import HttpResponse
+from corehq.apps.hqcase.utils import get_cases_in_domain
 from corehq.apps.reports.datatables import DataTablesHeader, DataTablesColumn
 from corehq.apps.reports.filters.dates import DatespanFilter
 from corehq.apps.reports.generic import ElasticTabularReport, GetParamsMixin
@@ -844,6 +845,17 @@ class MetReport(BaseReport):
         self.override_template = "opm/met_print_report.html"
         return HttpResponse(self._async_context()['report'])
 
+    @property
+    @memoized
+    def vhnd_availability(self):
+        # need to implement this off of Fluff
+        vhnd_cases = get_cases_in_domain(DOMAIN, type="vhnd")
+        vhnd_service = {}
+        for case in vhnd_cases:
+            owner_id = case.owner_id
+            forms = [form for form in case.get_forms() if form.xmlns == VHND_XMLNS and self.datespan.startdate_utc < form.received_on < self.datespan.enddate_utc]
+            vhnd_service[owner_id] = len(forms) > 0
+        return vhnd_service
 
 def _unformat_row(row):
     regexp = re.compile('(.*?)>([0-9]+)(<.*?)>([0-9]*).*')
