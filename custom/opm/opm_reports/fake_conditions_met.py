@@ -285,8 +285,8 @@ class DuplicateConditionsMet(object):
                 self.cash = '<span style="color: green;">Rs. 2000</span>'
             elif child_age == 36:
                 self.cash = '<span style="color: green;">Rs. 3000</span>'
-        self.met_or_not = met_or_not
         met_or_not = not False in [met_one, met_two, met_three, met_four, met_five]
+        self.met_or_not = met_or_not
         if case_obj.owner_id not in report.vhnd_availability:
             raise InvalidRow
         vhnd_availability = report.vhnd_availability[case_obj.owner_id]

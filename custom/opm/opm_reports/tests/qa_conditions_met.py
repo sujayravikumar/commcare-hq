@@ -4,8 +4,12 @@ from dimagi.utils.decorators.memoized import memoized
 import datetime
 
 from corehq.apps.users.models import CommCareCase
-
+"""
+from custom.opm.opm_reports.tests.qa_conditions_met import sample_test
+"""
 CASE_INDEX_BY_AWC = {}
+
+DOMAIN = "opm"
 
 PREGNANCY_APP_CMR = {
 	4: "window_1_1",
@@ -88,19 +92,34 @@ class AppCMR(DuplicateConditionsMet):
 class QARunner(object):
 	def __init__(self, filters, filename="None"):
 		self.filters = filters
+		startdate = datetime.datetime(filters["year"], filters["month"], 1)
+		enddate = startdate + datetime.timedelta(30)
+		self.datespan = type('datespan', (object,), {"startdate": startdate, "enddate":enddate})()
 
 	def get_report_object(self):
 		filters = self.filters
-		startdate = datetime.datetime(filters["year"], filters["month"], 1)
-		enddate = startdate + datetime.timedelta(30)
 		obj = type('report', (object,),{
 				"snapshot": None,
 				"month": filters["month"],
 				"year": filters["year"],
-				"datespan": type('datespan', (object,), {"startdate": startdate, "enddate":enddate})(),
-				"block": filters["block"]
+				"datespan": self.datespan,
+				"block": filters["block"],
+				"vhnd_availability":self.vhnd_availability
 			})()
 		return obj
+
+	@property
+	@memoized
+	def vhnd_availability(self):
+		# need to implement this off of Fluff
+		vhnd_cases = get_cases_in_domain(DOMAIN, type="vhnd")
+		vhnd_service = {}
+		for case in vhnd_cases:
+			owner_id = case.owner_id
+			dates = [form.form["date_vhnd_held"] for form in case.get_forms() if "date_vhnd_held" in form.form]
+			vhnd_date = [date for date in dates if type(date) == datetime.date and self.datespan.startdate.date() <= date <= self.datespan.enddate.date()]
+			vhnd_service[owner_id] = len(vhnd_date) > 0
+		return vhnd_service
 
 	def get_case_list(self, for_all_cases=False):
 		if not for_all_cases:
@@ -126,7 +145,8 @@ class QARunner(object):
 			try:
 				cmr = AppCMR(case, report)
 				cmr.set_app_met_or_not()
-			except:
+			except Exception as e:
+				print e
 				pass
 			if not cmr:
 				continue
