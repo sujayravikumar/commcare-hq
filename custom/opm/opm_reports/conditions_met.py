@@ -75,7 +75,7 @@ class ConditionsMet(object):
         ]
     }
 
-    def __init__(self, case, report):
+    def __init__(self, case, report, child_num=1):
         if report.snapshot is not None:
             report.filter(
                 lambda key: case['_source'][key],
@@ -90,6 +90,7 @@ class ConditionsMet(object):
                 return img_elem % image_y
             elif condition is False:
                 return img_elem % image_n
+        child_num_prop = lambda x: x.replace("child1", "child" + str(child_num))
 
         met = {
             'window_1_1': None,
@@ -98,26 +99,26 @@ class ConditionsMet(object):
             'window_2_2': None,
             'attendance_vhnd_3': None,
             'attendance_vhnd_6': None,
-            'child1_vhndattend_calc': None,
-            'prev_child1_vhndattend_calc': None,
-            'child1_attendance_vhnd': None,
+            child_num_prop('child1_vhndattend_calc'): None,
+            child_num_prop('prev_child1_vhndattend_calc'): None,
+            child_num_prop('child1_attendance_vhnd'): None,
             'weight_tri_1': None,
             'prev_weight_tri_1': None,
             'weight_tri_2': None,
             'prev_weight_tri_2': None,
-            'child1_growthmon_calc': None,
-            'prev_child1_growthmon_calc': None,
-            'child1_excl_breastfeed_calc': None,
-            'prev_child1_excl_breastfeed_calc': None,
-            'child1_ors_calc': None,
-            'prev_child1_ors_calc': None,
-            'child1_weight_calc': None,
-            'child1_register_calc': None,
-            'child1_measles_calc': None,
-            'prev_child1_weight_calc': None,
-            'prev_child1_register_calc': None,
-            'prev_child1_measles_calc': None,
-            'child1_suffer_diarrhea': None,
+            child_num_prop('child1_growthmon_calc'): None,
+            child_num_prop('prev_child1_growthmon_calc'): None,
+            child_num_prop('child1_excl_breastfeed_calc'): None,
+            child_num_prop('prev_child1_excl_breastfeed_calc'): None,
+            child_num_prop('child1_ors_calc'): None,
+            child_num_prop('prev_child1_ors_calc'): None,
+            child_num_prop('child1_weight_calc'): None,
+            child_num_prop('child1_register_calc'): None,
+            child_num_prop('child1_measles_calc'): None,
+            child_num_prop('prev_child1_weight_calc'): None,
+            child_num_prop('prev_child1_register_calc'): None,
+            child_num_prop('prev_child1_measles_calc'): None,
+            child_num_prop('child1_suffer_diarrhea'): None,
             'interpret_grade_1': None
         }
 
@@ -132,7 +133,7 @@ class ConditionsMet(object):
         def get_property_from_forms(forms, met_properties):
             for form in forms:
                 for k, v in met_properties.iteritems():
-                    if k in ('child1_suffer_diarrhea'):
+                    if k in (child_num_prop('child1_suffer_diarrhea')):
                         if 'child_1' in form.form and k in form.form['child_1']:
                             met_properties[k] = form.form['child_1'][k]
                     else:
@@ -142,6 +143,15 @@ class ConditionsMet(object):
 
         case_obj = CommCareCase.get(case['_source']['_id'])
         case_property = lambda _property, default: get_property(case_obj, _property, default=default)
+
+        if child_num == 1:
+            extra_childs = []
+            for num in [2, 3, 4]:
+                name = "child" + str(num) + "_name"
+                is_extra = case_property("name", "")
+                if is_extra is not "":
+                    extra_childs.append(ConditionsMet(case, report, child_num=num))
+            report.set_extra_row_objects(extra_childs)
 
         self.case_id = case_property('_id', '')
         self.block_name = case_property('block_name', '')
@@ -207,13 +217,13 @@ class ConditionsMet(object):
             filtered_forms = [form for form in forms if report.datespan.startdate <= form.received_on <= report.datespan.enddate]   
             if self.child_age == 3:
                 prev_forms = [form for form in forms if report.datespan.startdate - datetime.timedelta(90) <= form.received_on <= report.datespan.enddate]
-                weight_key = "child1_child_weight"
+                weight_key = child_num_prop("child1_child_weight")
                 child_forms = [form.form["child_1"] for form in prev_forms if "child_1" in form.form]
                 birth_weight = [child[weight_key] for child in child_forms if weight_key in child]
                 child_birth_weight_taken = '1' in birth_weight
             if self.child_age == 6:
                 prev_forms = [form for form in forms if report.datespan.startdate - datetime.timedelta(180) <= form.received_on <= report.datespan.enddate]
-                excl_key = "child1_excl_breastfeed_calc"
+                excl_key = child_num_prop("child1_excl_breastfeed_calc")
                 exclusive_breastfed = [form.form[excl_key] for form in prev_forms if excl_key in form.form]
                 child_excusive_breastfed = exclusive_breastfed == ['received', 'received', 'received', 'received', 'received', 'received']
             get_property_from_forms(filtered_forms, met)
@@ -247,24 +257,24 @@ class ConditionsMet(object):
             met_one, met_two, met_three, met_four, met_five = None, None, None, None, None
             self.one, self.two, self.three, self.four, self.five = '','','','',''
             if self.child_age != 1:
-                met_one = 'received' in [met['child1_vhndattend_calc'], met['prev_child1_vhndattend_calc'], met['child1_attendance_vhnd']]
+                met_one = 'received' in [met[child_num_prop('child1_vhndattend_calc')], met[child_num_prop('prev_child1_vhndattend_calc')], met[child_num_prop('child1_attendance_vhnd')]]
                 self.one = condition_image(C_ATTENDANCE_Y, C_ATTENDANCE_N, met_one)
             if self.child_age % 3 == 0:
-                met_two = 'received' in [met['child1_growthmon_calc'], met['prev_child1_growthmon_calc']]
-                if met['child1_suffer_diarrhea'] == '1':
-                    met_three = 'received' in [met['child1_ors_calc'], met['prev_child1_ors_calc']]
+                met_two = 'received' in [met[child_num_prop('child1_growthmon_calc')], met[child_num_prop('prev_child1_growthmon_calc')]]
+                if met[child_num_prop('child1_suffer_diarrhea')] == '1':
+                    met_three = 'received' in [met[child_num_prop('child1_ors_calc')], met[child_num_prop('prev_child1_ors_calc')]]
                     self.three = condition_image(ORSZNTREAT_Y, ORSZNTREAT_N, met_three)
                 self.two = condition_image(C_WEIGHT_Y, C_WEIGHT_N, met_two)
             if self.child_age == 3 and report.block.lower() == 'atri':
                 met_four = child_birth_weight_taken
                 self.four = condition_image(CHILD_WEIGHT_Y, CHILD_WEIGHT_N, met_four)
             if self.child_age == 6 and report.block.lower() == 'atri':
-                met_four = 'received' in [met['child1_register_calc'] or met['prev_child1_register_calc']]
+                met_four = 'received' in [met[child_num_prop('child1_register_calc')] or met[child_num_prop('prev_child1_register_calc')]]
                 met_five = child_excusive_breastfed
                 self.four = condition_image(C_REGISTER_Y, C_REGISTER_N, met_four)
                 self.five = condition_image(EXCBREASTFED_Y, EXCBREASTFED_N, met_five)
             if self.child_age == 12 and report.block.lower() == 'atri':
-                met_four = 'received' in [met['child1_measles_calc'] or met['prev_child1_measles_calc']]
+                met_four = 'received' in [met[child_num_prop('child1_measles_calc')] or met[child_num_prop('prev_child1_measles_calc')]]
                 self.four = condition_image(MEASLEVACC_Y, MEASLEVACC_N, met_four)
 
 

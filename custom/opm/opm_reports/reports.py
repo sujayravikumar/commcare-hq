@@ -699,6 +699,10 @@ class MetReport(BaseReport):
     exportable = False
     default_case_type = "Pregnancy"
     filter_fields = [('awc_name', 'awcs'), ('owner_id', 'gp'), ('closed', 'is_open')]
+    extra_row_objects = []
+
+    def set_extra_row_objects(self, row_objects):
+        self.extra_row_objects = row_objects
 
     @property
     def report_subtitles(self):
@@ -764,7 +768,7 @@ class MetReport(BaseReport):
         if self.snapshot is not None:
             return self.snapshot.rows
         rows = []
-        for row in self.row_objects:
+        for row in self.row_objects + self.extra_row_objects:
             rows.append([getattr(row, method) for
                 method, header, visible in self.model.method_map[self.block.lower()]])
         return rows
