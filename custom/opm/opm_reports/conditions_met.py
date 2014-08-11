@@ -43,6 +43,7 @@ class ConditionsMet(object):
             ('husband_name', _("Husband Name"), True),
             ('status', _("Current status"), True),
             ('preg_month', _('Pregnancy Month'), True),
+            ('child_name', _("Child Name"), True),
             ('child_age', _("Child Age"), True),
             ('window', _("Window"), True),
             ('one', _("1"), True),
@@ -62,6 +63,7 @@ class ConditionsMet(object):
             ('husband_name', _("Husband Name"), True),
             ('status', _("Current status"), True),
             ('preg_month', _('Pregnancy Month'), True),
+            ('child_name', _("Child Name"), True),
             ('child_age', _("Child Age"), True),
             ('window', _("Window"), True),
             ('one', _("1"), True),
@@ -145,13 +147,11 @@ class ConditionsMet(object):
         case_property = lambda _property, default: get_property(case_obj, _property, default=default)
 
         if child_num == 1:
-            extra_childs = []
-            for num in [2, 3, 4]:
-                name = "child" + str(num) + "_name"
-                is_extra = case_property("name", "")
-                if is_extra is not "":
-                    extra_childs.append(ConditionsMet(case, report, child_num=num))
-            report.set_extra_row_objects(extra_childs)
+            num_childs = int(case_property("live_birth_amount", 1))
+            if num_childs > 3:
+                num_childs = 3 # app supports upto three children only
+            extra_child_objects = [(ConditionsMet(case, report, child_num=num)) for num in range(2, num_childs + 1)]
+            report.set_extra_row_objects(extra_child_objects)
 
         self.case_id = case_property('_id', '')
         self.block_name = case_property('block_name', '')
@@ -208,6 +208,7 @@ class ConditionsMet(object):
         child_birth_weight_taken = None # None - condition n/a, True - condition met, False - condition not met
         child_excusive_breastfed = None
         if self.status == 'mother':
+            self.child_name = case_property(child_num_prop("child1_name"), EMPTY_FIELD)
             forms = case_obj.get_forms()
             for form in forms:
                 if 'birth_spacing_prompt' in form.form:
@@ -236,6 +237,7 @@ class ConditionsMet(object):
             8: case_property('month_8_attended', 0)
         }
         if self.status == 'pregnant':
+            self.child_name = EMPTY_FIELD
             met_one, met_two, met_three, met_four, met_five = None, None, None, None, None
             self.child_age = EMPTY_FIELD
             if self.preg_month != 9:

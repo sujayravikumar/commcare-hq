@@ -702,7 +702,7 @@ class MetReport(BaseReport):
     extra_row_objects = []
 
     def set_extra_row_objects(self, row_objects):
-        self.extra_row_objects = row_objects
+        self.extra_row_objects = self.extra_row_objects + row_objects
 
     @property
     def report_subtitles(self):
