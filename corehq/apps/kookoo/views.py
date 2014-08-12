@@ -5,6 +5,22 @@ from corehq.apps.ivr.api import incoming, IVR_EVENT_NEW_CALL, IVR_EVENT_INPUT, I
 from corehq.apps.kookoo import api as backend_module
 from corehq.apps.sms.models import CallLog
 from dimagi.utils.couch import CriticalSection
+from corehq.apps.api.decorators import require_api_key
+
+PERMISSION_KOOKOO = "KOOKOO"
+
+
+@csrf_exempt
+@require_api_key(permission=PERMISSION_KOOKOO)
+def ivr_auth(request, api_key):
+    return ivr(request)
+
+
+@csrf_exempt
+@require_api_key(permission=PERMISSION_KOOKOO)
+def ivr_finished_auth(request, api_key):
+    return ivr_finished(request)
+
 
 """
 Kookoo invokes this view for its main communication with HQ.

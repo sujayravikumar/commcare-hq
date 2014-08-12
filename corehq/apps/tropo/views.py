@@ -9,6 +9,22 @@ from corehq.apps.sms.mixin import VerifiedNumber
 from corehq.apps.sms.models import CallLog, INCOMING, OUTGOING
 from datetime import datetime
 from corehq.apps.sms.util import strip_plus
+from corehq.apps.api.decorators import require_api_key
+
+PERMISSION_TROPO = "TROPO"
+
+
+@csrf_exempt
+@require_api_key(permission=PERMISSION_TROPO)
+def sms_in_auth(request, api_key):
+    return sms_in(request)
+
+
+@csrf_exempt
+@require_api_key(permission=PERMISSION_TROPO)
+def ivr_in_auth(request, api_key):
+    return ivr_in(request)
+
 
 @csrf_exempt
 def sms_in(request):

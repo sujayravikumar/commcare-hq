@@ -1,5 +1,14 @@
 from django.http import HttpResponse
 from corehq.apps.sms.api import incoming as incoming_sms
+from corehq.apps.api.decorators import require_api_key
+
+PERMISSION_SISLOG = "SISLOG"
+
+
+@require_api_key(permission=PERMISSION_SISLOG)
+def sms_in_auth(request, api_key):
+    return sms_in(request)
+
 
 def sms_in(request):
     """
