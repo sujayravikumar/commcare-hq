@@ -12,7 +12,7 @@ from corehq.pillows.mappings.user_mapping import USER_INDEX
 from corehq.pillows.mappings.xform_mapping import XFORM_INDEX
 
 
-def get_es(timeout=30):
+def get_es(timeout=30 * 2 * 60):
     """
     Get a handle to the configured elastic search DB
     """
