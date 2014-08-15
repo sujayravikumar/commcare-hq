@@ -1226,6 +1226,14 @@ class AdminReportsTab(UITab):
                     UserReport,
                 ]
             ]),
+            (_('CommTrack Reports'), [
+                {
+                    'title': report.name,
+                    'url': reverse('admin_report_dispatcher',
+                                   args=(report.slug,)),
+                } for report in [
+                ]
+            ]),
         ]
 
     @property
