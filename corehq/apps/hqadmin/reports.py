@@ -454,6 +454,7 @@ class CommTrackAdminReport(GlobalAdminReports):
         params.update({
             "commtrack_enabled": ["T"],
         })
+        return params
 
 
 class CommTrackRealProjectSpacesReport(CommTrackAdminReport):
