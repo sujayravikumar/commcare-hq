@@ -333,7 +333,7 @@ class GlobalAdminReports(AdminReport):
 
     @property
     def template_context(self):
-        context = super(AdminReport, self).template_context
+        context = super(GlobalAdminReports, self).template_context
         indicator_data = copy.deepcopy(INDICATOR_DATA)
         from django.core.urlresolvers import reverse
         for key in self.indicators:
@@ -450,7 +450,7 @@ class UserReport(GlobalAdminReports):
 class CommTrackAdminReport(GlobalAdminReports):
     @property
     def params_es_dict(self):
-        params = super(GlobalAdminReports, self).params_es_dict
+        params = super(CommTrackAdminReport, self).params_es_dict
         params.update({
             "commtrack_enabled": ["T"],
         })
