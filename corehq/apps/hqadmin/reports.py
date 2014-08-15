@@ -445,3 +445,12 @@ class UserReport(GlobalAdminReports):
         'users_mobile',
         'users_web',
     ]
+
+
+class CommTrackAdminReport(GlobalAdminReports):
+    @property
+    def params_es_dict(self):
+        params = super(GlobalAdminReports, self).params_es_dict
+        params.update({
+            "commtrack_enabled": ["T"],
+        })
