@@ -454,3 +454,10 @@ class CommTrackAdminReport(GlobalAdminReports):
         params.update({
             "commtrack_enabled": ["T"],
         })
+
+
+class CommTrackRealProjectSpacesReport(CommTrackAdminReport):
+    slug = 'commtrack_project_spaces'
+    name = _('Real Project Spaces')
+    indicators = [
+    ]
