@@ -111,6 +111,20 @@ INDICATOR_DATA = {
         },
         "xaxis_label": "# users",
     },
+    "commtrack_domain_count": {
+        "ajax_view": "admin_reports_stats_data",
+        "chart_name": "domains",
+        "chart_title": "Total CommTrack Project Spaces",
+        "date_field_opts": [
+            {
+                "name": "Date Created",
+                "value": "date_created",
+            },
+        ],
+        "histogram_type": "domains",
+        "interval": "week",
+        "xaxis_label": "# domains",
+    },
 }
 
 
@@ -461,4 +475,5 @@ class CommTrackRealProjectSpacesReport(CommTrackAdminReport):
     slug = 'commtrack_project_spaces'
     name = _('Real Project Spaces')
     indicators = [
+        'commtrack_domain_count',
     ]
