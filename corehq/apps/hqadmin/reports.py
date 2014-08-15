@@ -342,10 +342,7 @@ class GlobalAdminReports(AdminReport):
             )
             if not ("params_es_dict" in indicator_data[key]):
                 indicator_data[key]["params_es_dict"] = {}
-            if self.use_real_project_spaces:
-                indicator_data[key]["params_es_dict"].update({
-                    "is_test": ["false"],
-                })
+            indicator_data[key]["params_es_dict"].update(self.params_es_dict)
             indicator_data[key]["params_es"] = json.dumps(
                 indicator_data[key]["params_es_dict"]
             )
@@ -367,6 +364,15 @@ class GlobalAdminReports(AdminReport):
     @property
     def use_real_project_spaces(self):
         return True
+
+    @property
+    def params_es_dict(self):
+        params = {}
+        if self.use_real_project_spaces:
+            params.update({
+                "is_test": ["false"],
+            })
+        return params
 
 
 class RealProjectSpacesReport(GlobalAdminReports):
