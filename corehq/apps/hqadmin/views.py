@@ -1024,7 +1024,8 @@ def stats_data(request):
         domain_info = [{"names": None, "display_name": _("All Domains")}]
 
     stats_data = get_stats_data(domain_info, histo_type, request.datespan, interval=interval,
-                                user_type_mobile=params_es.get("user_type_mobile"))
+                                user_type_mobile=params_es.get("user_type_mobile"),
+                                is_cumulative=request.GET.get("is_cumulative", "True") == "True")
     return json_response(stats_data)
 
 
