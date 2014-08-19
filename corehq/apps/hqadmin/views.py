@@ -924,7 +924,7 @@ def get_active_domain_stats_data(params, datespan, interval='month', datefield='
             .filter({"terms": params})
     )
     real_domain_query_results = real_domain_query.run().raw_hits
-    real_domains = {x['fields']['name'] for x in real_domain_query_results}
+    real_domains = {x['fields']['name'][0] for x in real_domain_query_results}
 
     histo_data = []
     for timestamp in reversed(keys):
