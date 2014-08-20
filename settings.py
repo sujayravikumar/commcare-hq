@@ -161,6 +161,7 @@ TEMPLATE_CONTEXT_PROCESSORS = [
     "corehq.util.context_processors.base_template",
     "corehq.util.context_processors.analytics_js",
     "corehq.util.context_processors.raven",
+    "corehq.util.context_processors.domains_for_user",
 ]
 
 TEMPLATE_DIRS = []
@@ -189,6 +190,10 @@ DEFAULT_APPS = (
 )
 
 CRISPY_TEMPLATE_PACK = 'bootstrap'
+CRISPY_ALLOWED_TEMPLATE_PACKS = (
+    'bootstrap',
+    'bootstrap3',
+)
 
 HQ_APPS = (
     'django_digest',
@@ -314,6 +319,8 @@ HQ_APPS = (
 
     'custom.colalife',
     'custom.intrahealth',
+
+    'bootstrap3_crispy',
 )
 
 TEST_APPS = ()
@@ -333,6 +340,7 @@ APPS_TO_EXCLUDE_FROM_TESTS = (
     'corehq.apps.megamobile',
     'corehq.apps.yo',
     'crispy_forms',
+    'bootstrap3_crispy',
     'django_extensions',
     'django_prbac',
     'djcelery',
@@ -1118,6 +1126,7 @@ PILLOWTOPS = {
         'custom.opm.opm_reports.models.OpmUserFluffPillow',
         'custom.opm.opm_reports.models.OpmFormFluffPillow',
         'custom.opm.opm_reports.models.OpmHealthStatusAllInfoFluffPillow',
+        'custom.opm.opm_reports.models.OPMHierarchyFluffPillow',
         'custom.apps.cvsu.models.UnicefMalawiFluffPillow',
         'custom.reports.care_sa.models.CareSAFluffPillow',
         'custom.reports.mc.models.MalariaConsortiumFluffPillow',
