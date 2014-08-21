@@ -4,6 +4,7 @@ from decimal import Decimal
 from django.conf import settings
 
 from django.contrib import messages
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.validators import MinLengthValidator, validate_slug
 from django import forms
@@ -20,12 +21,14 @@ from crispy_forms.helper import FormHelper
 from crispy_forms import layout as crispy
 from django_countries.countries import COUNTRIES
 from corehq import privileges, toggles
+from corehq.apps.accounting.exceptions import CreateAccountingAdminError
 from corehq.apps.accounting.invoicing import DomainInvoiceFactory
 from corehq.apps.accounting.tasks import send_subscription_reminder_emails
+from corehq.apps.users.models import WebUser
 
 from dimagi.utils.decorators.memoized import memoized
 from dimagi.utils.django.email import send_HTML_email
-from django_prbac.models import Role, Grant
+from django_prbac.models import Role, Grant, UserRole
 
 from corehq.apps.accounting.async_handlers import (
     FeatureRateAsyncHandler,
@@ -163,7 +166,7 @@ class BillingAccountBasicForm(forms.Form):
                 _("This account has subscriptions associated with it. "
                   "Please specify a transfer account before deactivating.")
             )
-        if transfer_subs == self.account.name:
+        if self.account is not None and transfer_subs == self.account.name:
             raise ValidationError(
                 _("The transfer account can't be the same one you're trying "
                   "to deactivate.")
@@ -517,7 +520,7 @@ class SubscriptionForm(forms.Form):
         is_active = is_active_subscription(date_start, date_end)
         do_not_invoice = self.cleaned_data['do_not_invoice']
         auto_generate_credits = self.cleaned_data['auto_generate_credits']
-        return Subscription.new_domain_subscription(
+        sub = Subscription.new_domain_subscription(
             account, domain, plan_version,
             date_start=date_start,
             date_end=date_end,
@@ -528,6 +531,7 @@ class SubscriptionForm(forms.Form):
             auto_generate_credits=auto_generate_credits,
             web_user=self.web_user,
         )
+        return sub
 
     def clean_active_accounts(self):
         transfer_account = self.cleaned_data.get('active_accounts')
@@ -538,6 +542,7 @@ class SubscriptionForm(forms.Form):
 
     def update_subscription(self):
         self.subscription.update_subscription(
+            date_start=self.cleaned_data['start_date'],
             date_end=self.cleaned_data['end_date'],
             date_delay_invoicing=self.cleaned_data['delay_invoice_until'],
             do_not_invoice=self.cleaned_data['do_not_invoice'],
@@ -1798,3 +1803,57 @@ class ResendEmailForm(forms.Form):
         contact_emails += self.cleaned_data['additional_recipients']
         record = BillingRecord.generate_record(self.invoice)
         record.send_email(contact_emails=contact_emails)
+
+
+class CreateAdminForm(forms.Form):
+    username = forms.CharField(
+        required=False,
+    )
+
+    def __init__(self, *args, **kwargs):
+        super(CreateAdminForm, self).__init__(*args, **kwargs)
+
+        self.helper = FormHelper()
+        self.helper.form_show_labels= False
+        self.helper.form_style = 'inline'
+        self.helper.layout = crispy.Layout(
+            InlineField(
+                'username',
+                css_id="select-admin-username",
+            ),
+            StrictButton(
+                mark_safe('<i class="icon-plus"></i> %s' % "Add Admin"),
+                css_class="btn-success",
+                type="submit",
+            )
+        )
+
+    def add_admin_user(self):
+        # create UserRole for user
+        username = self.cleaned_data['username']
+        try:
+            user = User.objects.get(username=username)
+        except User.DoesNotExist:
+            raise CreateAccountingAdminError(
+                "User '%s' does not exist" % username
+            )
+        web_user = WebUser.get_by_username(username)
+        if not web_user or not web_user.is_superuser:
+            raise CreateAccountingAdminError(
+                "The user '%s' is not a superuser." % username,
+            )
+        try:
+            user_role = UserRole.objects.get(user=user)
+        except UserRole.DoesNotExist:
+            user_privs = Role.objects.get_or_create(
+                name="Privileges for %s" % user.username,
+                slug="%s_privileges" % user.username,
+            )[0]
+            user_role = UserRole.objects.create(
+                user=user,
+                role=user_privs,
+            )
+        ops_role = Role.objects.get(slug=privileges.OPERATIONS_TEAM)
+        if not user_role.role.has_privilege(ops_role):
+            Grant.objects.create(from_role=user_role.role, to_role=ops_role)
+        return user
