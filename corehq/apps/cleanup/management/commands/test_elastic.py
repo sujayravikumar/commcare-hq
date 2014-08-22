@@ -22,6 +22,7 @@ def _test_elastic(doc_id):
     uid = uuid.uuid4().hex
     doc['_rev'] = uid
     post = elastic.post("{}/case/{}/_update".format(index, doc_id), data={"doc": doc})
+    print post
     doc_id_query = {
         "filter": {
             "ids": {"values": [doc_id]}
