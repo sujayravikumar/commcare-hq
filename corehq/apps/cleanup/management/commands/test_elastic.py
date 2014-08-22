@@ -21,8 +21,17 @@ def _test_elastic(doc_id):
     doc = CommCareCase.get_db().get(doc_id)
     uid = uuid.uuid4().hex
     doc['_rev'] = uid
-    post = elastic.post("{}/case/{}/_update".format(index, doc_id), data={"doc": doc})
-    print post
+    doc_path = '{}/case/{}'.format(index, doc_id)
+    exists = elastic.head(doc_path)
+    if exists:
+        print 'doc exists'
+        post = elastic.post("{}/_update".format(doc_path), data={"doc": doc})
+        print post
+    else:
+        print 'creating doc'
+        res = elastic.put(doc_path, data=doc)
+        print res
+
     doc_id_query = {
         "filter": {
             "ids": {"values": [doc_id]}
