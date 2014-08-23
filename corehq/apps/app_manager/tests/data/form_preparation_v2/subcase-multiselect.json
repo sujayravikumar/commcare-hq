@@ -1,0 +1,666 @@
+{
+    "_attachments": {
+        "5e1aea6f0af0bf06754bf315d69fe866515e3f7e.xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n<h:html xmlns:h=\"http://www.w3.org/1999/xhtml\" xmlns:orx=\"http://openrosa.org/jr/xforms\" xmlns=\"http://www.w3.org/2002/xforms\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" xmlns:jr=\"http://openrosa.org/javarosa\" xmlns:vellum=\"http://commcarehq.org/xforms/vellum\">\n\t<h:head>\n\t\t<h:title>See Task</h:title>\n\t\t<model>\n\t\t\t<instance>\n\t\t\t\t<data xmlns:jrm=\"http://dev.commcarehq.org/jr/xforms\" xmlns=\"http://openrosa.org/formdesigner/9D5D0E88-5020-4469-994A-79791F15467E\" uiVersion=\"1\" version=\"1\" name=\"See Task\">\n\t\t\t\t\t<task />\n\t\t\t\t</data>\n\t\t\t</instance>\n\t\t\t<bind nodeset=\"/data/task\" type=\"xsd:string\" />\n\t\t\t<itext>\n\t\t\t\t<translation lang=\"en\" default=\"\">\n\t\t\t\t\t<text id=\"task-label2\">\n\t\t\t\t\t\t<value>Task</value>\n\t\t\t\t\t</text>\n\t\t\t\t</translation>\n\t\t\t</itext>\n\t\t</model>\n\t</h:head>\n\t<h:body>\n\t\t<input ref=\"/data/task\">\n\t\t\t<label ref=\"jr:itext('task-label2')\" />\n\t\t</input>\n\t</h:body>\n</h:html>",
+        "8eb65e0e8de94a365e5146d71efb4e2c878dbc99.xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n<h:html xmlns:h=\"http://www.w3.org/1999/xhtml\" xmlns:orx=\"http://openrosa.org/jr/xforms\" xmlns=\"http://www.w3.org/2002/xforms\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" xmlns:jr=\"http://openrosa.org/javarosa\" xmlns:vellum=\"http://commcarehq.org/xforms/vellum\">\n\t<h:head>\n\t\t<h:title>New Form</h:title>\n\t\t<model>\n\t\t\t<instance>\n\t\t\t\t<data xmlns:jrm=\"http://dev.commcarehq.org/jr/xforms\" xmlns=\"http://openrosa.org/formdesigner/7945B146-AD78-467B-98D0-D05D95370F1E\" uiVersion=\"1\" version=\"1\" name=\"New Form\">\n\t\t\t\t\t<tasks />\n\t\t\t\t</data>\n\t\t\t</instance>\n\t\t\t<bind nodeset=\"/data/tasks\" />\n\t\t\t<itext>\n\t\t\t\t<translation lang=\"en\" default=\"\">\n\t\t\t\t\t<text id=\"tasks-label\">\n\t\t\t\t\t\t<value>Select tasks for patient</value>\n\t\t\t\t\t</text>\n\t\t\t\t\t<text id=\"tasks-do_homework-label\">\n\t\t\t\t\t\t<value>Do Homework</value>\n\t\t\t\t\t</text>\n\t\t\t\t\t<text id=\"tasks-eat_food-label\">\n\t\t\t\t\t\t<value>Eat Food</value>\n\t\t\t\t\t</text>\n\t\t\t\t\t<text id=\"tasks-sleep-label\">\n\t\t\t\t\t\t<value>Sleep</value>\n\t\t\t\t\t</text>\n\t\t\t\t\t<text id=\"tasks-exercise-label\">\n\t\t\t\t\t\t<value>Exercise</value>\n\t\t\t\t\t</text>\n\t\t\t\t</translation>\n\t\t\t</itext>\n\t\t</model>\n\t</h:head>\n\t<h:body>\n\t\t<select ref=\"/data/tasks\">\n\t\t\t<label ref=\"jr:itext('tasks-label')\" />\n\t\t\t<item>\n\t\t\t\t<label ref=\"jr:itext('tasks-do_homework-label')\" />\n\t\t\t\t<value>do_homework</value>\n\t\t\t</item>\n\t\t\t<item>\n\t\t\t\t<label ref=\"jr:itext('tasks-eat_food-label')\" />\n\t\t\t\t<value>eat_food</value>\n\t\t\t</item>\n\t\t\t<item>\n\t\t\t\t<label ref=\"jr:itext('tasks-sleep-label')\" />\n\t\t\t\t<value>sleep</value>\n\t\t\t</item>\n\t\t\t<item>\n\t\t\t\t<label ref=\"jr:itext('tasks-exercise-label')\" />\n\t\t\t\t<value>exercise</value>\n\t\t\t</item>\n\t\t</select>\n\t</h:body>\n</h:html>",
+        "f9db514d5ece22ff5c2843a910b320dd397e2607.xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n<h:html xmlns:h=\"http://www.w3.org/1999/xhtml\" xmlns:orx=\"http://openrosa.org/jr/xforms\" xmlns=\"http://www.w3.org/2002/xforms\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" xmlns:jr=\"http://openrosa.org/javarosa\" xmlns:vellum=\"http://commcarehq.org/xforms/vellum\">\n\t<h:head>\n\t\t<h:title>New Form</h:title>\n\t\t<model>\n\t\t\t<instance>\n\t\t\t\t<data xmlns:jrm=\"http://dev.commcarehq.org/jr/xforms\" xmlns=\"http://openrosa.org/formdesigner/51589FC9-110A-4DB0-9DE7-FE9F7C7A052D\" uiVersion=\"1\" version=\"1\" name=\"New Form\">\n\t\t\t\t\t<patient_name />\n\t\t\t\t</data>\n\t\t\t</instance>\n\t\t\t<bind nodeset=\"/data/patient_name\" type=\"xsd:string\" />\n\t\t\t<itext>\n\t\t\t\t<translation lang=\"en\" default=\"\">\n\t\t\t\t\t<text id=\"patient_name-label\">\n\t\t\t\t\t\t<value>Patient Name</value>\n\t\t\t\t\t</text>\n\t\t\t\t</translation>\n\t\t\t</itext>\n\t\t</model>\n\t</h:head>\n\t<h:body>\n\t\t<input ref=\"/data/patient_name\">\n\t\t\t<label ref=\"jr:itext('patient_name-label')\" />\n\t\t</input>\n\t</h:body>\n</h:html>"
+    },
+    "admin_password": null,
+    "admin_password_charset": "n",
+    "application_version": "2.0",
+    "attribution_notes": null,
+    "auto_gps_capture": false,
+    "build_broken": false,
+    "build_broken_reason": null,
+    "build_comment": null,
+    "build_langs": [
+        "en"
+    ],
+    "build_signed": true,
+    "build_spec": {
+        "build_number": null,
+        "doc_type": "BuildSpec",
+        "latest": true,
+        "version": "2.13.0"
+    },
+    "built_on": null,
+    "built_with": {
+        "build_number": null,
+        "datetime": null,
+        "doc_type": "BuildRecord",
+        "latest": null,
+        "signed": true,
+        "version": null
+    },
+    "cached_properties": {},
+    "case_sharing": false,
+    "cloudcare_enabled": false,
+    "comment_from": null,
+    "commtrack_enabled": false,
+    "commtrack_requisition_mode": null,
+    "copy_history": [],
+    "deployment_date": null,
+    "description": null,
+    "doc_type": "Application",
+    "is_released": false,
+    "langs": [
+        "en"
+    ],
+    "modules": [
+        {
+            "case_details": {
+                "doc_type": "DetailPair",
+                "long": {
+                    "columns": [
+                        {
+                            "advanced": "",
+                            "calc_xpath": ".",
+                            "doc_type": "DetailColumn",
+                            "enum": [],
+                            "field": "name",
+                            "filter_xpath": "",
+                            "format": "plain",
+                            "header": {
+                                "en": "Name"
+                            },
+                            "late_flag": 30,
+                            "model": "case",
+                            "time_ago_interval": 365.25
+                        }
+                    ],
+                    "display": "long",
+                    "doc_type": "Detail",
+                    "sort_elements": []
+                },
+                "short": {
+                    "columns": [
+                        {
+                            "advanced": "",
+                            "calc_xpath": ".",
+                            "doc_type": "DetailColumn",
+                            "enum": [],
+                            "field": "name",
+                            "filter_xpath": "",
+                            "format": "plain",
+                            "header": {
+                                "en": "Name"
+                            },
+                            "late_flag": 30,
+                            "model": "case",
+                            "time_ago_interval": 365.25
+                        }
+                    ],
+                    "display": "short",
+                    "doc_type": "Detail",
+                    "sort_elements": []
+                }
+            },
+            "case_label": {
+                "en": "Cases"
+            },
+            "case_list": {
+                "doc_type": "CaseList",
+                "label": {},
+                "show": false
+            },
+            "case_type": "patient",
+            "doc_type": "Module",
+            "forms": [
+                {
+                    "actions": {
+                        "case_preload": {
+                            "condition": {
+                                "answer": null,
+                                "doc_type": "FormActionCondition",
+                                "operator": null,
+                                "question": null,
+                                "type": "always"
+                            },
+                            "doc_type": "PreloadAction",
+                            "preload": {}
+                        },
+                        "close_case": {
+                            "condition": {
+                                "answer": null,
+                                "doc_type": "FormActionCondition",
+                                "operator": null,
+                                "question": null,
+                                "type": "never"
+                            },
+                            "doc_type": "FormAction"
+                        },
+                        "close_referral": {
+                            "condition": {
+                                "answer": null,
+                                "doc_type": "FormActionCondition",
+                                "operator": "=",
+                                "question": null,
+                                "type": "never"
+                            },
+                            "doc_type": "FormAction"
+                        },
+                        "doc_type": "FormActions",
+                        "open_case": {
+                            "condition": {
+                                "answer": null,
+                                "doc_type": "FormActionCondition",
+                                "operator": null,
+                                "question": null,
+                                "type": "always"
+                            },
+                            "doc_type": "OpenCaseAction",
+                            "external_id": null,
+                            "name_path": "/data/patient_name"
+                        },
+                        "open_referral": {
+                            "condition": {
+                                "answer": null,
+                                "doc_type": "FormActionCondition",
+                                "operator": "=",
+                                "question": null,
+                                "type": "never"
+                            },
+                            "doc_type": "OpenReferralAction",
+                            "followup_date": null,
+                            "name_path": null
+                        },
+                        "referral_preload": {
+                            "condition": {
+                                "answer": null,
+                                "doc_type": "FormActionCondition",
+                                "operator": "=",
+                                "question": null,
+                                "type": "never"
+                            },
+                            "doc_type": "PreloadAction",
+                            "preload": {}
+                        },
+                        "subcases": [],
+                        "update_case": {
+                            "condition": {
+                                "answer": null,
+                                "doc_type": "FormActionCondition",
+                                "operator": null,
+                                "question": null,
+                                "type": "always"
+                            },
+                            "doc_type": "UpdateCaseAction",
+                            "update": {}
+                        },
+                        "update_referral": {
+                            "condition": {
+                                "answer": null,
+                                "doc_type": "FormActionCondition",
+                                "operator": "=",
+                                "question": null,
+                                "type": "never"
+                            },
+                            "doc_type": "UpdateReferralAction",
+                            "followup_date": null
+                        }
+                    },
+                    "auto_gps_capture": false,
+                    "doc_type": "Form",
+                    "form_filter": "",
+                    "form_type": "module_form",
+                    "media_audio": null,
+                    "media_image": null,
+                    "name": {
+                        "en": "Register Patient"
+                    },
+                    "post_form_workflow": "default",
+                    "requires": "none",
+                    "show_count": false,
+                    "unique_id": "f9db514d5ece22ff5c2843a910b320dd397e2607",
+                    "version": null,
+                    "xmlns": "http://openrosa.org/formdesigner/51589FC9-110A-4DB0-9DE7-FE9F7C7A052D"
+                },
+                {
+                    "actions": {
+                        "case_preload": {
+                            "condition": {
+                                "answer": null,
+                                "doc_type": "FormActionCondition",
+                                "operator": null,
+                                "question": null,
+                                "type": "never"
+                            },
+                            "doc_type": "PreloadAction",
+                            "preload": {}
+                        },
+                        "close_case": {
+                            "condition": {
+                                "answer": null,
+                                "doc_type": "FormActionCondition",
+                                "operator": null,
+                                "question": null,
+                                "type": "never"
+                            },
+                            "doc_type": "FormAction"
+                        },
+                        "close_referral": {
+                            "condition": {
+                                "answer": null,
+                                "doc_type": "FormActionCondition",
+                                "operator": "=",
+                                "question": null,
+                                "type": "never"
+                            },
+                            "doc_type": "FormAction"
+                        },
+                        "doc_type": "FormActions",
+                        "open_case": {
+                            "condition": {
+                                "answer": null,
+                                "doc_type": "FormActionCondition",
+                                "operator": null,
+                                "question": null,
+                                "type": "never"
+                            },
+                            "doc_type": "OpenCaseAction",
+                            "external_id": null,
+                            "name_path": null
+                        },
+                        "open_referral": {
+                            "condition": {
+                                "answer": null,
+                                "doc_type": "FormActionCondition",
+                                "operator": "=",
+                                "question": null,
+                                "type": "never"
+                            },
+                            "doc_type": "OpenReferralAction",
+                            "followup_date": null,
+                            "name_path": null
+                        },
+                        "referral_preload": {
+                            "condition": {
+                                "answer": null,
+                                "doc_type": "FormActionCondition",
+                                "operator": "=",
+                                "question": null,
+                                "type": "never"
+                            },
+                            "doc_type": "PreloadAction",
+                            "preload": {}
+                        },
+                        "subcases": [
+                            {
+                                "case_name": "/data/tasks",
+                                "case_properties": {},
+                                "case_type": "task",
+                                "close_condition": {
+                                    "answer": null,
+                                    "doc_type": "FormActionCondition",
+                                    "operator": null,
+                                    "question": null,
+                                    "type": "never"
+                                },
+                                "condition": {
+                                    "answer": null,
+                                    "doc_type": "FormActionCondition",
+                                    "operator": null,
+                                    "question": null,
+                                    "type": "always"
+                                },
+                                "doc_type": "OpenSubCaseAction",
+                                "reference_id": null,
+                                "repeat_context": null
+                            }
+                        ],
+                        "update_case": {
+                            "condition": {
+                                "answer": null,
+                                "doc_type": "FormActionCondition",
+                                "operator": null,
+                                "question": null,
+                                "type": "never"
+                            },
+                            "doc_type": "UpdateCaseAction",
+                            "update": {}
+                        },
+                        "update_referral": {
+                            "condition": {
+                                "answer": null,
+                                "doc_type": "FormActionCondition",
+                                "operator": "=",
+                                "question": null,
+                                "type": "never"
+                            },
+                            "doc_type": "UpdateReferralAction",
+                            "followup_date": null
+                        }
+                    },
+                    "auto_gps_capture": false,
+                    "doc_type": "Form",
+                    "form_filter": "",
+                    "form_type": "module_form",
+                    "media_audio": null,
+                    "media_image": null,
+                    "name": {
+                        "en": "Add Tasks"
+                    },
+                    "post_form_workflow": "default",
+                    "requires": "none",
+                    "show_count": false,
+                    "unique_id": "8eb65e0e8de94a365e5146d71efb4e2c878dbc99",
+                    "version": null,
+                    "xmlns": "http://openrosa.org/formdesigner/7945B146-AD78-467B-98D0-D05D95370F1E"
+                }
+            ],
+            "media_audio": null,
+            "media_image": null,
+            "module_type": "basic",
+            "name": {
+                "en": "Patient"
+            },
+            "parent_select": {
+                "active": false,
+                "doc_type": "ParentSelect",
+                "module_id": null,
+                "relationship": "parent"
+            },
+            "put_in_root": false,
+            "ref_details": {
+                "doc_type": "DetailPair",
+                "long": {
+                    "columns": [],
+                    "display": "long",
+                    "doc_type": "Detail",
+                    "sort_elements": []
+                },
+                "short": {
+                    "columns": [],
+                    "display": "short",
+                    "doc_type": "Detail",
+                    "sort_elements": []
+                }
+            },
+            "referral_label": {
+                "en": "Referrals"
+            },
+            "referral_list": {
+                "doc_type": "CaseList",
+                "label": {},
+                "show": false
+            },
+            "task_list": {
+                "doc_type": "CaseList",
+                "label": {},
+                "show": false
+            },
+            "unique_id": "accdd91fef6c8c20410c35ef385624e2cb8e7e43"
+        },
+        {
+            "case_details": {
+                "doc_type": "DetailPair",
+                "long": {
+                    "columns": [
+                        {
+                            "advanced": "",
+                            "calc_xpath": ".",
+                            "doc_type": "DetailColumn",
+                            "enum": [],
+                            "field": "name",
+                            "filter_xpath": "",
+                            "format": "plain",
+                            "header": {
+                                "en": "Name"
+                            },
+                            "late_flag": 30,
+                            "model": "case",
+                            "time_ago_interval": 365.25
+                        }
+                    ],
+                    "display": "long",
+                    "doc_type": "Detail",
+                    "sort_elements": []
+                },
+                "short": {
+                    "columns": [
+                        {
+                            "advanced": "",
+                            "calc_xpath": ".",
+                            "doc_type": "DetailColumn",
+                            "enum": [],
+                            "field": "name",
+                            "filter_xpath": "",
+                            "format": "plain",
+                            "header": {
+                                "en": "Name"
+                            },
+                            "late_flag": 30,
+                            "model": "case",
+                            "time_ago_interval": 365.25
+                        }
+                    ],
+                    "display": "short",
+                    "doc_type": "Detail",
+                    "sort_elements": []
+                }
+            },
+            "case_label": {
+                "en": "Cases"
+            },
+            "case_list": {
+                "doc_type": "CaseList",
+                "label": {},
+                "show": false
+            },
+            "case_type": "task",
+            "doc_type": "Module",
+            "forms": [
+                {
+                    "actions": {
+                        "case_preload": {
+                            "condition": {
+                                "answer": null,
+                                "doc_type": "FormActionCondition",
+                                "operator": null,
+                                "question": null,
+                                "type": "always"
+                            },
+                            "doc_type": "PreloadAction",
+                            "preload": {
+                                "/data/task": "name"
+                            }
+                        },
+                        "close_case": {
+                            "condition": {
+                                "answer": null,
+                                "doc_type": "FormActionCondition",
+                                "operator": null,
+                                "question": null,
+                                "type": "never"
+                            },
+                            "doc_type": "FormAction"
+                        },
+                        "close_referral": {
+                            "condition": {
+                                "answer": null,
+                                "doc_type": "FormActionCondition",
+                                "operator": "=",
+                                "question": null,
+                                "type": "never"
+                            },
+                            "doc_type": "FormAction"
+                        },
+                        "doc_type": "FormActions",
+                        "open_case": {
+                            "condition": {
+                                "answer": null,
+                                "doc_type": "FormActionCondition",
+                                "operator": null,
+                                "question": null,
+                                "type": "never"
+                            },
+                            "doc_type": "OpenCaseAction",
+                            "external_id": null,
+                            "name_path": null
+                        },
+                        "open_referral": {
+                            "condition": {
+                                "answer": null,
+                                "doc_type": "FormActionCondition",
+                                "operator": "=",
+                                "question": null,
+                                "type": "never"
+                            },
+                            "doc_type": "OpenReferralAction",
+                            "followup_date": null,
+                            "name_path": null
+                        },
+                        "referral_preload": {
+                            "condition": {
+                                "answer": null,
+                                "doc_type": "FormActionCondition",
+                                "operator": "=",
+                                "question": null,
+                                "type": "never"
+                            },
+                            "doc_type": "PreloadAction",
+                            "preload": {}
+                        },
+                        "subcases": [],
+                        "update_case": {
+                            "condition": {
+                                "answer": null,
+                                "doc_type": "FormActionCondition",
+                                "operator": null,
+                                "question": null,
+                                "type": "always"
+                            },
+                            "doc_type": "UpdateCaseAction",
+                            "update": {}
+                        },
+                        "update_referral": {
+                            "condition": {
+                                "answer": null,
+                                "doc_type": "FormActionCondition",
+                                "operator": "=",
+                                "question": null,
+                                "type": "never"
+                            },
+                            "doc_type": "UpdateReferralAction",
+                            "followup_date": null
+                        }
+                    },
+                    "auto_gps_capture": false,
+                    "doc_type": "Form",
+                    "form_filter": "",
+                    "form_type": "module_form",
+                    "media_audio": null,
+                    "media_image": null,
+                    "name": {
+                        "en": "See Task"
+                    },
+                    "post_form_workflow": "default",
+                    "requires": "case",
+                    "show_count": false,
+                    "unique_id": "5e1aea6f0af0bf06754bf315d69fe866515e3f7e",
+                    "version": null,
+                    "xmlns": "http://openrosa.org/formdesigner/9D5D0E88-5020-4469-994A-79791F15467E"
+                }
+            ],
+            "media_audio": null,
+            "media_image": null,
+            "module_type": "basic",
+            "name": {
+                "en": "Tasks"
+            },
+            "parent_select": {
+                "active": false,
+                "doc_type": "ParentSelect",
+                "module_id": null,
+                "relationship": "parent"
+            },
+            "put_in_root": false,
+            "ref_details": {
+                "doc_type": "DetailPair",
+                "long": {
+                    "columns": [],
+                    "display": "long",
+                    "doc_type": "Detail",
+                    "sort_elements": []
+                },
+                "short": {
+                    "columns": [],
+                    "display": "short",
+                    "doc_type": "Detail",
+                    "sort_elements": []
+                }
+            },
+            "referral_label": {
+                "en": "Referrals"
+            },
+            "referral_list": {
+                "doc_type": "CaseList",
+                "label": {},
+                "show": false
+            },
+            "task_list": {
+                "doc_type": "CaseList",
+                "label": {},
+                "show": false
+            },
+            "unique_id": "8df0029d38b24ce7dc4f20bfcf8ed1f1d68e32e7"
+        }
+    ],
+    "multimedia_map": {},
+    "name": "Subcases from a Multi-Select",
+    "phone_model": null,
+    "platform": "nokia/s40",
+    "profile": {
+        "features": {
+            "sense": "false",
+            "users": "true"
+        },
+        "properties": {
+            "ViewStyle": "v_chatterbox",
+            "cc-autoup-freq": "freq-never",
+            "cc-content-valid": "no",
+            "cc-days-form-retain": "-1",
+            "cc-entry-mode": "cc-entry-quick",
+            "cc-login-images": "No",
+            "cc-resize-images": "none",
+            "cc-send-procedure": "cc-send-http",
+            "cc-send-unsent": "cc-su-auto",
+            "cc-show-incomplete": "yes",
+            "cc-show-saved": "yes",
+            "cc-user-mode": "cc-u-normal",
+            "extra_key_action": "audio",
+            "log_prop_daily": "log_never",
+            "log_prop_weekly": "log_short",
+            "logenabled": "Enabled",
+            "loose_media": "no",
+            "password_format": "n",
+            "purge-freq": "0",
+            "restore-tolerance": "loose",
+            "server-tether": "push-only",
+            "unsent-number-limit": "5",
+            "user_reg_server": "required"
+        }
+    },
+    "recipients": "",
+    "secure_submissions": false,
+    "show_user_registration": false,
+    "success_message": {},
+    "text_input": "roman",
+    "translation_strategy": "select-known",
+    "translations": {},
+    "use_custom_suite": false,
+    "user_registration": {
+        "auto_gps_capture": false,
+        "data_paths": {},
+        "doc_type": "UserRegistrationForm",
+        "form_type": "user_registration",
+        "name": {},
+        "password_path": "password",
+        "post_form_workflow": "default",
+        "show_count": false,
+        "unique_id": "80d89a3095b08c6490b37654a174c5b3910c935f",
+        "username_path": "username",
+        "version": null,
+        "xmlns": null
+    },
+    "user_type": null
+}
