@@ -15,6 +15,36 @@
                             <update/>
                         </case>
                     </subcase_0>
+                    <subcase_1>
+                        <case xmlns="http://commcarehq.org/case/transaction/v2" case_id="" date_modified="" user_id="">
+                            <create>
+                                <case_name/>
+                                <owner_id/>
+                                <case_type>task</case_type>
+                            </create>
+                            <update/>
+                        </case>
+                    </subcase_1>
+                    <subcase_2>
+                        <case xmlns="http://commcarehq.org/case/transaction/v2" case_id="" date_modified="" user_id="">
+                            <create>
+                                <case_name/>
+                                <owner_id/>
+                                <case_type>task</case_type>
+                            </create>
+                            <update/>
+                        </case>
+                    </subcase_2>
+                    <subcase_3>
+                        <case xmlns="http://commcarehq.org/case/transaction/v2" case_id="" date_modified="" user_id="">
+                            <create>
+                                <case_name/>
+                                <owner_id/>
+                                <case_type>task</case_type>
+                            </create>
+                            <update/>
+                        </case>
+                    </subcase_3>
                     <orx:meta xmlns:cc="http://commcarehq.org/xforms">
                         <orx:deviceID/>
                         <orx:timeStart/>
@@ -52,6 +82,29 @@
             <setvalue event="xforms-ready" ref="/data/subcase_0/case/@case_id" value="uuid()"/>
             <bind calculate="/data/tasks" nodeset="/data/subcase_0/case/create/case_name"/>
             <bind calculate="/data/meta/userID" nodeset="/data/subcase_0/case/create/owner_id"/>
+            <bind calculate="jr:itext('tasks-do_homework-label')" nodeset="/data/subcase_0/case/create/case_name"/>
+
+            <bind calculate="/data/meta/timeEnd" nodeset="/data/subcase_1/case/@date_modified" type="xsd:dateTime"/>
+            <bind calculate="/data/meta/userID" nodeset="/data/subcase_1/case/@user_id"/>
+            <setvalue event="xforms-ready" ref="/data/subcase_1/case/@case_id" value="uuid()"/>
+            <bind calculate="/data/tasks" nodeset="/data/subcase_1/case/create/case_name"/>
+            <bind calculate="/data/meta/userID" nodeset="/data/subcase_1/case/create/owner_id"/>
+            <bind calculate="jr:itext('tasks-eat_food-label')" nodeset="/data/subcase_1/case/create/case_name"/>
+
+            <bind calculate="/data/meta/timeEnd" nodeset="/data/subcase_2/case/@date_modified" type="xsd:dateTime"/>
+            <bind calculate="/data/meta/userID" nodeset="/data/subcase_2/case/@user_id"/>
+            <setvalue event="xforms-ready" ref="/data/subcase_2/case/@case_id" value="uuid()"/>
+            <bind calculate="/data/tasks" nodeset="/data/subcase_2/case/create/case_name"/>
+            <bind calculate="/data/meta/userID" nodeset="/data/subcase_2/case/create/owner_id"/>
+            <bind calculate="jr:itext('tasks-sleep-label')" nodeset="/data/subcase_2/case/create/case_name"/>
+
+            <bind calculate="/data/meta/timeEnd" nodeset="/data/subcase_3/case/@date_modified" type="xsd:dateTime"/>
+            <bind calculate="/data/meta/userID" nodeset="/data/subcase_3/case/@user_id"/>
+            <setvalue event="xforms-ready" ref="/data/subcase_3/case/@case_id" value="uuid()"/>
+            <bind calculate="/data/tasks" nodeset="/data/subcase_3/case/create/case_name"/>
+            <bind calculate="/data/meta/userID" nodeset="/data/subcase_3/case/create/owner_id"/>
+            <bind calculate="jr:itext('tasks-exercise-label')" nodeset="/data/subcase_3/case/create/case_name"/>
+
             <setvalue event="xforms-ready" ref="/data/meta/deviceID" value="instance('commcaresession')/session/context/deviceid"/>
             <setvalue event="xforms-ready" ref="/data/meta/timeStart" value="now()"/>
             <bind nodeset="/data/meta/timeStart" type="xsd:dateTime"/>
