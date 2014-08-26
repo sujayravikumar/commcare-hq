@@ -146,8 +146,12 @@ var HQVisualizations = function (options) {
 
         self.data = merge_options(self.data, data);
 
-        $.getJSON(self.ajax_url, self.data,
-            function(d) {
+        $.ajax({
+            url: self.ajax_url,
+            dataType: 'json',
+            data: self.data,
+            success: function(d) {
+                console.log("in success");
                 var startdate = new Date(Date.UTC(d.startdate[0], d.startdate[1]-1, d.startdate[2]));
                 var enddate = new Date(Date.UTC(d.enddate[0], d.enddate[1]-1, d.enddate[2]));
                 self.charts = loadCharts(self.chart_name, self.xaxis_label, d.histo_data, d.initial_values,
@@ -181,10 +185,12 @@ var HQVisualizations = function (options) {
                 if (callback_fn) {
                     callback_fn();
                 }
-            }
-        ).fail(function() {
-            $loading.hide();
-            $error.show();
+            },
+            error: function() {
+                $loading.hide();
+                $error.show();
+            },
+            timeout: 1000 * 60 * 60 * 2
         });
     };
 };
