@@ -190,7 +190,7 @@ var HQVisualizations = function (options) {
                 $loading.hide();
                 $error.show();
             },
-            timeout: 1000 * 60 * 60 * 2
+            timeout: 0
         });
     };
 };
