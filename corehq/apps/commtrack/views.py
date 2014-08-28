@@ -2,6 +2,7 @@ from django.http import HttpResponse, HttpResponseRedirect, Http404, HttpRespons
 from django.shortcuts import render
 from django.utils.decorators import method_decorator
 from django.utils.translation import ugettext as _, ugettext_noop
+from django.views.decorators.http import require_POST
 from corehq.apps.commtrack.helpers import psi_one_time_setup
 from corehq.apps.commtrack.util import get_or_make_def_program, all_sms_codes
 
@@ -172,6 +173,40 @@ class DefaultConsumptionView(BaseCommTrackManageView):
         return self.get(request, *args, **kwargs)
 
 
+@require_POST
+@domain_admin_required
+def archive_product(request, domain, prod_id, archive=True):
+    """
+    Archive product
+    """
+    product = Product.get(prod_id)
+    product.archive()
+    return HttpResponse(json.dumps(dict(
+        success=True,
+        message=_("Product '{product_name}' has successfully been {action}.").format(
+            product_name=product.name,
+            action="archived",
+        )
+    )))
+
+
+@require_POST
+@domain_admin_required
+def unarchive_product(request, domain, prod_id, archive=True):
+    """
+    Unarchive product
+    """
+    product = Product.get(prod_id)
+    product.unarchive()
+    return HttpResponse(json.dumps(dict(
+        success=True,
+        message=_("Product '{product_name}' has successfully been {action}.").format(
+            product_name=product.name,
+            action="unarchived",
+        )
+    )))
+
+
 class ProductListView(BaseCommTrackManageView):
     # todo mobile workers shares this type of view too---maybe there should be a class for this?
     urlname = 'commtrack_product_list'
@@ -205,6 +240,12 @@ class ProductListView(BaseCommTrackManageView):
                 'limit': self.limit,
                 'total': self.total
             },
+            'archive_help_text': _(
+                "Archive a product to stop showing data for it in \
+                reports and on mobile applications. Archiving is \
+                completely reversible, so you can always reactivate \
+                it later."
+            ),
             'show_inactive': self.show_inactive,
             'pagination_limit_options': range(self.DEFAULT_LIMIT, 51, self.DEFAULT_LIMIT)
         }
@@ -216,10 +257,29 @@ class FetchProductListView(ProductListView):
     def skip(self):
         return (int(self.page) - 1) * int(self.limit)
 
+    def get_archive_text(self, is_archived):
+        if is_archived:
+            return _("This will re-activate the product, and the product will show up in reports again.")
+        return _("As a result of archiving, this product will no longer appear in reports. "
+                 "This action is reversable; you can reactivate this product by viewing "
+                 "Show Archived Products and clicking 'Unarchive'.")
+
     @property
     def product_data(self):
         data = []
-        products = Product.by_domain(domain=self.domain, limit=self.limit, skip=self.skip())
+        if self.show_inactive:
+            products = Product.archived_by_domain(
+                domain=self.domain,
+                limit=self.limit,
+                skip=self.skip(),
+            )
+        else:
+            products = Product.by_domain(
+                domain=self.domain,
+                limit=self.limit,
+                skip=self.skip(),
+            )
+
         for p in products:
             if p.program_id:
                 program = Program.get(p.program_id)
@@ -231,6 +291,12 @@ class FetchProductListView(ProductListView):
             info = p._doc
             info['program'] = program.name
             info['edit_url'] = reverse('commtrack_product_edit', kwargs={'domain': self.domain, 'prod_id': p._id})
+            info['archive_action_desc'] = self.get_archive_text(self.show_inactive)
+            info['archive_action_text'] = _("Un-Archive") if self.show_inactive else _("Archive")
+            info['archive_url'] = reverse(
+                'unarchive_product' if self.show_inactive else 'archive_product',
+                kwargs={'domain': self.domain, 'prod_id': p._id}
+            )
             data.append(info)
         return data
 
@@ -373,7 +439,9 @@ def product_importer_job_poll(request, domain, download_id, template="hqwebapp/p
 def download_products(request, domain):
     def _get_products(domain):
         for p_doc in iter_docs(Product.get_db(), Product.ids_by_domain(domain)):
-            yield Product.wrap(p_doc)
+            # filter out archived products from export
+            if not ('is_archived' in p_doc and p_doc['is_archived']):
+                yield Product.wrap(p_doc)
 
     def _build_row(keys, product):
         row = []
