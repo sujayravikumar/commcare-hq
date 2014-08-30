@@ -54,6 +54,9 @@ FAILURE_MESSAGES = {
     "replace_with_UID": ugettext_noop(
         "Rows shouldn't contain UIDs while using replace option. Excel sheet '{tag}' contains UID in a row."
     ),
+    "bad_row_number": ugettext_noop(
+        "In sheet:'{tag}' and row number:'{row_number}' - "
+    ),
 }
 
 
@@ -255,14 +258,18 @@ def run_upload(domain, workbook, replace=False, task=None):
             items_in_table = len(data_items)
             for sort_key, di in enumerate(data_items):
                 _update_progress(table_number, sort_key, items_in_table)
+                bad_row_number_message = _(FAILURE_MESSAGES["bad_row_number"]).format(
+                    row_number=sort_key + 2,
+                    tag=tag
+                )
                 # Check that type definitions in 'types' sheet vs corresponding columns in the item-sheet MATCH
                 item_fields_list = di['field'].keys()
                 not_in_sheet, not_in_types = diff_lists(item_fields_list, data_type.fields_without_attributes)
                 if len(not_in_sheet) > 0:
-                    error_message = _(FAILURE_MESSAGES["has_no_field_column"]).format(tag=tag, field=not_in_sheet[0])
+                    error_message = bad_row_number_message + _(FAILURE_MESSAGES["has_no_field_column"]).format(tag=tag, field=not_in_sheet[0])
                     raise ExcelMalformatException(error_message)
                 if len(not_in_types) > 0:
-                    error_message = _(FAILURE_MESSAGES["has_extra_column"]).format(tag=tag, field=not_in_types[0])
+                    error_message = bad_row_number_message + _(FAILURE_MESSAGES["has_extra_column"]).format(tag=tag, field=not_in_types[0])
                     raise ExcelMalformatException(error_message)
 
                 # check that properties in 'types' sheet vs item-sheet MATCH
@@ -273,14 +280,14 @@ def run_upload(domain, workbook, replace=False, task=None):
                         type_props = field.properties
                         not_in_sheet, not_in_types = diff_lists(sheet_props_list, type_props)
                         if len(not_in_sheet) > 0:
-                            error_message = _(FAILURE_MESSAGES["sheet_has_no_property"]).format(
+                            error_message = bad_row_number_message + _(FAILURE_MESSAGES["sheet_has_no_property"]).format(
                                 tag=tag,
                                 property=not_in_sheet[0],
                                 field=field.field_name
                             )
                             raise ExcelMalformatException(error_message)
                         if len(not_in_types) > 0:
-                            error_message = _(FAILURE_MESSAGES["sheet_has_extra_property"]).format(
+                            error_message = bad_row_number_message + _(FAILURE_MESSAGES["sheet_has_extra_property"]).format(
                                 tag=tag,
                                 property=not_in_types[0],
                                 field=field.field_name
@@ -288,18 +295,18 @@ def run_upload(domain, workbook, replace=False, task=None):
                             raise ExcelMalformatException(error_message)
                         # check that fields with properties are numbered
                         if type(di['field'][field.field_name]) != list:
-                            error_message = _(FAILURE_MESSAGES["invalid_field_with_property"]).format(field=field.field_name)
+                            error_message = bad_row_number_message + _(FAILURE_MESSAGES["invalid_field_with_property"]).format(field=field.field_name)
                             raise ExcelMalformatException(error_message)
                         field_prop_len = len(di['field'][field.field_name])
                         for prop in sheet_props:
                             if type(sheet_props[prop]) != list:
-                                error_message = _(FAILURE_MESSAGES["invalid_property"]).format(
+                                error_message = bad_row_number_message + _(FAILURE_MESSAGES["invalid_property"]).format(
                                     field=field.field_name,
                                     prop=prop
                                 )
                                 raise ExcelMalformatException(error_message)
                             if len(sheet_props[prop]) != field_prop_len:
-                                error_message = _(FAILURE_MESSAGES["wrong_field_property_combos"]).format(
+                                error_message = bad_row_number_message + _(FAILURE_MESSAGES["wrong_field_property_combos"]).format(
                                     field=field.field_name,
                                     prop=prop
                                 )
