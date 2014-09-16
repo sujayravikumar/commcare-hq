@@ -51,16 +51,21 @@ def task_creation(request, domain, app_id, module_id, form_id):
     else:
         return HttpResponse("GET or POST only.", content_type="text/plain")
 
-def _ucla_form_modifier(form, question_ids):
+def _ucla_form_modifier(form, question_paths):
+    """
+    :param form:
+    :param question_paths: A list of full question paths: i.e. ["/data/my-group/my-multi-select"]
+    :return:
+    """
 
     message = ""
 
     xform = form.wrapped_xform()
 
-    # Get the questions specified in question_ids
-    question_dict = {q["value"].split("/")[-1]: FormQuestion.wrap(q) for q in form.get_questions(["en"])}
-    question_ids = {q for q in question_ids}.intersection(question_dict.keys())
-    questions = [question_dict[k] for k in question_ids]
+    # Get the questions specified in question_paths
+    question_dict = {q["value"]: FormQuestion.wrap(q) for q in form.get_questions(["en"])}
+    question_paths = {q for q in question_paths}.intersection(question_dict.keys())
+    questions = [question_dict[k] for k in question_paths]
 
     # Get the existing subcases
     existing_subcases = {c.case_name:c for c in form.actions.subcases}
@@ -70,13 +75,15 @@ def _ucla_form_modifier(form, question_ids):
     for question in questions:
         for option in question.options:
 
-            hidden_value_tag = question.value.split("/")[-1] + "-" + option.value
+            # Hidden value ids will be in the form:
+            # [<group_name>-]*<question_id>-<option.value>
+            hidden_value_tag = "-".join(question.value.split("/")[2:] + [option.value])
             hidden_value_path = "/data/" + hidden_value_tag
             hidden_value_text = option.label
 
             # Create new hidden values for each question option if they don't already exist:
 
-            if hidden_value_tag not in question_dict:
+            if hidden_value_path not in question_dict:
 
                 # Add data element
                 tag = "{x}%s" % hidden_value_tag
