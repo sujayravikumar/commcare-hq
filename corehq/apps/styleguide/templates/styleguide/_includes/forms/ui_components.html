@@ -1,6 +1,141 @@
 <section class="hq-styleguide-article">
     <header class="page-header">
         <h1 id="components">UI Components</h1>
+
+        Each category includes an example of the UI component, how to describe
+        the component in a spec, and how to utilize the component with crispy
+        forms.
+
+        <h2>Buttons</h2>
+        <h3>Example</h3>
+        <button type="submit" class="btn btn-primary">Update</button>
+        <h3>Spec Requirements</h3>
+        <p>Component: submit button</p>
+        <p>Label: Update</p>
+        <p>Disable on submit: True</p>
+        <h3>Crispy</h3>
+        <div class="highlight-python">
+            <div class="highlight">
+                <pre>
+from crispy_forms.layout import Submit
+...
+Submit('submit', 'Update')
+                </pre>
+            </div>
+        </div>
+{#        <ul class="nav nav-tabs">#}
+{#            <li><a href="#account" data-toggle="tab">Example</a></li>#}
+{#            <li><a href="#subscriptions" data-toggle="tab">Spec Requirements</a></li>#}
+{#            <li><a href="#credits" data-toggle="tab">Crispy</a></li>#}
+{#        </ul>#}
+{##}
+{#        <div class="tab-content">#}
+{#            <div class="tab-pane" id="account">#}
+{#                <button type="submit">Update</button>#}
+{#            </div>#}
+{##}
+{#            <div class="tab-pane" id="subscriptions">#}
+{#                <p>Component: submit button</p>#}
+{#                <p>Label: Update</p>#}
+{#                <p>Disable on submit: True</p>#}
+{#            </div>#}
+{##}
+{#            <div class="tab-pane" id="credits">#}
+{#                <div class="highlight-python">#}
+{#                    <div class="highlight">#}
+{#                        <pre>#}
+{#                            from crispy_forms.layout import Submit#}
+{#                            ...#}
+{#                            Submit('submit', 'Update')#}
+{#                        </pre>#}
+{#                    </div>#}
+{#                </div>#}
+{#            </div>#}
+{#        </div>#}
+
+        <h2>Checkbox</h2>
+        <h3>Example</h3>
+        <input type="checkbox" />
+        <h3>Spec Requirements</h3>
+        <p>Component: checkbox</p>
+        <h3>Crispy</h3>
+        TODO
+
+        <h2>Legend</h2>
+        <h3>Example</h3>
+        <legend>Edit Information</legend>
+        <h3>Spec Requirements</h3>
+        <p>Component: legend</p>
+        <p>Text: Edit Information</p>
+        <h3>Crispy</h3>
+        TODO
+
+        <h2>Radio Select</h2>
+        TODO
+
+        <h2>Select</h2>
+        <h3>Example</h3>
+{#        <form class="form-horizontal" role="form">#}
+{#            <div class="form-group">#}
+{#                <label for="inputEmail3" class="col-sm-2 control-label">Email</label>#}
+{#                <div class="col-sm-10">#}
+{#                    <input type="email" class="form-control" id="inputEmail3" placeholder="Email">#}
+{#                </div>#}
+{#            </div>#}
+{#            <div class="form-group">#}
+{#                <label class="control-label" for="id_customer_type">#}
+{#                    Customer Type#}
+{#                </label>#}
+{#                <div class="col-sm-10">#}
+{#                    <div class="controls">#}
+{#                        <select id="id_customer_type" name="customer_type">#}
+{#                            <option value="basic" selected="selected">Basic</option>#}
+{#                            <option value="plus">Plus</option>#}
+{#                            <option value="full">Full</option>#}
+{#                        </select>#}
+{#                    </div>#}
+{#                </div>#}
+{#            </div>#}
+{#        </form>#}
+        <label class="control-label" for="id_customer_type">
+            Customer Type
+        </label>
+            <div class="controls">
+                <select id="id_customer_type" name="customer_type">
+                    <option value="basic" selected="selected">Basic</option>
+                    <option value="plus">Plus</option>
+                    <option value="full">Full</option>
+                </select>
+            </div>
+        <h3>Spec Requirements</h3>
+        <p>Component: select</p>
+        <p>Label: Customer Type</p>
+        <p>Options: Basic, Plus, Full</p>
+        <h3>Crispy</h3>
+        <div class="highlight-python">
+            <div class="highlight">
+                <pre>
+from django import forms
+...
+class DomainMetadataForm(forms.Form):
+    customer_type = ChoiceField(
+        label=_('Customer Type'),
+        choices=(('basic', _('Basic')),
+                 ('plus', _('Plus')),
+                 ('full', _('Full')))
+    )
+                </pre>
+            </div>
+        </div>
+
+        <h2>Select2 Widget</h2>
+        TODO
+
+        <h2>Text Field</h2>
+        <h3>Example</h3>
+        <input type="text" />
+        <h3>Spec Requirements</h3>
+        <p>Component: text field</p>
     </header>
     <p class="lead">
     </p>
