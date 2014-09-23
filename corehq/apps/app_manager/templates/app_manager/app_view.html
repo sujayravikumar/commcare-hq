@@ -269,12 +269,17 @@
                 <form class="form form-horizontal" method="post" action="{% url "copy_app" domain %}">
                     {% crispy copy_app_form %}
                 </form>
+                <h3>Export Application with Gzip</h3>
+                <form action="{% url "gzip_app" domain app.id %}" method="POST">
+                    <button type="submit" class="btn btn-primary disable-on-submit">
+                        {% trans "Zip this application" %}
+                    </button>
+                </form>
             </div>
         </div>
         <div class="tab-pane" id="delete">
             <h3>{% trans "Delete Application" %}</h3>
             <form action="{% url "corehq.apps.app_manager.views.delete_app" domain app.id %}" method="POST">
-
                 <button type="submit" class="btn btn-danger disable-on-submit">
                     <i class="icon-trash"></i>
                     {% trans "Delete this application" %}

@@ -1,8 +1,11 @@
 from StringIO import StringIO
 import copy
+import gzip
 import logging
 import hashlib
 import itertools
+from wsgiref.util import FileWrapper
+import zipfile
 from lxml import etree
 import os
 import re
@@ -126,6 +129,7 @@ from corehq.apps.app_manager.decorators import safe_download, no_conflict_requir
 from django.contrib import messages
 from django_prbac.exceptions import PermissionDenied
 from django_prbac.utils import ensure_request_has_privilege
+import tempfile
 
 logger = logging.getLogger(__name__)
 
@@ -285,6 +289,23 @@ def copy_app(req, domain):
         return copy_app_check_domain(req, form.cleaned_data['domain'], form.cleaned_data['name'], app_id)
     else:
         return view_generic(req, domain, app_id=app_id, copy_app_form=form)
+
+
+@require_can_edit_apps
+def gzip_app(req, domain, app_id):
+    app_json = get_app(None, app_id)
+    #
+    fd, fpath = tempfile.mkstemp()
+    print type(app_json)
+    with os.fdopen(fd, 'w') as tmp:
+        with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as z:
+            z.writestr(fpath, app_json.export_json())
+
+    wrapper = FileWrapper(open(fpath))
+    response = HttpResponse(wrapper, mimetype='application/zip')
+    response['Content-Length'] = os.path.getsize(fpath)
+    set_file_download(response, app_id)
+    return response
 
 
 @require_can_edit_apps
