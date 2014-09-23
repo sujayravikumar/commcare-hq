@@ -267,12 +267,13 @@
         <div class="tab-pane{% if copy_app_form.is_bound %} active{% endif %}" id="copy">
             <div>
                 <form class="form form-horizontal" method="post" action="{% url "copy_app" domain %}">
-                    {% crispy copy_app_form %}
                 </form>
-                <h3>Export Application with Gzip</h3>
+                {% crispy copy_app_form %}
+                <h3>Export compressed application</h3>
                 <form action="{% url "gzip_app" domain app.id %}" method="POST">
-                    <button type="submit" class="btn btn-primary disable-on-submit">
-                        {% trans "Zip this application" %}
+                    <button type="submit" class="btn btn-primary">
+                        <i class="icon icon-download"></i>
+                        {% trans "Download" %}
                     </button>
                 </form>
             </div>
