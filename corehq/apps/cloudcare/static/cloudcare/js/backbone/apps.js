@@ -672,9 +672,25 @@ cloudCare.AppView = Backbone.View.extend({
                 }
             });
         };
+        data.errorCounts = {};
         data.onerror = function (resp) {
-            showError(resp.message, $("#cloudcare-notifications"));
-            cloudCare.dispatch.trigger("form:error", form, caseModel);
+            // increment the error count
+            if (! data.errorCounts[resp.error_type]){
+                data.errorCounts[resp.error_type] = 0;
+            }
+            data.errorCounts[resp.error_type] = data.errorCounts[resp.error_type] + 1;
+
+            // Don't display repeating errors
+            var skipError = false;
+            if (resp.error_type == 'EmptyCacheFileException' && data.errorCounts[resp.error_type] > 1){
+                skipError = true;
+            }
+            if (! skipError) {
+                // Display the error
+                debugger;
+                showError(resp.message, $("#cloudcare-notifications"));
+                cloudCare.dispatch.trigger("form:error", form, caseModel);
+            }
         };
         data.onload = function (adapter, resp) {
             cloudCare.dispatch.trigger("form:ready", form, caseModel);
