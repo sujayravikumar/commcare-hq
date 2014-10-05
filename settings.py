@@ -1127,6 +1127,7 @@ PILLOWTOPS = {
     'core_ext': [
         'corehq.pillows.reportcase.ReportCasePillow',
         'corehq.pillows.reportxform.ReportXFormPillow',
+        'corehq.apps.userreports.pillow.ConfigurableIndicatorPillow',
     ],
     'cache': [
         'corehq.pillows.cacheinvalidate.CacheInvalidatePillow',
