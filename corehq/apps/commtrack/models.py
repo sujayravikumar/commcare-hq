@@ -74,9 +74,12 @@ class Program(Document):
     name = StringProperty()
     code = StringProperty()
     last_modified = DateTimeProperty()
+    default = BooleanProperty(default=False)
+    is_archived = BooleanProperty(default=False)
 
     def save(self, *args, **kwargs):
         self.last_modified = datetime.now()
+
         return super(Program, self).save(*args, **kwargs)
 
     @classmethod
@@ -94,6 +97,50 @@ class Program(Document):
             return Program.view(**kwargs)
         else:
             return [row["doc"] for row in Program.view(wrap_doc=False, **kwargs)]
+
+    @classmethod
+    def default_for_domain(cls, domain):
+        programs = cls.by_domain(domain)
+        for p in programs:
+            if p.default:
+                return p
+
+    def delete(self):
+        # you cannot delete the default program
+        if self.default:
+            raise Exception(_('You cannot delete the default product'))
+
+        default = Program.default_for_domain(self.domain)
+
+        product_ids = [
+            r['_id'] for r in Product.by_program_id(
+                self.domain,
+                self._id,
+                wrap=False
+            )
+        ]
+        to_save = []
+
+        for product in iter_docs(Product.get_db(), product_ids):
+            product['program_id'] = default._id
+            to_save.append(product)
+
+            # break up saving in case there are many products
+            if to_save > 500:
+                Product.get_db().bulk_save(to_save)
+                to_save = []
+
+        Product.get_db().bulk_save(to_save)
+
+        return super(Program, self).delete()
+
+    def unarchive(self):
+        """
+        Unarchive a program, causing it (and its data) to show
+        up in Couch and SQL views again.
+        """
+        self.is_archived = False
+        self.save()
 
     @classmethod
     def get_by_code(cls, domain, code):
@@ -184,8 +231,7 @@ class Product(Document):
     def by_program_id(cls, domain, prog_id, wrap=True, **kwargs):
         kwargs.update(dict(
             view_name='commtrack/product_by_program_id',
-            startkey=[domain, prog_id],
-            endkey=[domain, {}],
+            key=[domain, prog_id],
             include_docs=True
         ))
         if wrap:
@@ -1337,7 +1383,7 @@ class SQLProduct(models.Model):
     This is used to efficiently filter StockState and other
     SQL based queries to exclude data for archived products.
     """
-    domain = models.CharField(max_length=100, db_index=True)
+    domain = models.CharField(max_length=255, db_index=True)
     product_id = models.CharField(max_length=100, db_index=True)
     name = models.CharField(max_length=100, null=True)
     is_archived = models.BooleanField(default=False)
