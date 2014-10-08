@@ -14,4 +14,8 @@ class DomainMetadataAPI(View):
 
     def get_metadata(self, domain):
         return {
+            "domain_properties": self.get_domain_properties(domain),
         }
+
+    def get_domain_properties(self, domain):
+        return {term: domain[term] for term in domain}
