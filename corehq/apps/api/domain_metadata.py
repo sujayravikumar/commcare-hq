@@ -1,12 +1,15 @@
 from django.http import HttpResponse, Http404
+from django.utils.decorators import method_decorator
 from django.views.generic import View
 from corehq import Domain
+from corehq.apps.domain.decorators import require_superuser
 from corehq.apps.es.domains import DomainES
 
 from dimagi.utils.web import json_response
 
 
 class DomainMetadataAPI(View):
+    @method_decorator(require_superuser)
     def get(self, *args, **kwargs):
         domain = Domain.get_by_name(kwargs.get('domain'))
         if not domain:
