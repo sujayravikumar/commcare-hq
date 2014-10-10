@@ -360,6 +360,7 @@ class CommTrackSetupTab(UITab):
             ProductListView,
             NewProductView,
             EditProductView,
+            ProductFieldsView,
             DefaultConsumptionView,
             ProgramListView,
             NewProgramView,
@@ -390,6 +391,10 @@ class CommTrackSetupTab(UITab):
                     {
                         'title': EditProductView.page_title,
                         'urlname': EditProductView.urlname,
+                    },
+                    {
+                        'title': ProductFieldsView.page_name,
+                        'urlname': ProductFieldsView.urlname,
                     },
                 ]
             },
@@ -918,6 +923,7 @@ class ProjectUsersTab(UITab):
                     return None
 
             from corehq.apps.users.views.mobile import EditCommCareUserView, ConfirmBillingAccountForExtraUsersView
+            from corehq.apps.users.views.mobile.custom_data_fields import UserFieldsView
             mobile_users_menu = [
                 {'title': _('Mobile Workers'),
                  'url': reverse('commcare_users', args=[self.domain]),
@@ -931,6 +937,8 @@ class ProjectUsersTab(UITab):
                       'urlname': 'upload_commcare_users'},
                      {'title': ConfirmBillingAccountForExtraUsersView.page_title,
                       'urlname': ConfirmBillingAccountForExtraUsersView.urlname},
+                     {'title': UserFieldsView.page_name,
+                      'urlname': UserFieldsView.urlname},
                  ]},
                 {'title': _('Groups'),
                  'url': reverse('all_groups', args=[self.domain]),
