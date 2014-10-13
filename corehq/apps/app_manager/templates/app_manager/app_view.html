@@ -281,8 +281,8 @@
                     <h3>Import compressed application</h3>
                     <form action="{% url "import_zipped" domain app.id %}" method="POST" enctype="multipart/form-data">
                         <i class="icon icon-arrow-up"></i>
-                        <input type="file" id="xform_file_input" name="xform" />
-                        <input type="submit" id="xform_file_submit" value="Upload" >
+                        <input type="file" id="zipped-file-input" />
+                        <input class="btn btn-primary" type="submit" id="xform_file_submit" value="Upload" >
                     </form>
                 </div>
             </div>
