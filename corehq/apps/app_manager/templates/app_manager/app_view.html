@@ -269,9 +269,9 @@
                 <form class="form form-horizontal" method="post" action="{% url "copy_app" domain %}">
                 </form>
                 {% crispy copy_app_form %}
-                <div style="{% if export_apps_toggle %}display: none;{% endif %}">
+                {{ export_apps_toggle }}
+                <div style="{% if not export_apps_toggle %}display: none;{% endif %}">
                     <h3>Export compressed application</h3>
-                    {% if export_apps_toggle %} export_apps_toggle is true{% endif %}
                     <form action="{% url "gzip_app" domain app.id %}" method="POST">
                         <button type="submit" class="btn btn-primary">
                             <i class="icon icon-arrow-down"></i>
@@ -280,9 +280,9 @@
                     </form>
                     <h3>Import compressed application</h3>
                     <form action="{% url "import_zipped" domain app.id %}" method="POST" enctype="multipart/form-data">
-                        <i class="icon icon-arrow-up"></i>
                         <input type="file" id="zipped-file-input" />
-                        <input class="btn btn-primary" type="submit" id="xform_file_submit" value="Upload" >
+                        <i class="icon icon-arrow-up"></i>
+                        <input type="submit" id="xform_file_submit" value="Upload" >
                     </form>
                 </div>
             </div>
