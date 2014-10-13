@@ -269,8 +269,9 @@
                 <form class="form form-horizontal" method="post" action="{% url "copy_app" domain %}">
                 </form>
                 {% crispy copy_app_form %}
-                <div visible="{% if user_has_permissions %}visible {% endif %}">
+                <div style="{% if export_apps_toggle %}display: none;{% endif %}">
                     <h3>Export compressed application</h3>
+                    {% if export_apps_toggle %} export_apps_toggle is true{% endif %}
                     <form action="{% url "gzip_app" domain app.id %}" method="POST">
                         <button type="submit" class="btn btn-primary">
                             <i class="icon icon-arrow-down"></i>

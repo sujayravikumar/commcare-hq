@@ -142,4 +142,8 @@ VIEW_SYNC_HISTORY = StaticToggle(
 STOCK_TRANSACTION_EXPORT = StaticToggle(
     'ledger_export',
     'Show "export transactions" link on case details page',
+
+EXPORT_ZIPPED_APPS = StaticToggle(
+    'export-zipped-apps',
+    'Export+Import Zipped Applications'
 )
