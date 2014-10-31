@@ -15,6 +15,12 @@ from . import case_calcs, user_calcs
 # be performed
 from custom.utils.utils import flat_field
 
+# This calculator is necessary to generate 'date' field which is required in the database
+class Numerator(fluff.Calculator):
+    @fluff.null_emitter
+    def numerator(self, doc):
+        yield None
+
 
 class OpmCaseFluff(fluff.IndicatorDocument):
     def case_property(property):
@@ -56,18 +62,25 @@ class OpmUserFluff(fluff.IndicatorDocument):
     domains = ('opm',)
     group_by = ('domain', )
 
+    save_direct_to_sql = True
+
     name = flat_field(lambda user: user.name)
-    awc_name = user_data('awc')
+
+    numerator = Numerator()
+    awc_code = user_data('awc_code')
     bank_name = user_data('bank_name')
+    ifs_code = user_data('ifs_code')
     account_number = user_data('account_number')
+    awc = user_data('awc')
     block = user_data('block')
+    gp = user_data('gp')
     village = user_data('village')
 
 
-def _get_case_id(form):
+def _get_user_id(form):
     case = form.form.get('case', {})
     if hasattr(case, 'get'):
-        return case.get('@case_id')
+        return case.get('@user_id')
 
 
 # This is a more typical fluff doc, storing arbitrary info pulled from forms.
@@ -78,7 +91,7 @@ class OpmFormFluff(fluff.IndicatorDocument):
     domains = ('opm',)
     group_by = (
         'domain',
-        fluff.AttributeGetter('case_id', _get_case_id),
+        fluff.AttributeGetter('user_id', _get_user_id),
     )
     save_direct_to_sql = True
 
@@ -130,13 +143,6 @@ class OpmHealthStatusAllInfoFluff(fluff.IndicatorDocument):
     suffering = case_calcs.ChildrenInfo(prop='child%s_suffer_diarrhea')
     excbreastfed = case_calcs.BreastFed()
     measlesvacc = case_calcs.ChildrenInfo(prop='child%s_child_measlesvacc')
-
-
-# This calculator is necessary to generate 'date' field which is required in the database
-class Numerator(fluff.Calculator):
-    @fluff.null_emitter
-    def numerator(self, case):
-        yield None
 
 
 class OPMHierarchyFluff(fluff.IndicatorDocument):

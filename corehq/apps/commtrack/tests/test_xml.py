@@ -4,7 +4,7 @@ from lxml import etree
 import os
 import random
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from casexml.apps.case.mock import CaseBlock
 from casexml.apps.case.xml import V2
 from casexml.apps.phone.restore import RestoreConfig
@@ -166,7 +166,7 @@ class CommTrackSubmissionTest(CommTrackTest):
         self.sp2 = make_supply_point(self.domain.name, loc2)
 
     @override_settings(CASEXML_FORCE_DOMAIN_CHECK=False)
-    def submit_xml_form(self, xml_method, **submit_extras):
+    def submit_xml_form(self, xml_method, timestamp=None, **submit_extras):
         instance_id = uuid.uuid4().hex
         instance = submission_wrap(
             instance_id,
@@ -175,6 +175,7 @@ class CommTrackSubmissionTest(CommTrackTest):
             self.sp,
             self.sp2,
             xml_method,
+            timestamp=timestamp,
         )
         submit_form_locally(
             instance=instance,
@@ -228,6 +229,24 @@ class CommTrackBalanceTransferTest(CommTrackSubmissionTest):
             self.assertEqual(Decimal(str(inferred)), inferred_txn.quantity)
             self.assertEqual(Decimal(str(amt)), inferred_txn.stock_on_hand)
             self.assertEqual(stockconst.TRANSACTION_TYPE_CONSUMPTION, inferred_txn.type)
+
+    def test_archived_product_submissions(self):
+        """
+        This is basically the same as above, but separated to be
+        verbose about what we are checking (and to make it easy
+        to change the expected behavior if the requirements change
+        soon.
+        """
+        initial = float(100)
+        initial_amounts = [(p._id, initial) for p in self.products]
+        final_amounts = [(p._id, float(50 - 10*i)) for i, p in enumerate(self.products)]
+
+        self.submit_xml_form(balance_submission(initial_amounts))
+        self.products[1].archive()
+        self.submit_xml_form(balance_submission(final_amounts))
+
+        for product, amt in final_amounts:
+            self.check_product_stock(self.sp, product, amt, 0)
 
     def test_balance_submit_multiple_stocks(self):
         def _random_amounts():
@@ -474,7 +493,10 @@ class CommTrackArchiveSubmissionTest(CommTrackSubmissionTest):
 
     def testArchiveLastForm(self):
         initial_amounts = [(p._id, float(100)) for p in self.products]
-        self.submit_xml_form(balance_submission(initial_amounts))
+        self.submit_xml_form(
+            balance_submission(initial_amounts),
+            timestamp=datetime.now() + timedelta(-30)
+        )
 
         final_amounts = [(p._id, float(50)) for i, p in enumerate(self.products)]
         second_form_id = self.submit_xml_form(balance_submission(final_amounts))
@@ -486,7 +508,10 @@ class CommTrackArchiveSubmissionTest(CommTrackSubmissionTest):
             self.assertEqual(3, StockState.objects.filter(case_id=self.sp._id).count())
             for state in StockState.objects.filter(case_id=self.sp._id):
                 self.assertEqual(Decimal(50), state.stock_on_hand)
-                self.assertIsNotNone(state.daily_consumption)
+                self.assertEqual(
+                    round(float(state.daily_consumption), 2),
+                    1.67
+                )
 
         # check initial setup
         _assert_initial_state()

@@ -1,13 +1,21 @@
+from collections import namedtuple
+from urllib import urlencode
+
 from django.template.loader import render_to_string
 from django.utils.safestring import mark_safe, mark_for_escaping
 from django.core.urlresolvers import reverse
 from django.utils.translation import ugettext as _
 from django.utils.translation import ugettext_noop, ugettext_lazy
-from corehq import toggles, privileges
+from corehq import toggles, privileges, Domain
 from corehq.apps.accounting.dispatcher import AccountingAdminInterfaceDispatcher
 from corehq.apps.accounting.models import BillingAccountAdmin, Invoice
 from corehq.apps.accounting.utils import is_accounting_admin
 from corehq.apps.domain.utils import get_adm_enabled_domains
+from corehq.apps.hqadmin.reports import (
+    RealProjectSpacesReport,
+    CommConnectProjectSpacesReport,
+    CommTrackProjectSpacesReport,
+)
 from corehq.apps.indicators.dispatcher import IndicatorAdminInterfaceDispatcher
 from corehq.apps.indicators.utils import get_indicator_domains
 from corehq.apps.reminders.util import can_use_survey_reminders
@@ -49,12 +57,24 @@ def format_second_level_context(title, url, menu):
     }
 
 
+class GaTracker(namedtuple('GaTracking', 'category action label')):
+    """
+    Info for tracking clicks using Google Analytics
+    see https://developers.google.com/analytics/devguides/collection/analyticsjs/events
+    """
+    def __new__(cls, category, action, label=None):
+        return super(GaTracker, cls).__new__(cls, category, action, label)
+
+
 class UITab(object):
     title = None
     view = None
     subtab_classes = None
 
     dispatcher = None
+
+    # must be instance of GaTracker
+    ga_tracker = None
 
     def __init__(self, request, current_url_name, domain=None, couch_user=None,
                  project=None, org=None):
@@ -271,6 +291,30 @@ class IndicatorAdminTab(UITab):
         indicator_enabled_projects = get_indicator_domains()
         return self.couch_user.can_edit_data() and self.domain in indicator_enabled_projects
 
+    @property
+    def sidebar_items(self):
+        items = super(IndicatorAdminTab, self).sidebar_items
+        from corehq.apps.indicators.views import (
+            BulkExportIndicatorsView,
+            BulkImportIndicatorsView,
+        )
+        items.append([
+            _("Other Actions"), [
+                {
+                    'title': BulkImportIndicatorsView.page_title,
+                    'url': reverse(BulkImportIndicatorsView.urlname,
+                                   args=[self.domain]),
+                    'urlname': BulkImportIndicatorsView.urlname,
+                },
+                {
+                    'title': _("Download Indicators Export"),
+                    'url': reverse(BulkExportIndicatorsView.urlname,
+                                   args=[self.domain]),
+                }
+            ]
+        ])
+        return items
+
 
 class DashboardTab(UITab):
     title = ugettext_noop("Dashboard")
@@ -278,14 +322,21 @@ class DashboardTab(UITab):
 
     @property
     def is_viewable(self):
-        return (self.couch_user
+        return (self.domain and self.project and not self.project.is_snapshot
+                and self.couch_user
                 and toggles.DASHBOARD_PREVIEW.enabled(self.couch_user.username))
 
 
 class ReportsTab(UITab):
     title = ugettext_noop("Reports")
-    view = "corehq.apps.reports.views.saved_reports"
     subtab_classes = (ProjectReportsTab, ADMReportsTab, IndicatorAdminTab)
+
+    @property
+    def view(self):
+        module = Domain.get_module_by_name(self.domain)
+        if hasattr(module, 'DEFAULT_REPORT_CLASS'):
+            return "corehq.apps.reports.views.default"
+        return "corehq.apps.reports.views.saved_reports"
 
 
 class ProjectInfoTab(UITab):
@@ -351,7 +402,6 @@ class CommTrackSetupTab(UITab):
             NewProgramView,
             EditProgramView,
             SMSSettingsView,
-            ILSConfigView,
         )
         from corehq.apps.locations.views import (
             LocationsListView,
@@ -363,9 +413,8 @@ class CommTrackSetupTab(UITab):
             LocationSettingsView,
         )
 
-        items = []
 
-        items.append([_('CommTrack Setup'), [
+        return [[_('CommTrack Setup'), [
             # products
             {
                 'title': ProductListView.page_title,
@@ -444,13 +493,7 @@ class CommTrackSetupTab(UITab):
                 'title': FacilitySyncView.page_title,
                 'url': reverse(FacilitySyncView.urlname, args=[self.domain]),
             },
-        ]])
-        if self.couch_user and (self.couch_user.is_superuser or IS_DEVELOPER.enabled(self.couch_user.username)):
-            items[0][1].append({
-                'title': ILSConfigView.page_title,
-                'url': reverse(ILSConfigView.urlname, args=[self.domain]),
-            })
-        return items
+        ]]]
 
 
 class ProjectDataTab(UITab):
@@ -589,6 +632,8 @@ class ApplicationsTab(UITab):
 class CloudcareTab(UITab):
     title = ugettext_noop("CloudCare")
     view = "corehq.apps.cloudcare.views.default"
+
+    ga_tracker = GaTracker('CloudCare', 'Click Cloud-Care top-level nav')
 
     @property
     def is_viewable(self):
@@ -847,12 +892,20 @@ class MessagingTab(UITab):
                 ],
             })
         if self.couch_user.is_superuser or self.couch_user.is_domain_admin(self.domain):
-            settings_pages.extend([
-                {'title': ugettext_lazy("General Settings"),
-                 'url': reverse('sms_settings', args=[self.domain])},
+            if toggles.REMINDERS_UI_PREVIEW.enabled(self.couch_user.username):
+                settings_pages.append(
+                    {'title': ugettext_lazy("General Settings"),
+                     'url': reverse('sms_settings_new', args=[self.domain])},
+                )
+            else:
+                settings_pages.append(
+                    {'title': ugettext_lazy("General Settings"),
+                     'url': reverse('sms_settings', args=[self.domain])},
+                )
+            settings_pages.append(
                 {'title': ugettext_lazy("Languages"),
-                 'url': reverse('sms_languages', args=[self.domain])},
-            ])
+                 'url': reverse('sms_languages', args=[self.domain])}
+            )
         if settings_pages:
             items.append((_("Settings"), settings_pages))
 
@@ -1220,7 +1273,21 @@ class AdminReportsTab(UITab):
                  'url': reverse('mobile_user_reports')},
                 {'title': _('Loadtest Report'),
                  'url': reverse('loadtest_report')},
-            ]), (_('Administrative Operations'), admin_operations)]
+            ]),
+            (_('Administrative Operations'), admin_operations),
+            (_('CommCare Reports'), [
+                {
+                    'title': report.name,
+                    'url': '%s?%s' % (reverse('admin_report_dispatcher',
+                                   args=(report.slug,)),
+                                   urlencode(report.default_params))
+                } for report in [
+                    RealProjectSpacesReport,
+                    CommConnectProjectSpacesReport,
+                    CommTrackProjectSpacesReport,
+                ]
+            ]),
+        ]
 
     @property
     def is_viewable(self):

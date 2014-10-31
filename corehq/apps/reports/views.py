@@ -26,6 +26,7 @@ import pytz
 from corehq import toggles, Domain
 from casexml.apps.case.cleanup import rebuild_case, close_case
 from corehq.apps.data_interfaces.dispatcher import DataInterfaceDispatcher
+from corehq.apps.reports.display import FormType
 from corehq.util.couch import get_document_or_404
 
 import couchexport
@@ -103,6 +104,9 @@ require_can_view_all_reports = require_permission(Permissions.view_reports)
 
 @login_and_domain_required
 def default(request, domain):
+    module = Domain.get_module_by_name(domain)
+    if hasattr(module, 'DEFAULT_REPORT_CLASS'):
+        return HttpResponseRedirect(getattr(module, 'DEFAULT_REPORT_CLASS').get_url(domain))
     return HttpResponseRedirect(reverse(saved_reports, args=[domain]))
 
 @login_and_domain_required
@@ -910,6 +914,7 @@ def generate_case_export_payload(domain, include_closed, format, group, user_fil
             return len(self.all_case_ids)
 
     # todo deal with cached user dict here
+    group = Group.get(group) if group else None
     users = get_all_users_by_domain(domain, group=group, user_filter=user_filter)
     groups = Group.get_case_sharing_groups(domain)
 
@@ -920,8 +925,9 @@ def generate_case_export_payload(domain, include_closed, format, group, user_fil
             domain,
             stream_cases(case_ids),
             workbook,
+            filter_group=group,
             users=users,
-            groups=groups,
+            all_groups=groups,
             process=process
         )
         export_users(users, workbook)
@@ -985,6 +991,7 @@ def _get_form_context(request, domain, instance_id):
         "timezone": timezone,
         "instance": instance,
         "user": request.couch_user,
+        "request": request,
     }
     context['form_render_options'] = context
     return context
@@ -1009,7 +1016,8 @@ def _get_form_or_404(id):
 @require_GET
 def form_data(request, domain, instance_id):
     context = _get_form_context(request, domain, instance_id)
-
+    instance = context['instance']
+    context['form_meta'] = FormType(domain, instance.xmlns, instance.app_id).metadata
     try:
         form_name = context['instance'].form["@name"]
     except KeyError:

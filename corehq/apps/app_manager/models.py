@@ -377,7 +377,7 @@ class AdvancedFormActions(DocumentSchema):
             else:
                 parent = self.actions_meta_by_tag[action.parent_tag]['action']
                 if parent.case_type == parent_case_type:
-                    yield parent
+                    yield action
 
     def get_case_tags(self):
         for action in self.get_all_actions():
@@ -499,6 +499,32 @@ class CachedStringProperty(object):
         cache.set(key, value, 7*24*60*60)  # cache for 7 days
 
 
+class ScheduleVisit(DocumentSchema):
+    """
+    due:         Days after the anchor date that this visit is due
+    late_window: Days after the due day that this visit is valid until
+    """
+    due = IntegerProperty()
+    late_window = IntegerProperty()
+
+
+class FormSchedule(DocumentSchema):
+    """
+    anchor:                     Case property containing a date after which this schedule becomes active
+    expiry:                     Days after the anchor date that this schedule expires (optional)
+    visit_list:                 List of visits in this schedule
+    post_schedule_increment:    Repeat period for visits to occur after the last fixed visit (optional)
+    transition_condition:       Condition under which the schedule transitions to the next phase
+    termination_condition:      Condition under which the schedule terminates
+    """
+    anchor = StringProperty()
+    expires = IntegerProperty()
+    visits = SchemaListProperty(ScheduleVisit)
+    post_schedule_increment = IntegerProperty()
+    transition_condition = SchemaProperty(FormActionCondition)
+    termination_condition = SchemaProperty(FormActionCondition)
+
+
 class FormBase(DocumentSchema):
     """
     Part of a Managed Application; configuration for a form.
@@ -507,7 +533,7 @@ class FormBase(DocumentSchema):
     """
     form_type = None
 
-    name = DictProperty()
+    name = DictProperty(unicode)
     unique_id = StringProperty()
     show_count = BooleanProperty(default=False)
     xmlns = StringProperty()
@@ -568,6 +594,10 @@ class FormBase(DocumentSchema):
             return form, app
         else:
             return form
+
+    @property
+    def schedule_form_id(self):
+        return self.unique_id[:6]
 
     def wrapped_xform(self):
         return XForm(self.source)
@@ -1151,7 +1181,7 @@ class DetailPair(DocumentSchema):
 
 
 class ModuleBase(IndexedSchema, NavMenuItemMediaMixin):
-    name = DictProperty()
+    name = DictProperty(unicode)
     unique_id = StringProperty()
     case_type = StringProperty()
 
@@ -1480,6 +1510,7 @@ class AdvancedForm(IndexedFormBase, NavMenuItemMediaMixin):
     form_type = 'advanced_form'
     form_filter = StringProperty()
     actions = SchemaProperty(AdvancedFormActions)
+    schedule = SchemaProperty(FormSchedule, default=None)
 
     def add_stuff_to_xform(self, xform):
         super(AdvancedForm, self).add_stuff_to_xform(xform)
@@ -1571,8 +1602,16 @@ class AdvancedForm(IndexedFormBase, NavMenuItemMediaMixin):
                 error.update(error_meta)
                 errors.append(error)
 
+        module = self.get_module()
+        if module.has_schedule and not (self.schedule and self.schedule.anchor):
+            error = {
+                'type': 'validation error',
+                'validation_message': _("All forms in this module require a visit schedule.")
+            }
+            error.update(error_meta)
+            errors.append(error)
+
         if validate_module:
-            module = self.get_module()
             errors.extend(module.get_case_errors(
                 needs_case_type=False,
                 needs_case_detail=module.requires_case_details(),
@@ -1600,7 +1639,8 @@ class AdvancedForm(IndexedFormBase, NavMenuItemMediaMixin):
                     subcase.case_properties.keys()
                 )
                 parent = self.actions.get_action_from_tag(subcase.parent_tag)
-                parent_types.add((parent.case_type, subcase.parent_reference_id or 'parent'))
+                if parent:
+                    parent_types.add((parent.case_type, subcase.parent_reference_id or 'parent'))
 
         return parent_types, case_properties
 
@@ -1613,6 +1653,7 @@ class AdvancedModule(ModuleBase):
     product_details = SchemaProperty(DetailPair)
     put_in_root = BooleanProperty(default=False)
     case_list = SchemaProperty(CaseList)
+    has_schedule = BooleanProperty()
 
     @classmethod
     def new_module(cls, name, lang):
@@ -2514,13 +2555,16 @@ class ApplicationBase(VersionedDoc, SnapshotMixin,
 
     def validate_fixtures(self):
         if not domain_has_privilege(self.domain, privileges.LOOKUP_TABLES):
-            for form in self.get_forms():
-                if form.has_fixtures:
-                    raise PermissionDenied(_(
-                        "Usage of lookup tables is not supported by your "
-                        "current subscription. Please upgrade your "
-                        "subscription before using this feature."
-                    ))
+            # remote apps don't support get_forms yet.
+            # for now they can circumvent the fixture limitation. sneaky bastards.
+            if hasattr(self, 'get_forms'):
+                for form in self.get_forms():
+                    if form.has_fixtures:
+                        raise PermissionDenied(_(
+                            "Usage of lookup tables is not supported by your "
+                            "current subscription. Please upgrade your "
+                            "subscription before using this feature."
+                        ))
 
     def validate_jar_path(self):
         build = self.get_build()
@@ -2973,7 +3017,10 @@ class Application(ApplicationBase, TranslationMixin, HQMediaMixin):
             del setting_value
 
         if self.case_sharing:
-            app_profile['properties']['server-tether'] = 'sync'
+            app_profile['properties']['server-tether'] = {
+                'force': True,
+                'value': 'sync',
+            }
 
         if with_media:
             profile_url = self.media_profile_url if not is_odk else (self.odk_media_profile_url + '?latest=true')
@@ -3349,7 +3396,7 @@ class Application(ApplicationBase, TranslationMixin, HQMediaMixin):
                     return False
                 return True
             visited.add(m.id)
-            if m.parent_select.active:
+            if hasattr(m, 'parent_select') and m.parent_select.active:
                 parent = modules.get(m.parent_select.module_id, None)
                 if parent != None and cycle_helper(parent):
                     return True

@@ -3,9 +3,9 @@ from django.shortcuts import render
 from django.utils.decorators import method_decorator
 from django.utils.translation import ugettext as _, ugettext_noop
 from django.views.decorators.http import require_POST
-from corehq.apps.commtrack.util import get_or_make_def_program, all_sms_codes
+from corehq.apps.commtrack.util import get_or_create_default_program, all_sms_codes
 
-from corehq.apps.domain.decorators import domain_admin_required, require_previewer, login_and_domain_required, \
+from corehq.apps.domain.decorators import domain_admin_required, login_and_domain_required, \
     cls_require_superuser_or_developer
 from corehq.apps.domain.models import Domain
 from corehq.apps.commtrack.models import Product, Program
@@ -13,7 +13,6 @@ from corehq.apps.commtrack.forms import ProductForm, ProgramForm, ConsumptionFor
 from corehq.apps.domain.views import BaseDomainView
 from corehq.apps.hqwebapp.utils import get_bulk_upload_form
 from corehq.apps.locations.models import Location
-from corehq.toggles import IS_DEVELOPER
 from dimagi.utils.decorators.memoized import memoized
 from corehq import toggles
 from soil.util import expose_download, get_download_context
@@ -28,9 +27,7 @@ import copy
 from couchexport.writers import Excel2007ExportWriter
 from StringIO import StringIO
 from couchexport.models import Format
-from custom.ilsgateway.models import ILSGatewayConfig
-from custom.ilsgateway.tasks import bootstrap_domain_task as ils_bootstrap_domain_task
-
+from dimagi.utils.web import json_response
 
 
 @domain_admin_required
@@ -174,6 +171,53 @@ class DefaultConsumptionView(BaseCommTrackManageView):
         return self.get(request, *args, **kwargs)
 
 
+@require_POST
+@domain_admin_required
+def delete_program(request, domain, prog_id):
+    program = Program.get(prog_id)
+    program.delete()
+    return json_response({
+        'success': True,
+        'message': _("Program '{program_name}' has successfully been deleted.").format(
+            program_name=program.name,
+        )
+    })
+
+
+@require_POST
+@domain_admin_required
+def archive_product(request, domain, prod_id, archive=True):
+    """
+    Archive product
+    """
+    product = Product.get(prod_id)
+    product.archive()
+    return json_response({
+        'success': True,
+        'message': _("Product '{product_name}' has successfully been {action}.").format(
+            product_name=product.name,
+            action="archived",
+        )
+    })
+
+
+@require_POST
+@domain_admin_required
+def unarchive_product(request, domain, prod_id, archive=True):
+    """
+    Unarchive product
+    """
+    product = Product.get(prod_id)
+    product.unarchive()
+    return json_response({
+        'success': True,
+        'message': _("Product '{product_name}' has successfully been {action}.").format(
+            product_name=product.name,
+            action="unarchived",
+        )
+    })
+
+
 class ProductListView(BaseCommTrackManageView):
     # todo mobile workers shares this type of view too---maybe there should be a class for this?
     urlname = 'commtrack_product_list'
@@ -207,6 +251,12 @@ class ProductListView(BaseCommTrackManageView):
                 'limit': self.limit,
                 'total': self.total
             },
+            'archive_help_text': _(
+                "Archive a product to stop showing data for it in \
+                reports and on mobile applications. Archiving is \
+                completely reversible, so you can always reactivate \
+                it later."
+            ),
             'show_inactive': self.show_inactive,
             'pagination_limit_options': range(self.DEFAULT_LIMIT, 51, self.DEFAULT_LIMIT)
         }
@@ -218,21 +268,46 @@ class FetchProductListView(ProductListView):
     def skip(self):
         return (int(self.page) - 1) * int(self.limit)
 
+    def get_archive_text(self, is_archived):
+        if is_archived:
+            return _("This will re-activate the product, and the product will show up in reports again.")
+        return _("As a result of archiving, this product will no longer appear in reports. "
+                 "This action is reversable; you can reactivate this product by viewing "
+                 "Show Archived Products and clicking 'Unarchive'.")
+
     @property
     def product_data(self):
         data = []
-        products = Product.by_domain(domain=self.domain, limit=self.limit, skip=self.skip())
+        if self.show_inactive:
+            products = Product.archived_by_domain(
+                domain=self.domain,
+                limit=self.limit,
+                skip=self.skip(),
+            )
+        else:
+            products = Product.by_domain(
+                domain=self.domain,
+                limit=self.limit,
+                skip=self.skip(),
+            )
+
         for p in products:
             if p.program_id:
                 program = Program.get(p.program_id)
             else:
-                program = get_or_make_def_program(self.domain)
+                program = get_or_create_default_program(self.domain)
                 p.program_id = program.get_id
                 p.save()
 
             info = p._doc
             info['program'] = program.name
             info['edit_url'] = reverse('commtrack_product_edit', kwargs={'domain': self.domain, 'prod_id': p._id})
+            info['archive_action_desc'] = self.get_archive_text(self.show_inactive)
+            info['archive_action_text'] = _("Un-Archive") if self.show_inactive else _("Archive")
+            info['archive_url'] = reverse(
+                'unarchive_product' if self.show_inactive else 'archive_product',
+                kwargs={'domain': self.domain, 'prod_id': p._id}
+            )
             data.append(info)
         return data
 
@@ -375,7 +450,9 @@ def product_importer_job_poll(request, domain, download_id, template="hqwebapp/p
 def download_products(request, domain):
     def _get_products(domain):
         for p_doc in iter_docs(Product.get_db(), Product.ids_by_domain(domain)):
-            yield Product.wrap(p_doc)
+            # filter out archived products from export
+            if not ('is_archived' in p_doc and p_doc['is_archived']):
+                yield Product.wrap(p_doc)
 
     def _build_row(keys, product):
         row = []
@@ -510,7 +587,9 @@ class FetchProgramListView(ProgramListView):
         programs = Program.by_domain(self.domain)
         for p in programs:
             info = p._doc
+            info['is_default'] = info.pop('default')
             info['edit_url'] = reverse('commtrack_program_edit', kwargs={'domain': self.domain, 'prog_id': p._id})
+            info['delete_url'] = reverse('delete_program', kwargs={'domain': self.domain, 'prog_id': p._id})
             data.append(info)
         return data
 
@@ -615,51 +694,6 @@ class EditProgramView(NewProgramView):
         return reverse(self.urlname, args=[self.domain, self.program_id])
 
 
-class ILSConfigView(BaseCommTrackManageView):
-    urlname = 'ils_config'
-    sync_urlname = 'sync_ilsgateway'
-    page_title = ugettext_noop("ILSGateway")
-    template_name = 'locations/facility_sync.html'
-    source = 'ilsgateway'
-
-    @cls_require_superuser_or_developer
-    def dispatch(self, request, *args, **kwargs):
-        return super(ILSConfigView, self).dispatch(request, *args, **kwargs)
-
-    @property
-    def page_context(self):
-        return {
-            'settings': self.settings_context,
-            'source': self.source,
-            'sync_url': self.sync_urlname,
-            'is_developer': IS_DEVELOPER.enabled(self.request.couch_user.username)
-        }
-
-    @property
-    def settings_context(self):
-        config = ILSGatewayConfig.for_domain(self.domain_object.name)
-
-        if config:
-            return {
-                "source_config": config._doc,
-            }
-        else:
-            return {
-                "source_config": ILSGatewayConfig()._doc
-            }
-
-    def post(self, request, *args, **kwargs):
-        payload = json.loads(request.POST.get('json'))
-        ils = ILSGatewayConfig.wrap(self.settings_context['source_config'])
-        ils.enabled = payload['source_config'].get('enabled', None)
-        ils.domain = self.domain_object.name
-        ils.url = payload['source_config'].get('url', None)
-        ils.username = payload['source_config'].get('username', None)
-        ils.password = payload['source_config'].get('password', None)
-        ils.save()
-        return self.get(request, *args, **kwargs)
-
-
 class FetchProductForProgramListView(EditProgramView):
     urlname = 'commtrack_product_for_program_fetch'
 
@@ -748,10 +782,3 @@ class SMSSettingsView(BaseCommTrackManageView):
         self.domain_object.commtrack_settings.save()
 
         return self.get(request, *args, **kwargs)
-
-
-@domain_admin_required
-@require_POST
-def sync_ilsgateway(request, domain):
-    ils_bootstrap_domain_task.delay(domain)
-    return HttpResponse('OK')

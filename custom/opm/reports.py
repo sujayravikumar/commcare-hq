@@ -17,6 +17,7 @@ from django.http import HttpResponse, HttpRequest, QueryDict
 from django.template import RequestContext
 from django.template.loader import render_to_string
 from django.utils.translation import ugettext_noop, ugettext as _
+from sqlagg.filters import RawFilter, IN
 from couchexport.models import Format
 
 from dimagi.utils.couch.database import iter_docs
@@ -30,10 +31,10 @@ from corehq.apps.es import cases as case_es, filters as es_filters
 from corehq.apps.reports.cache import request_cache
 from corehq.apps.reports.datatables import DataTablesHeader, DataTablesColumn
 from corehq.apps.reports.filters.dates import DatespanFilter
-from corehq.apps.reports.filters.select import SelectOpenCloseFilter, MonthFilter, YearFilter
+from corehq.apps.reports.filters.select import MonthFilter, YearFilter
 from corehq.apps.reports.generic import ElasticTabularReport, GetParamsMixin
 from corehq.apps.reports.sqlreport import DatabaseColumn, SqlData, AggregateColumn, DataFormatter, DictDataFormat
-from corehq.apps.reports.standard import CustomProjectReport, MonthYearMixin
+from corehq.apps.reports.standard import CustomProjectReport, MonthYearMixin, DatespanMixin
 from corehq.apps.reports.standard.maps import ElasticSearchMapReport
 from corehq.apps.users.models import CommCareCase, CouchUser, CommCareUser
 from corehq.elastic import es_query
@@ -44,13 +45,37 @@ from .utils import BaseMixin, normal_format, format_percent
 from .beneficiary import Beneficiary, ConditionsMet
 from .health_status import HealthStatus
 from .incentive import Worker
-from .filters import HierarchyFilter, MetHierarchyFilter
+from .filters import (HierarchyFilter, MetHierarchyFilter,
+                      OPMSelectOpenCloseFilter as OpenCloseFilter)
 from .constants import *
 
 
-DATE_FILTER ="date between :startdate and :enddate"
-DATE_FILTER_EXTENDED = '(opened_on <= :enddate AND (closed_on >= :enddate OR closed_on = '')) OR (opened_on <= :enddate AND (closed_on >= :startdate or closed_on <= :enddate))'
-
+DATE_FILTER = "date between :startdate and :enddate"
+DATE_FILTER_EXTENDED = """(
+    opened_on <= :enddate AND (
+        closed_on >= :enddate OR
+        closed_on = ''
+        )
+    ) OR (
+    opened_on <= :enddate AND (
+        closed_on >= :startdate or closed_on <= :enddate
+        )
+    )
+"""
+DATE_FILTER_EXTENDED_OPENED = """(
+    opened_on <= :enddate AND (
+        closed_on >= :enddate OR
+        closed_on = ''
+        )
+    )
+"""
+DATE_FILTER_EXTENDED_CLOSED = """(
+    opened_on <= :enddate AND (
+        closed_on <= :enddate AND
+        closed_on != ''
+        )
+    )
+"""
 
 def ret_val(value):
     return value
@@ -67,7 +92,6 @@ class OpmCaseSqlData(SqlData):
 
     @property
     def filter_values(self):
-
         return dict(
             domain=self.domain,
             user_id=self.user_id,
@@ -108,23 +132,23 @@ class OpmCaseSqlData(SqlData):
 class OpmFormSqlData(SqlData):
     table_name = "fluff_OpmFormFluff"
 
-    def __init__(self, domain, case_id, datespan):
+    def __init__(self, domain, user_id, datespan):
         self.domain = domain
-        self.case_id = case_id
+        self.user_id = user_id
         self.datespan = datespan
 
     @property
     def filter_values(self):
         return dict(
             domain=self.domain,
-            case_id=self.case_id,
+            user_id=self.user_id,
             startdate=self.datespan.startdate_utc.date(),
             enddate=self.datespan.enddate_utc.date()
         )
 
     @property
     def group_by(self):
-        return ['case_id']
+        return ['user_id']
 
     @property
     def filters(self):
@@ -132,24 +156,24 @@ class OpmFormSqlData(SqlData):
             "domain = :domain",
             "date between :startdate and :enddate"
         ]
-        if self.case_id:
-            filters.append("case_id = :case_id")
+        if self.user_id:
+            filters.append("user_id = :user_id")
         return filters
 
     @property
     def columns(self):
         return [
-            DatabaseColumn("Case ID", SimpleColumn("case_id")),
+            DatabaseColumn("User ID", SimpleColumn("user_id")),
             DatabaseColumn("Growth Monitoring Total", SumColumn("growth_monitoring_total")),
             DatabaseColumn("Service Forms Total", SumColumn("service_forms_total")),
         ]
 
     @property
     def data(self):
-        if self.case_id is None:
+        if self.user_id is None:
             return super(OpmFormSqlData, self).data
-        if self.case_id in super(OpmFormSqlData, self).data:
-            return super(OpmFormSqlData, self).data[self.case_id]
+        if self.user_id in super(OpmFormSqlData, self).data:
+            return super(OpmFormSqlData, self).data[self.user_id]
         else:
             return None
 
@@ -190,19 +214,21 @@ class OpmHealthStatusSqlData(SqlData):
 
     table_name = 'fluff_OpmHealthStatusAllInfoFluff'
 
-    def __init__(self, domain, user_id, datespan):
+    def __init__(self, domain, user_id, datespan, case_status):
         self.domain = domain
         self.user_id = user_id
         self.datespan = datespan
+        self.case_status = case_status
 
     @property
     def filter_values(self):
-        return dict(
+        filter = dict(
             domain=self.domain,
             user_id=self.user_id,
-            startdate=self.datespan.startdate_utc.date(),
-            enddate=self.datespan.enddate_utc.date()
+            startdate=str(self.datespan.startdate_utc.date()),
+            enddate=str(self.datespan.enddate_utc.date()),
         )
+        return filter
 
     @property
     def group_by(self):
@@ -210,74 +236,165 @@ class OpmHealthStatusSqlData(SqlData):
 
     @property
     def filters(self):
-        filters = [
+        return [
             "domain = :domain",
             "user_id = :user_id"
         ]
+
+    @property
+    def wrapped_sum_column_filters(self):
+        return self.wrapped_filters + [RawFilter(DATE_FILTER)]
+
+    @property
+    def wrapped_sum_column_filters_extended(self):
+        filters = self.wrapped_filters
+        if self.case_status == 'open':
+            filters.extend([RawFilter(DATE_FILTER_EXTENDED_OPENED)])
+        elif self.case_status == 'closed':
+            filters.extend([RawFilter(DATE_FILTER_EXTENDED_CLOSED)])
+        else:
+            filters.extend([RawFilter(DATE_FILTER_EXTENDED)])
         return filters
 
     @property
     def columns(self):
+        def AggColumn(label, alias, sum_slug, slug, extended=False):
+            return AggregateColumn(
+                label,
+                format_percent,
+                [
+                    AliasColumn(alias),
+                    SumColumn(
+                        sum_slug,
+                        filters=self.wrapped_sum_column_filters_extended
+                                if extended else self.wrapped_sum_column_filters),
+                ],
+                slug=slug,
+                format_fn=ret_val,
+            )
+
+        def GrowthMonitoringColumn(number):
+            return AggColumn(
+                "# of Children Who Have Attended At Least {} Growth Monitoring"
+                "Session".format(number),
+                alias='childrens',
+                sum_slug='growth_monitoring_session_{}_total'.format(number),
+                slug='growth_monitoring_session_{}'.format(number),
+            )
+
         return [
             DatabaseColumn('# of Beneficiaries Registered',
-                           SumColumn('beneficiaries_registered_total',
-                                     alias="beneficiaries",
-                                     filters=self.filters.append(DATE_FILTER_EXTENDED)),
-                           format_fn=normal_format),
-            AggregateColumn('# of Pregnant Women Registered', format_percent,
-                            [AliasColumn('beneficiaries'),
-                             SumColumn('lmp_total', filters=self.filters.append(DATE_FILTER_EXTENDED))], slug='lmp', format_fn=ret_val),
-            AggregateColumn('# of Mothers of Children Aged 3 Years and Below Registered', format_percent,
-                            [AliasColumn('beneficiaries'), SumColumn('lactating_total', alias='mothers', filters=self.filters.append(DATE_FILTER_EXTENDED))], slug='mother_reg', format_fn=ret_val),
-            DatabaseColumn('# of Children Between 0 and 3 Years of Age Registered', SumColumn('children_total', alias="childrens", filters=self.filters.append(DATE_FILTER_EXTENDED)), format_fn=normal_format),
-            AggregateColumn('# of Beneficiaries Attending VHND Monthly', format_percent, [AliasColumn('beneficiaries'), SumColumn('vhnd_monthly_total', filters=self.filters.append(DATE_FILTER))], slug='vhnd_monthly', format_fn=ret_val),
-            AggregateColumn('# of Pregnant Women Who Have Received at least 30 IFA Tablets', format_percent,
-                            [AliasColumn('beneficiaries'), SumColumn('ifa_tablets_total', filters=self.filters.append(DATE_FILTER))], slug='ifa_tablets', format_fn=ret_val),
-            AggregateColumn('# of Pregnant Women Whose Weight Gain Was Monitored At Least Once', format_percent,
-                            [AliasColumn('beneficiaries'), SumColumn('weight_once_total', filters=self.filters.append(DATE_FILTER))], slug='weight_once', format_fn=ret_val),
-            AggregateColumn('# of Pregnant Women Whose Weight Gain Was Monitored Twice', format_percent,
-                            [AliasColumn('beneficiaries'), SumColumn('weight_twice_total', filters=self.filters.append(DATE_FILTER))], slug='weight_twice', format_fn=ret_val),
-            AggregateColumn('# of Children Whose Weight Was Monitored at Birth', format_percent,
-                            [AliasColumn('childrens'), SumColumn('children_monitored_at_birth_total', filters=self.filters.append(DATE_FILTER))], slug='children_monitored_at_birth', format_fn=ret_val),
-            AggregateColumn('# of Children Whose Birth Was Registered', format_percent,
-                            [AliasColumn('childrens'), SumColumn('children_registered_total', filters=self.filters.append(DATE_FILTER))], slug='children_registered', format_fn=ret_val),
-            AggregateColumn('# of Children Who Have Attended At Least 1 Growth Monitoring Session', format_percent,
-                            [AliasColumn('childrens'), SumColumn('growth_monitoring_session_1_total', filters=self.filters.append(DATE_FILTER))], slug='growth_monitoring_session_1', format_fn=ret_val),
-            AggregateColumn('# of Children Who Have Attended At Least 2 Growth Monitoring Sessions', format_percent,
-                            [AliasColumn('childrens'), SumColumn('growth_monitoring_session_2_total', filters=self.filters.append(DATE_FILTER))], slug='growth_monitoring_session_2', format_fn=ret_val),
-            AggregateColumn('# of Children Who Have Attended At Least 3 Growth Monitoring Sessions', format_percent,
-                            [AliasColumn('childrens'), SumColumn('growth_monitoring_session_3_total', filters=self.filters.append(DATE_FILTER))], slug='growth_monitoring_session_3', format_fn=ret_val),
-            AggregateColumn('# of Children Who Have Attended At Least 4 Growth Monitoring Sessions', format_percent,
-                            [AliasColumn('childrens'), SumColumn('growth_monitoring_session_4_total', filters=self.filters.append(DATE_FILTER))], slug='growth_monitoring_session_4', format_fn=ret_val),
-            AggregateColumn('# of Children Who Have Attended At Least 5 Growth Monitoring Sessions', format_percent,
-                            [AliasColumn('childrens'), SumColumn('growth_monitoring_session_5_total', filters=self.filters.append(DATE_FILTER))], slug='growth_monitoring_session_5', format_fn=ret_val),
-            AggregateColumn('# of Children Who Have Attended At Least 6 Growth Monitoring Sessions', format_percent,
-                            [AliasColumn('childrens'), SumColumn('growth_monitoring_session_6_total', filters=self.filters.append(DATE_FILTER))], slug='growth_monitoring_session_6', format_fn=ret_val),
-            AggregateColumn('# of Children Who Have Attended At Least 7 Growth Monitoring Sessions', format_percent,
-                            [AliasColumn('childrens'), SumColumn('growth_monitoring_session_7_total', filters=self.filters.append(DATE_FILTER))], slug='growth_monitoring_session_7', format_fn=ret_val),
-            AggregateColumn('# of Children Who Have Attended At Least 8 Growth Monitoring Sessions', format_percent,
-                            [AliasColumn('childrens'), SumColumn('growth_monitoring_session_8_total', filters=self.filters.append(DATE_FILTER))], slug='growth_monitoring_session_8', format_fn=ret_val),
-            AggregateColumn('# of Children Who Have Attended At Least 9 Growth Monitoring Sessions', format_percent,
-                            [AliasColumn('childrens'), SumColumn('growth_monitoring_session_9_total', filters=self.filters.append(DATE_FILTER))], slug='growth_monitoring_session_9', format_fn=ret_val),
-            AggregateColumn('# of Children Who Have Attended At Least 10 Growth Monitoring Sessions', format_percent,
-                            [AliasColumn('childrens'), SumColumn('growth_monitoring_session_10_total', filters=self.filters.append(DATE_FILTER))], slug='growth_monitoring_session_10', format_fn=ret_val),
-            AggregateColumn('# of Children Who Have Attended At Least 11 Growth Monitoring Sessions', format_percent,
-                            [AliasColumn('childrens'), SumColumn('growth_monitoring_session_11_total', filters=self.filters.append(DATE_FILTER))], slug='growth_monitoring_session_11', format_fn=ret_val),
-            AggregateColumn('# of Children Who Have Attended At Least 12 Growth Monitoring Sessions', format_percent,
-                            [AliasColumn('childrens'), SumColumn('growth_monitoring_session_12_total', filters=self.filters.append(DATE_FILTER))], slug='growth_monitoring_session_12', format_fn=ret_val),
-            AggregateColumn('# of Children Whose Nutritional Status is Normal', format_percent,
-                            [AliasColumn('childrens'), SumColumn('nutritional_status_normal_total', filters=self.filters.append(DATE_FILTER))], slug='nutritional_status_normal', format_fn=ret_val),
-            AggregateColumn('# of Children Whose Nutritional Status is "MAM"', format_percent,
-                            [AliasColumn('childrens'), SumColumn('nutritional_status_mam_total', filters=self.filters.append(DATE_FILTER))], slug='nutritional_status_mam', format_fn=ret_val),
-            AggregateColumn('# of Children Whose Nutritional Status is "SAM"', format_percent,
-                            [AliasColumn('childrens'), SumColumn('nutritional_status_sam_total', filters=self.filters.append(DATE_FILTER))], slug='nutritional_status_sam', format_fn=ret_val),
-            AggregateColumn('# of Children Who Have Received ORS and Zinc Treatment if He/She Contracts Diarrhea', format_percent,
-                            [SumColumn('treated_total', filters=self.filters.append(DATE_FILTER)), SumColumn('suffering_total', filters=self.filters.append(DATE_FILTER))], slug='ors_zinc', format_fn=ret_val),
-            AggregateColumn('# of Mothers of Children Aged 3 Years and Below Who Reported to Have Exclusively Breastfed Their Children for First 6 Months',
-                            format_percent,
-                            [AliasColumn('mothers'), SumColumn('excbreastfed_total', filters=self.filters.append(DATE_FILTER))], slug="breastfed", format_fn=ret_val),
-            AggregateColumn('# of Children Who Received Measles Vaccine', format_percent,
-                            [AliasColumn('childrens'), SumColumn('measlesvacc_total', filters=self.filters.append(DATE_FILTER))], slug='measlesvacc', format_fn=ret_val),
+                SumColumn('beneficiaries_registered_total',
+                    alias="beneficiaries",
+                    filters=self.wrapped_sum_column_filters_extended),
+                format_fn=normal_format),
+            AggColumn(
+                '# of Pregnant Women Registered',
+                alias='beneficiaries',
+                sum_slug='lmp_total',
+                slug='lmp',
+                extended=True,
+            ),
+            AggregateColumn('# of Mothers of Children Aged 3 Years and Below Registered',
+                format_percent,
+                [AliasColumn('beneficiaries'),
+                    SumColumn('lactating_total',
+                        # TODO necessary?
+                        alias='mothers',
+                        filters=self.wrapped_sum_column_filters_extended)],
+                    slug='mother_reg',
+                    format_fn=ret_val),
+            DatabaseColumn('# of Children Between 0 and 3 Years of Age Registered',
+                SumColumn('children_total',
+                    alias="childrens",
+                    filters=self.wrapped_sum_column_filters_extended),
+                format_fn=normal_format),
+            AggColumn(
+                '# of Beneficiaries Attending VHND Monthly',
+                alias='beneficiaries',
+                sum_slug='vhnd_monthly_total',
+                slug='vhnd_monthly',
+            ),
+            AggColumn(
+                '# of Pregnant Women Who Have Received at least 30 IFA Tablets',
+                alias='beneficiaries',
+                sum_slug='ifa_tablets_total',
+                slug='ifa_tablets',
+            ),
+            AggColumn(
+                '# of Pregnant Women Whose Weight Gain Was Monitored At Least Once',
+                alias='beneficiaries',
+                sum_slug='weight_once_total',
+                slug='weight_once',
+            ),
+            AggColumn(
+                '# of Pregnant Women Whose Weight Gain Was Monitored Twice',
+                alias='beneficiaries',
+                sum_slug='weight_twice_total',
+                slug='weight_twice',
+            ),
+            AggColumn(
+                '# of Children Whose Weight Was Monitored at Birth',
+                alias='childrens',
+                sum_slug='children_monitored_at_birth_total',
+                slug='children_monitored_at_birth',
+            ),
+            AggColumn(
+                '# of Children Whose Birth Was Registered',
+                alias='childrens',
+                sum_slug='children_registered_total',
+                slug='children_registered',
+            ),
+            GrowthMonitoringColumn(1),
+            GrowthMonitoringColumn(2),
+            GrowthMonitoringColumn(3),
+            GrowthMonitoringColumn(4),
+            GrowthMonitoringColumn(5),
+            GrowthMonitoringColumn(6),
+            GrowthMonitoringColumn(7),
+            GrowthMonitoringColumn(8),
+            GrowthMonitoringColumn(9),
+            GrowthMonitoringColumn(10),
+            GrowthMonitoringColumn(11),
+            GrowthMonitoringColumn(12),
+            AggColumn(
+                '# of Children Whose Nutritional Status is Normal',
+                alias='childrens',
+                sum_slug='nutritional_status_normal_total',
+                slug='nutritional_status_normal',
+            ),
+            AggColumn(
+                '# of Children Whose Nutritional Status is "MAM"',
+                alias='childrens',
+                sum_slug='nutritional_status_mam_total',
+                slug='nutritional_status_mam',
+            ),
+            AggColumn(
+                '# of Children Whose Nutritional Status is "SAM"',
+                alias='childrens',
+                sum_slug='nutritional_status_sam_total',
+                slug='nutritional_status_sam',
+            ),
+            AggregateColumn('# of Children Who Have Received ORS and Zinc Treatment if He/She Contracts Diarrhea',
+                    format_percent,
+                    [SumColumn('treated_total',
+                        filters=self.wrapped_sum_column_filters),
+                        SumColumn('suffering_total',
+                            filters=self.wrapped_sum_column_filters)],
+                        slug='ors_zinc',
+                        format_fn=ret_val),
+            AggColumn(
+                '# of Mothers of Children Aged 3 Years and Below Who Reported to Have Exclusively Breastfed Their Children for First 6 Months',
+                alias='mothers',
+                sum_slug='excbreastfed_total',
+                slug="breastfed",
+            ),
+            AggColumn(
+                '# of Children Who Received Measles Vaccine',
+                alias='childrens',
+                sum_slug='measlesvacc_total',
+                slug='measlesvacc',
+            ),
         ]
 
 
@@ -521,12 +638,8 @@ class CaseReportMixin(object):
     is_rendered_as_email = False
 
     @property
-    def display_open_cases_only(self):
-        return self.request_params.get('is_open') == 'open'
-
-    @property
-    def display_closed_cases_only(self):
-        return self.request_params.get('is_open') == 'closed'
+    def case_status(self):
+        return OpenCloseFilter.case_status(self.request_params)
 
     def get_rows(self, datespan):
         def get_awc_filter(awcs):
@@ -546,12 +659,12 @@ class CaseReportMixin(object):
                 .term("type.exact", self.default_case_type)
         query.index = 'report_cases'
 
-        if self.display_open_cases_only:
+        if self.case_status == 'open':
             query = query.filter(es_filters.OR(
                 case_es.is_closed(False),
                 case_es.closed_range(gte=self.datespan.enddate_utc)
             ))
-        elif self.display_closed_cases_only:
+        elif self.case_status == 'closed':
             query = query.filter(case_es.closed_range(lte=self.datespan.enddate_utc))
 
         if self.awcs:
@@ -569,12 +682,12 @@ class CaseReportMixin(object):
             MetHierarchyFilter,
             MonthFilter,
             YearFilter,
-            SelectOpenCloseFilter,
+            OpenCloseFilter,
         ]
 
     @property
     def block(self):
-        block = self.request_params.get("block")
+        block = self.request_params.get("hierarchy_block")
         if block:
             return block
         else:
@@ -655,6 +768,7 @@ class MetReport(CaseReportMixin, BaseReport):
     fix_left_col = True
     model = ConditionsMet
     exportable = False
+    default_rows = 5
 
     @property
     def headers(self):
@@ -683,6 +797,36 @@ class MetReport(CaseReportMixin, BaseReport):
     def fixed_cols_spec(self):
         return dict(num=9, width=800)
 
+class UsersIdsData(SqlData):
+    table_name = "fluff_OpmUserFluff"
+    group_by = ['doc_id', 'name', 'awc', 'awc_code', 'bank_name',
+                'ifs_code', 'account_number', 'gp', 'block', 'village']
+
+    @property
+    def filters(self):
+        if self.config.get('awc'):
+            return [IN('awc', 'awc')]
+        elif self.config.get('gp'):
+            return [IN('gp', 'gp')]
+        elif self.config.get('block'):
+            return [IN('block', 'block')]
+        return []
+
+    @property
+    def columns(self):
+        return [
+            DatabaseColumn('doc_id', SimpleColumn('doc_id')),
+            DatabaseColumn('name', SimpleColumn('name')),
+            DatabaseColumn('awc', SimpleColumn('awc')),
+            DatabaseColumn('awc_code', SimpleColumn('awc_code')),
+            DatabaseColumn('bank_name', SimpleColumn('bank_name')),
+            DatabaseColumn('ifs_code', SimpleColumn('ifs_code')),
+            DatabaseColumn('account_number', SimpleColumn('account_number')),
+            DatabaseColumn('gp', SimpleColumn('gp')),
+            DatabaseColumn('block', SimpleColumn('block')),
+            DatabaseColumn('village', SimpleColumn('village'))
+        ]
+
 class IncentivePaymentReport(BaseReport):
     name = "AWW Payment Report"
     slug = 'incentive_payment_report'
@@ -703,11 +847,18 @@ class IncentivePaymentReport(BaseReport):
         return {'last_month_totals': self.last_month_totals}
 
     def get_rows(self, datespan):
-        return CommCareUser.by_domain(DOMAIN)
+        config = {}
+        for lvl in ['awc', 'gp', 'block']:
+            req_prop = 'hierarchy_%s' % lvl
+            request_param = self.request.GET.getlist(req_prop, [])
+            if request_param and not request_param[0] == '0':
+                config.update({lvl: tuple(self.request.GET.getlist(req_prop, []))})
+                break
+        return UsersIdsData(config=config).get_data()
 
     def get_row_data(self, row):
-        case_sql_data = OpmCaseSqlData(DOMAIN, row._id, self.datespan)
-        form_sql_data = OpmFormSqlData(DOMAIN, row._id, self.datespan)
+        case_sql_data = OpmCaseSqlData(DOMAIN, row['doc_id'], self.datespan)
+        form_sql_data = OpmFormSqlData(DOMAIN, row['doc_id'], self.datespan)
         return self.model(row, self, case_sql_data.data, form_sql_data.data)
 
 def this_month_if_none(month, year):
@@ -795,7 +946,7 @@ def get_report(ReportClass, month=None, year=None, block=None, lang=None):
     return Report()
 
 
-class HealthStatusReport(BaseReport):
+class HealthStatusReport(DatespanMixin, BaseReport):
 
     ajax_pagination = True
     asynchronous = True
@@ -813,7 +964,11 @@ class HealthStatusReport(BaseReport):
 
     @property
     def fields(self):
-        return [HierarchyFilter, SelectOpenCloseFilter, DatespanFilter]
+        return [HierarchyFilter, OpenCloseFilter, DatespanFilter]
+
+    @property
+    def case_status(self):
+        return OpenCloseFilter.case_status(self.request_params)
 
     @property
     @memoized
@@ -854,17 +1009,22 @@ class HealthStatusReport(BaseReport):
         return self.es_results['hits'].get('hits', [])
 
     def get_row_data(self, row):
+        def empty_health_status(row):
+            model = HealthStatus()
+            model.awc = row['_source']['user_data']['awc']
+            return model
+
         if 'user_data' in row['_source'] and 'awc' in row['_source']['user_data']:
-            sql_data = OpmHealthStatusSqlData(DOMAIN, row['_id'], self.datespan)
+            sql_data = OpmHealthStatusSqlData(DOMAIN, row['_id'], self.datespan, self.case_status)
             if sql_data.data:
                 formatter = DataFormatter(DictDataFormat(sql_data.columns, no_value=format_percent(0, 0)))
                 data = dict(formatter.format(sql_data.data, keys=sql_data.keys, group_by=sql_data.group_by))
+                if row['_id'] not in data:
+                    return empty_health_status(row)
                 data[row['_id']].update({'awc': row['_source']['user_data']['awc']})
                 return HealthStatus(**data[row['_id']])
             else:
-                model = HealthStatus()
-                model.awc = row['_source']['user_data']['awc']
-                return model
+                return empty_health_status(row)
         else:
             raise InvalidRow
 
@@ -964,9 +1124,9 @@ class HealthMapSource(HealthStatusReport):
         users = self.get_users
         mapping = {}
         for user in users:
-            user_src = user['_source']
-            aww_name = user_src['first_name'] + " " + user_src['last_name']
-            meta_data = user_src['user_data']
+            user_src = user.get('_source', {})
+            aww_name = user_src.get('first_name', "") + " " + user_src.get('last_name', "")
+            meta_data = user_src.get('user_data', {})
             awc = meta_data.get("awc", "")
             block = meta_data.get("block", "")
             gp = meta_data.get("gp", "")
@@ -1015,7 +1175,7 @@ class HealthMapReport(BaseMixin, ElasticSearchMapReport, GetParamsMixin, CustomP
     name = "Health Status (Map)"
     slug = "health_status_map"
 
-    fields = [HierarchyFilter, SelectOpenCloseFilter, DatespanFilter]
+    fields = [HierarchyFilter, OpenCloseFilter, DatespanFilter]
 
     data_source = {
         'adapter': 'legacyreport',

@@ -11,13 +11,11 @@ from corehq.apps.api.es import CaseES
 from corehq.apps.es import filters
 from corehq.apps.es import users as user_es
 from corehq.apps.es.es_query import HQESQuery
-from corehq.apps.groups.models import Group
 from corehq.apps.reports.api import ReportDataSource
 from corehq.apps.reports.datatables import DataTablesHeader, DataTablesColumn
 from corehq.apps.reports.filters.search import SearchFilter
 from corehq.apps.reports.filters.select import SelectOpenCloseFilter
-from corehq.apps.reports.filters.users import SelectMobileWorkerFilter,\
-    ExpandedMobileWorkerFilterWithAllData as EMWF
+from corehq.apps.reports.filters.users import ExpandedMobileWorkerFilterWithAllData as EMWF
 from corehq.apps.reports.generic import ElasticProjectInspectionReport
 from corehq.apps.reports.models import HQUserType
 from corehq.apps.reports.standard import ProjectReportParametersMixin
@@ -198,15 +196,6 @@ class CaseListReport(CaseListMixin, ProjectInspectionReport, ReportDataSource):
 
     name = ugettext_noop('Case List')
     slug = 'case_list'
-
-    @property
-    @memoized
-    def rendered_report_title(self):
-        self.name = _("%(report_name)s for %(worker_type)s") % {
-            "report_name": _(self.name),
-            "worker_type": _(SelectMobileWorkerFilter.get_default_text(self.user_filter))
-        }
-        return self.name
 
     def slugs(self):
         return [

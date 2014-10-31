@@ -17,6 +17,10 @@ CACHE_BACKEND = 'memcached://127.0.0.1:11211/'
 DEBUG = True
 TEMPLATE_DEBUG = DEBUG
 LESS_DEBUG = DEBUG
+# Enable LESS_WATCH if you want less.js to constantly recompile.
+# Useful if you're making changes to the less files and don't want to refresh
+# your page.
+LESS_WATCH = False
 
 # clone http://github.com/dimagi/Vellum into submodules/formdesigner and use
 # this to select various versions of Vellum source on the form designer page.
@@ -180,6 +184,7 @@ DEFAULT_APPS = (
     'djtables',
     'django_prbac',
     'djkombu',
+    'djangular',
     'couchdbkit.ext.django',
     'crispy_forms',
     'django.contrib.markup',
@@ -261,6 +266,8 @@ HQ_APPS = (
     'corehq.apps.registration',
     'corehq.apps.unicel',
     'corehq.apps.reports',
+    'corehq.apps.reports_core',
+    'corehq.apps.userreports',
     'corehq.apps.data_interfaces',
     'corehq.apps.export',
     'corehq.apps.builds',
@@ -308,7 +315,6 @@ HQ_APPS = (
     'custom.reports.care_sa',
     'custom.apps.cvsu',
     'custom.reports.mc',
-    'custom.trialconnect',
     'custom.apps.crs_reports',
     'custom.hope',
     'custom.openlmis',
@@ -321,6 +327,8 @@ HQ_APPS = (
 
     'custom.colalife',
     'custom.intrahealth',
+    'custom.world_vision',
+
     'custom.care_pathways',
     'bootstrap3_crispy',
 )
@@ -336,7 +344,6 @@ APPS_TO_EXCLUDE_FROM_TESTS = (
     'corehq.apps.mach',
     'corehq.apps.ota',
     'corehq.apps.settings',
-    'corehq.apps.sislog',
     'corehq.apps.telerivet',
     'corehq.apps.tropo',
     'corehq.apps.megamobile',
@@ -457,7 +464,7 @@ HQ_FIXTURE_GENERATORS = [
     # core
     "corehq.apps.users.fixturegenerators.user_groups",
     "corehq.apps.fixtures.fixturegenerators.item_lists",
-    "corehq.apps.callcenter.fixturegenerators.indicators",
+    "corehq.apps.callcenter.fixturegenerators.indicators_fixture_generator",
     "corehq.apps.commtrack.fixtures.product_fixture_generator",
     "corehq.apps.commtrack.fixtures.program_fixture_generator",
     "corehq.apps.locations.fixtures.location_fixture_generator",
@@ -762,7 +769,7 @@ LOGGING = {
         'mail_admins': {
             'level': 'ERROR',
             'filters': ['require_debug_false'],
-            'class': 'django.utils.log.AdminEmailHandler',
+            'class': 'corehq.util.log.HqAdminEmailHandler',
         },
         'sentry': {
             'level': 'ERROR',
@@ -978,13 +985,13 @@ COUCHDB_APPS = [
     'pathindia',
     'pact',
     'psi',
-    'trialconnect',
     'accounting',
     'succeed',
     'ilsgateway',
     ('auditcare', 'auditcare'),
     ('couchlog', 'couchlog'),
     ('receiverwrapper', 'receiverwrapper'),
+    ('userreports', 'meta'),
     # needed to make couchdbkit happy
     ('fluff', 'fluff-bihar'),
     ('bihar', 'fluff-bihar'),
@@ -994,6 +1001,7 @@ COUCHDB_APPS = [
     ('cvsu', 'fluff-cvsu'),
     ('mc', 'fluff-mc'),
     ('m4change', 'm4change'),
+    ('wvindia2', 'wvindia2')
 ]
 
 COUCHDB_APPS += LOCAL_COUCHDB_APPS
@@ -1121,6 +1129,7 @@ PILLOWTOPS = {
     'core_ext': [
         'corehq.pillows.reportcase.ReportCasePillow',
         'corehq.pillows.reportxform.ReportXFormPillow',
+        'corehq.apps.userreports.pillow.ConfigurableIndicatorPillow',
     ],
     'cache': [
         'corehq.pillows.cacheinvalidate.CacheInvalidatePillow',
@@ -1149,14 +1158,15 @@ PILLOWTOPS = {
         'custom.intrahealth.models.TauxDeRuptureFluffPillow',
         'custom.intrahealth.models.LivraisonFluffPillow',
         'custom.care_pathways.models.GeographyFluffPillow',
-        'custom.care_pathways.models.FarmerRecordFluffPillow'
+        'custom.care_pathways.models.FarmerRecordFluffPillow',
+        'custom.world_vision.models.WorldVisionMotherFluffPillow',
+        'custom.world_vision.models.WorldVisionChildFluffPillow',
+        'custom.world_vision.models.WorldVisionHierarchyFluffPillow',
+
     ],
     'mvp': [
         'corehq.apps.indicators.pillows.FormIndicatorPillow',
         'corehq.apps.indicators.pillows.CaseIndicatorPillow',
-    ],
-    'trialconnect': [
-        'custom.trialconnect.smspillow.TCSMSPillow',
     ],
 }
 
@@ -1209,6 +1219,7 @@ ES_XFORM_FULL_INDEX_DOMAINS = [
 
 CUSTOM_MODULES = [
     'custom.apps.crs_reports',
+    'custom.ilsgateway',
 ]
 
 REMOTE_APP_NAMESPACE = "%(domain)s.commcarehq.org"
@@ -1243,9 +1254,6 @@ DOMAIN_MODULE_MAP = {
     'psi-unicef': 'psi',
     'project': 'custom.apps.care_benin',
 
-    'gc': 'custom.trialconnect',
-    'tc-test': 'custom.trialconnect',
-    'trialconnect': 'custom.trialconnect',
     'ipm-senegal': 'custom.intrahealth',
     'testing-ipm-senegal': 'custom.intrahealth',
 
@@ -1254,6 +1262,7 @@ DOMAIN_MODULE_MAP = {
     'm4change': 'custom.m4change',
     'succeed': 'custom.succeed',
     'test-pathfinder': 'custom.m4change',
+    'wvindia2': 'custom.world_vision',
     'pathways-india-mis': 'custom.care_pathways',
     'pathways-tanzania': 'custom.care_pathways',
 }
@@ -1291,4 +1300,5 @@ COMPRESS_OFFLINE_CONTEXT = {
     'login_template': LOGIN_TEMPLATE,
     'original_template': BASE_ASYNC_TEMPLATE,
     'less_debug': LESS_DEBUG,
+    'less_watch': LESS_WATCH,
 }
