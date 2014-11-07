@@ -47,6 +47,8 @@ class Location(CachedCouchDocumentMixin, Document):
         return "%s (%s)" % (self.name, self.location_type)
 
     def save(self, *args, **kwargs):
+        raise NotImplementedError('Saving Locations is temporarily disabled')
+
         self.last_modified = datetime.now()
 
         # lazy migration for site_code
