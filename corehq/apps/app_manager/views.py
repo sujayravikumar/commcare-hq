@@ -7,6 +7,7 @@ from lxml import etree
 import os
 import re
 import json
+import lxml.etree as etree
 from collections import defaultdict
 from xml.dom.minidom import parseString
 
