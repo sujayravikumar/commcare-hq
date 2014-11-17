@@ -377,6 +377,8 @@ class ProcessImageFileUploadView(BaseProcessFileUploadView):
 
 
 class ProcessIconFileUploadView(ProcessImageFileUploadView):
+    name = "hqmedia_uploader_logo"
+
     @property
     def form_path(self):
         return ("jr://file/commcare/image/%s%s"
@@ -384,7 +386,7 @@ class ProcessIconFileUploadView(ProcessImageFileUploadView):
 
     @property
     def filename(self):
-        raise NotImplementedError
+        return self.kwargs.get('logo_name')
 
     def process_upload(self):
         if self.app.icon_refs is None:
@@ -395,16 +397,6 @@ class ProcessIconFileUploadView(ProcessImageFileUploadView):
         self.app.icon_refs[self.filename] = ref['ref']
         self.app.save()
         return ref
-
-
-class ProcessJavaIconFileUploadView(ProcessIconFileUploadView):
-    name = "hqmedia_uploader_java_icon"
-    filename = "java_icon"
-
-
-class ProcessAndroidIconFileUploadView(ProcessIconFileUploadView):
-    name = "hqmedia_uploader_android_icon"
-    filename = "android_icon"
 
 
 class ProcessAudioFileUploadView(BaseProcessFileUploadView):
