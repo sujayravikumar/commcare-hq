@@ -235,7 +235,11 @@ def get_or_update_cases(xform, case_db):
     case_updates = get_case_updates(xform)
 
     for case_update in case_updates:
-        case_doc = _get_or_update_model(case_update, xform, case_db)
+        illegal_case_id_error = None
+        try:
+            case_doc = _get_or_update_model(case_update, xform, case_db)
+        except IllegalCaseId as illegal_case_id_error:
+            case_doc = None
         if case_doc:
             # todo: legacy behavior, should remove after new case processing
             # is fully enabled.
@@ -245,7 +249,15 @@ def get_or_update_cases(xform, case_db):
         else:
             logging.error(
                 "XForm %s had a case block that wasn't able to create a case! "
-                "This usually means it had a missing ID" % xform.get_id
+                "This usually means it had a missing ID",
+                xform.get_id,
+                extra={
+                    'data': {
+                        'illegal_case_id_error': illegal_case_id_error,
+                        'case_update': (case_update.raw_block
+                                        if case_update else None)
+                    },
+                }
             )
 
     # at this point we know which cases we want to update so sopy this away
@@ -253,18 +265,39 @@ def get_or_update_cases(xform, case_db):
     touched_cases = copy.copy(case_db.cache)
 
     # once we've gotten through everything, validate all indices
+    # todo: this validates all referenced_ids on relevant cases
+    # todo: not only indexes that have just been updated
+    # todo: this can get you into a state where you'll error on the same
+    # todo: bad reference every time a case is submitted to
     def _validate_indices(case):
         if case.indices:
             for index in case.indices:
-                # call get and not doc_exists to force domain checking
-                referenced_case = case_db.get(index.referenced_id)
+                try:
+                    # call get and not doc_exists to force domain checking
+                    referenced_case = case_db.get(index.referenced_id)
 
-                if not referenced_case:
-                    raise IllegalCaseId(
-                        ("Submitted index against an unknown case id: %s. "
-                         "This is not allowed. Most likely your case "
-                         "database is corrupt and you should restore your "
-                         "phone directly from the server.") % index.referenced_id)
+                    if not referenced_case:
+                        raise IllegalCaseId(
+                            ("Submitted index against an unknown case id: %s. "
+                             "This is not allowed. Most likely your case "
+                             "database is corrupt and you should restore your "
+                             "phone directly from the server.") % index.referenced_id)
+                except IllegalCaseId as illegal_case_id_error:
+                    # just log, don't raise an error or modify the index
+                    # todo: decide whether it's safer to modify the index:
+                    # todo: options: (1) delete index entirely
+                    # todo: (2) change referenced_id to None
+                    # todo: (3) 1 or 2 and keep a log of bad refs in the case
+                    logging.error(
+                        "Case %s references bad case id %s",
+                        case.get_id,
+                        index.referenced_id,
+                        extra={
+                            'data': {
+                                'illegal_case_id_error': illegal_case_id_error,
+                            }
+                        }
+                    )
 
     [_validate_indices(case) for case in case_db.cache.values()]
 
@@ -275,6 +308,8 @@ def _get_or_update_model(case_update, xform, case_db):
     """
     Gets or updates an existing case, based on a block of data in a
     submitted form.  Doesn't save anything.
+
+    raises IllegalCaseId
     """
 
     case = case_db.get(case_update.id)
