@@ -40,6 +40,7 @@ from corehq.apps.domain.decorators import require_superuser,\
 from corehq.apps.domain.utils import normalize_domain_name, get_domain_from_url
 from corehq.apps.hqwebapp.encoders import LazyEncoder
 from corehq.apps.hqwebapp.forms import EmailAuthenticationForm, CloudCareAuthenticationForm
+from corehq.apps.hqwebapp.models import MaintenanceAlert
 from corehq.apps.receiverwrapper.models import Repeater
 from corehq.apps.reports.util import is_mobile_worker_with_report_access
 from corehq.apps.users.models import CouchUser
@@ -949,3 +950,12 @@ def osdd(request, template='osdd.xml'):
     response = render(request, template, {'url_base': get_url_base()})
     response['Content-Type'] = 'application/xml'
     return response
+
+
+def maintenance_alerts(request, template='hqwebapp/maintenance_alerts.html'):
+    return render(request, template, {
+        'alerts': [{
+            'created': unicode(alert.created),
+            'html': alert.html,
+        } for alert in MaintenanceAlert.objects.all()[:5]]
+    })

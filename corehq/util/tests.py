@@ -6,6 +6,7 @@ from corehq.toggles import deterministic_random
 from corehq.util.couch import get_document_or_404
 from corehq.apps.users.models import WebUser
 from corehq.apps.users.models import CommCareUser
+from corehq.util.markup import mark_up_urls
 
 
 class GetDocTestCase(TestCase):
@@ -66,3 +67,7 @@ class DeterministicRandomTestCase(SimpleTestCase):
             # we expect about 1000 in each bucket and the sample is big enough that
             # these constraints are fine.
             self.assertTrue(900 < buckets[i] < 1100)
+
+__test__ = {
+    'mark_up_urls': mark_up_urls
+}

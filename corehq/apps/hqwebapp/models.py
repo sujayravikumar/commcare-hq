@@ -20,6 +20,7 @@ from corehq.apps.indicators.dispatcher import IndicatorAdminInterfaceDispatcher
 from corehq.apps.indicators.utils import get_indicator_domains
 from corehq.apps.reminders.util import can_use_survey_reminders
 from corehq.apps.smsbillables.dispatcher import SMSAdminInterfaceDispatcher
+from corehq.util.markup import mark_up_urls
 from django_prbac.exceptions import PermissionDenied
 from django_prbac.models import Role, UserRole
 from django_prbac.utils import ensure_request_has_privilege
@@ -34,6 +35,7 @@ from corehq.apps.adm.dispatcher import (ADMAdminInterfaceDispatcher,
 from corehq.apps.announcements.dispatcher import (
     HQAnnouncementAdminInterfaceDispatcher)
 from corehq.toggles import IS_DEVELOPER
+from django.db import models
 
 
 def format_submenu_context(title, url=None, html=None,
@@ -1499,6 +1501,7 @@ class OrgReportTab(OrgTab):
             format_submenu_context(_("User Data"), url=reverse("orgs_stats", args=(self.org.name, "users"))),
         ]
 
+
 class OrgSettingsTab(OrgTab):
     title = ugettext_noop("Settings")
     view = "corehq.apps.orgs.views.orgs_landing"
@@ -1510,3 +1513,15 @@ class OrgSettingsTab(OrgTab):
             format_submenu_context(_("Teams"), url=reverse("orgs_teams", args=(self.org.name,))),
             format_submenu_context(_("Members"), url=reverse("orgs_stats", args=(self.org.name,))),
         ]
+
+
+class MaintenanceAlert(models.Model):
+    created = models.DateTimeField(auto_now_add=True)
+    modified = models.DateTimeField(auto_now_add=True)
+    active = models.BooleanField(default=False)
+
+    text = models.TextField()
+
+    @property
+    def html(self):
+        return mark_up_urls(self.text)
