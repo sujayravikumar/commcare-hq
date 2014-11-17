@@ -376,7 +376,7 @@ class ProcessImageFileUploadView(BaseProcessFileUploadView):
         return ['image']
 
 
-class ProcessIconFileUploadMixin(object):
+class ProcessIconFileUploadView(ProcessImageFileUploadView):
     @property
     def form_path(self):
         return ("jr://file/commcare/image/%s%s"
@@ -386,27 +386,25 @@ class ProcessIconFileUploadMixin(object):
     def filename(self):
         raise NotImplementedError
 
+    def process_upload(self):
+        if self.app.icon_refs is None:
+            self.app.icon_refs = {}
+        ref = super(
+            ProcessIconFileUploadView, self
+        ).process_upload()
+        self.app.icon_refs[self.filename] = ref['ref']
+        self.app.save()
+        return ref
 
-class ProcessJavaIconFileUploadView(
-    ProcessIconFileUploadMixin,
-    ProcessImageFileUploadView,
-):
+
+class ProcessJavaIconFileUploadView(ProcessIconFileUploadView):
     name = "hqmedia_uploader_java_icon"
-
-    @property
-    def filename(self):
-        return "java_icon"
+    filename = "java_icon"
 
 
-class ProcessAndroidIconFileUploadView(
-    ProcessIconFileUploadMixin,
-    ProcessImageFileUploadView,
-):
+class ProcessAndroidIconFileUploadView(ProcessIconFileUploadView):
     name = "hqmedia_uploader_android_icon"
-
-    @property
-    def filename(self):
-        return "android_icon"
+    filename = "android_icon"
 
 
 class ProcessAudioFileUploadView(BaseProcessFileUploadView):

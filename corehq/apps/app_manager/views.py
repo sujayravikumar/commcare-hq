@@ -32,6 +32,10 @@ from corehq.apps.app_manager.forms import CopyApplicationForm
 from corehq.apps.app_manager import id_strings
 from corehq.apps.app_manager.templatetags.xforms_extras import trans
 from corehq.apps.commtrack.models import Program
+from corehq.apps.hqmedia.models import (
+    ApplicationMediaReference,
+    CommCareImage,
+)
 from corehq.apps.hqmedia.views import DownloadMultimediaZip
 from corehq.apps.hqwebapp.templatetags.hq_shared_tags import toggle_enabled
 from corehq.apps.hqwebapp.utils import get_bulk_upload_form
@@ -936,6 +940,7 @@ def view_generic(req, domain, app_id=None, module_id=None, form_id=None, is_user
         'copy_app_form': copy_app_form if copy_app_form is not None else CopyApplicationForm(app_id)
     })
 
+    java_media_info = app.icon_refs["java_icon"]
     from corehq.apps.hqmedia.controller import MultimediaIconUploadController
     from corehq.apps.hqmedia.views import (
         ProcessJavaIconFileUploadView,
@@ -959,6 +964,13 @@ def view_generic(req, domain, app_id=None, module_id=None, form_id=None, is_user
                 )
             ),
         ],
+        "java_ref":
+            ApplicationMediaReference(
+                java_media_info["path"],
+                media_class=CommCareImage,
+                module_id=java_media_info["m_id"],
+            ).as_dict(),
+        "java_media_info": java_media_info,
     })
 
     response = render(req, template, context)
