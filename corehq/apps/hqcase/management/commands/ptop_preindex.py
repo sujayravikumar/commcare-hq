@@ -1,4 +1,7 @@
-from gevent import monkey; monkey.patch_all()
+# Don't monkey-patch threads; can't share a db connection across threads
+import thread; reload(thread)
+from gevent import monkey; monkey.patch_all(thread=False)
+
 from cStringIO import StringIO
 import traceback
 from datetime import datetime
