@@ -9,27 +9,27 @@ from django.utils.safestring import mark_safe
 from django.utils.translation import ugettext as _, ugettext_noop
 from django.views.decorators.http import require_POST
 
+from corehq.apps.domain.decorators import domain_admin_required, login_and_domain_required
+from corehq.apps.hqwebapp.utils import get_bulk_upload_form
+from corehq.apps.commtrack.models import SupplyPointCase
+from corehq.apps.products.models import Product
+from corehq.apps.commtrack.util import unicode_slug
+from corehq.apps.facilities.models import FacilityRegistry
 from couchdbkit import ResourceNotFound
 from couchexport.models import Format
 from dimagi.utils.decorators.memoized import memoized
 from dimagi.utils.web import json_response
 from soil.util import expose_download, get_download_context
-
-from corehq.apps.commtrack.models import LocationType, SupplyPointCase
 from corehq.apps.commtrack.tasks import import_locations_async
-from corehq.apps.commtrack.util import unicode_slug
 from corehq.apps.commtrack.views import BaseCommTrackManageView
 from corehq.apps.consumption.shortcuts import get_default_monthly_consumption
 from corehq.apps.custom_data_fields.views import CustomDataFieldsMixin
-from corehq.apps.domain.decorators import domain_admin_required, login_and_domain_required
-from corehq.apps.facilities.models import FacilityRegistry
-from corehq.apps.hqwebapp.utils import get_bulk_upload_form
-from corehq.apps.products.models import Product
 from custom.openlmis.tasks import bootstrap_domain_task
 
 from .models import Location
 from .forms import LocationForm
 from .util import load_locs_json, location_hierarchy_config, dump_locations
+from .schema import LocationType
 
 
 @domain_admin_required
@@ -90,12 +90,13 @@ class LocationSettingsView(BaseCommTrackManageView):
     def page_context(self):
         return {
             'settings': self.settings_context,
+            'commtrack_enabled': self.domain_object.commtrack_enabled,
         }
 
     @property
     def settings_context(self):
         return {
-            'loc_types': [self._get_loctype_info(l) for l in self.domain_object.commtrack_settings.location_types],
+            'loc_types': [self._get_loctype_info(l) for l in self.domain_object.location_types],
         }
 
     def _get_loctype_info(self, loctype):
@@ -123,9 +124,9 @@ class LocationSettingsView(BaseCommTrackManageView):
 
         #TODO add server-side input validation here (currently validated on client)
 
-        self.domain_object.commtrack_settings.location_types = [mk_loctype(l) for l in payload['loc_types']]
+        self.domain_object.location_types = [mk_loctype(l) for l in payload['loc_types']]
 
-        self.domain_object.commtrack_settings.save()
+        self.domain_object.save()
 
         return self.get(request, *args, **kwargs)
 
@@ -337,6 +338,12 @@ class LocationImportView(BaseLocationView):
 
     @property
     def page_context(self):
+        def _get_manage_consumption():
+            if self.domain_object.commtrack_settings:
+                return self.domain_object.commtrack_settings.individual_consumption_defaults
+            else:
+                return False
+
         context = {
             'bulk_upload': {
                 "download_url": reverse(
@@ -344,7 +351,7 @@ class LocationImportView(BaseLocationView):
                 "adjective": _("location"),
                 "plural_noun": _("locations"),
             },
-            "manage_consumption": self.domain_object.commtrack_settings.individual_consumption_defaults,
+            "manage_consumption": _get_manage_consumption(),
         }
         context.update({
             'bulk_upload_form': get_bulk_upload_form(context),
@@ -400,16 +407,14 @@ def location_export(request, domain):
 @domain_admin_required
 @require_POST
 def sync_facilities(request, domain):
-    commtrack_settings = request.project.commtrack_settings
-
     # create Facility Registry and Facility LocationTypes if they don't exist
     if not any(lt.name == 'Facility Registry'
-               for lt in commtrack_settings.location_types):
-        commtrack_settings.location_types.extend([
+               for lt in request.project.location_types):
+        request.project.location_types.extend([
             LocationType(name='Facility Registry', allowed_parents=['']),
             LocationType(name='Facility', allowed_parents=['Facility Registry'])
         ])
-        commtrack_settings.save()
+        request.project.save()
 
     registry_locs = {
         l.external_id: l
