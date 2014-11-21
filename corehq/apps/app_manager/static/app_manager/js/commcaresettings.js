@@ -384,6 +384,9 @@ CommcareSettings.widgets.image_uploader = function (self) {
     self.is_uploader = function(slug) {
         return slug == self.slug;
     }
+    self.triggerUpload = function() {
+        triggerUploadForLogo(self.slug);
+    }
 };
 
 $(function () {

@@ -54,11 +54,18 @@
     </script>
     {% include 'hqmedia/partials/multimedia_init.html' %}
     <script type="text/javascript">
-        var java_ref = new ImageReference({{ java_ref|JSON }});
-        java_ref.upload_controller = HQMediaUploaders['hq_logo_java'];
-        java_ref.setObjReference({{ java_media_info|JSON }});
-        function java_ref_triggerUpload() {
-            java_ref.triggerUpload();
+        var refs = {{ refs|JSON }};
+        var media_info = {{ media_info|JSON }};
+        var image_refs = {};
+        for (var slug in refs) {
+            image_refs[slug] = new ImageReference(refs[slug]);
+            image_refs[slug].upload_controller = HQMediaUploaders[slug];
+            image_refs[slug].setObjReference(media_info[slug]);
+        }
+        function triggerUploadForLogo(slug) {
+            if(image_refs[slug]) {
+                image_refs[slug].triggerUpload();
+            }
         }
     </script>
     <script>

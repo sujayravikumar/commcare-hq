@@ -940,34 +940,36 @@ def view_generic(req, domain, app_id=None, module_id=None, form_id=None, is_user
         'copy_app_form': copy_app_form if copy_app_form is not None else CopyApplicationForm(app_id)
     })
 
-    java_media_info = app.icon_refs["java_icon"]
+    uploader_slugs = [
+        "hq_logo_android",
+        "hq_logo_java",
+    ]
     from corehq.apps.hqmedia.controller import MultimediaIconUploadController
     from corehq.apps.hqmedia.views import ProcessIconFileUploadView
     context.update({
         "sessionid": req.COOKIES.get('sessionid'),
         'uploaders': [
             MultimediaIconUploadController(
-                "hq_logo_java",
+                slug,
                 reverse(
                     ProcessIconFileUploadView.name,
-                    args=[domain, app_id, "java_icon"],
+                    args=[domain, app_id, slug],
                 )
-            ),
-            MultimediaIconUploadController(
-                "hq_logo_android",
-                reverse(
-                    ProcessIconFileUploadView.name,
-                    args=[domain, app_id, "android_icon"],
-                )
-            ),
+            )
+            for slug in uploader_slugs
         ],
-        "java_ref":
-            ApplicationMediaReference(
-                java_media_info["path"],
+        "refs": {
+            slug: ApplicationMediaReference(
+                app.icon_refs.get(slug)["path"],
                 media_class=CommCareImage,
-                module_id=java_media_info["m_id"],
-            ).as_dict(),
-        "java_media_info": java_media_info,
+                module_id=app.icon_refs.get(slug)["m_id"],
+            ).as_dict()
+            for slug in uploader_slugs if app.icon_refs.get(slug)
+        },
+        "media_info": {
+            slug: app.icon_refs.get(slug)
+            for slug in uploader_slugs if app.icon_refs.get(slug)
+        },
     })
 
     response = render(req, template, context)
