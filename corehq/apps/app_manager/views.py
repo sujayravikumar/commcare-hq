@@ -32,6 +32,10 @@ from corehq.apps.app_manager.forms import CopyApplicationForm
 from corehq.apps.app_manager import id_strings
 from corehq.apps.app_manager.templatetags.xforms_extras import trans
 from corehq.apps.programs.models import Program
+from corehq.apps.hqmedia.models import (
+    ApplicationMediaReference,
+    CommCareImage,
+)
 from corehq.apps.hqmedia.views import DownloadMultimediaZip
 from corehq.apps.hqwebapp.templatetags.hq_shared_tags import toggle_enabled
 from corehq.apps.hqwebapp.utils import get_bulk_upload_form
@@ -960,6 +964,38 @@ def view_generic(req, domain, app_id=None, module_id=None, form_id=None, is_user
     # Pass form for Copy Application to template:
     context.update({
         'copy_app_form': copy_app_form if copy_app_form is not None else CopyApplicationForm(app_id)
+    })
+
+    uploader_slugs = [
+        "hq_logo_android",
+        "hq_logo_java",
+    ]
+    from corehq.apps.hqmedia.controller import MultimediaIconUploadController
+    from corehq.apps.hqmedia.views import ProcessIconFileUploadView
+    context.update({
+        "sessionid": req.COOKIES.get('sessionid'),
+        'uploaders': [
+            MultimediaIconUploadController(
+                slug,
+                reverse(
+                    ProcessIconFileUploadView.name,
+                    args=[domain, app_id, slug],
+                )
+            )
+            for slug in uploader_slugs
+        ],
+        "refs": {
+            slug: ApplicationMediaReference(
+                app.icon_refs.get(slug)["path"],
+                media_class=CommCareImage,
+                module_id=app.icon_refs.get(slug)["m_id"],
+            ).as_dict()
+            for slug in uploader_slugs if app.icon_refs.get(slug)
+        },
+        "media_info": {
+            slug: app.icon_refs.get(slug)
+            for slug in uploader_slugs if app.icon_refs.get(slug)
+        },
     })
 
     response = render(req, template, context)
