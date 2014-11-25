@@ -21,6 +21,17 @@
         body {
             background-color: #f5f5ff;
         }
+        body .modal {
+            /* new custom width */
+            width: 880px;
+            /* must be half of the width, minus scrollbar on the left (30px) */
+            margin-left: -410px;
+            height: 585px;
+        }
+        #quick-view-iframe {
+            height: 430px;
+            width: 840px;
+        }
     </style>
 {% endblock %}
 
@@ -66,12 +77,15 @@
         </div>
     </div>
     {% endblocktrans %}
-
+    {% include "imports/quick_view_modal.html" %}
     <div style="padding-top:1em; text-align: right; clear:both; margin-top:1em;">
         <p>
             <span class="attention">{% trans "Want to learn more?" %}</span>
             <button class="try" onClick="parent.location='{% url "register_user" DOMAIN_TYPE %}'" title='{% trans "Sign up for a new account" %}'>
                 {% trans "Try it now!" %}
+            </button>
+            <button class="try" data-toggle="modal" data-target="#overview_modal" title='{% trans "Show overview" %}'>
+                {% trans "Show overview" %}
             </button>
         </p>
     </div>
