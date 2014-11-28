@@ -9,6 +9,7 @@
     <script src="{% static 'app_manager/js/lcs-merge.js' %}"></script>
     <script src="{% static 'hqwebapp/js/key-value-mapping.js' %}"></script>
     <script src="{% static 'app_manager/js/graph-config.js' %}"></script>
+    <script src="{% static 'app_manager/js/case-list-tile.js' %}"></script>
     <script>
     window.FEATURE_enable_enum_image = {{ enable_enum_image|BOOL }};
     window.FEATURE_enable_calc_xpaths = {{ enable_calc_xpaths|BOOL }};
@@ -102,9 +103,11 @@
             COMMCAREHQ.app_manager.setupValidation(
                 '{% url "validate_module_for_build" domain app.id module.id %}');
         });
+        $(function () {
+            ko.applyBindings(CaseListTile({unit: 40}), $('#case-detail-screen-config').get(0));
+        });
     </script>
 {% endblock %}
-
 {% block form-view %}
     <div id="build_errors"></div>
     {% if edit %}
@@ -271,6 +274,7 @@
                 <legend>
                     {% trans "Display Properties" %}
                 </legend>
+                {% include 'app_manager/partials/case_list_tile.html' %}
             </div>
             <div id="{{ detail.type }}-list-filtering-and-sorting">
                 <legend>
