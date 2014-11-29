@@ -29,7 +29,8 @@ function CaseListTile(options) {
     self.boxes = ko.observableArray();
     self.selectedBox = ko.observable(null);
     self.affordanceBoxes = ko.observableArray();
-    var getCursorPosition = function (e) {
+    var getCursorPositionPx = function (e) {
+        /* get pixel position from top left of canvas */
         var x;
         var y;
         if (e.pageX != undefined && e.pageY != undefined) {
@@ -43,19 +44,53 @@ function CaseListTile(options) {
         x -= self.$canvasGroup.get(0).offsetLeft;
         y -= self.$canvasGroup.get(0).offsetTop;
         return {
-            i: Math.floor(x/u),
-            j: Math.floor(y/u)
+            x: x,
+            y: y
+        };
+    };
+    var getCursorPosition = function (e) {
+        /* get quantized box position from top left of canvas */
+        var px = getCursorPositionPx(e);
+        return {
+            i: Math.floor(px.x/u),
+            j: Math.floor(px.y/u)
+        };
+    };
+    var getClosestVertex = function (px) {
+        /* take a pixel location and round to the nearest vertext */
+        return {
+            i: Math.floor((px.x)/u +.5),
+            j: Math.floor((px.y)/u +.5)
         };
     };
     var boxUnderCursorPosition = function (loc, boxesArray) {
         /* boxesArray is a dumb array, not ko.ObservableArray */
-        var loc = selection.start;
 
         for (var a = 0; a < boxesArray.length; a++) {
             var box = boxesArray[a];
             if (box.i() <= loc.i && loc.i < box.i() + box.width() &&
                 box.j() <= loc.j && loc.j < box.j() + box.height()) {
                 return box;
+            }
+        }
+        return null;
+    };
+    var edgeUnderCursorPosition = function (locPx, boxesArray) {
+        var fudge = 2;
+        for (var a = 0; a < boxesArray.length; a++) {
+            var box = boxesArray[a];
+            if (box.i() * u - fudge <= locPx.x && locPx.x < (box.i() + box.width()) * u + fudge &&
+                box.j() * u - fudge <= locPx.y && locPx.y < (box.j() + box.height()) * u + fudge) {
+                var match = {
+                    box: box,
+                    top: Math.abs(locPx.y - box.j() * u) < fudge,
+                    right: Math.abs(locPx.x - (box.i() + box.width()) * u) < fudge,
+                    bottom: Math.abs(locPx.y - (box.j() + box.height()) * u) < fudge,
+                    left: Math.abs(locPx.x - box.i() * u) < fudge
+                };
+                if (match.top || match.right || match.bottom || match.left) {
+                    return match;
+                }
             }
         }
         return null;
@@ -100,6 +135,48 @@ function CaseListTile(options) {
             height: normalizedSelection.end.j - normalizedSelection.start.j + 1
         };
     };
+    var getResizedBox = function (match, endVertex) {
+        var box = match.box;
+        var newBox = {
+            i: box.i(),
+            j: box.j(),
+            width: box.width(),
+            height: box.height()
+        };
+        if (match.top) {
+            if (endVertex.j >= box.j() + box.height()) {
+                newBox.height = 1;
+                newBox.j = box.j() + box.height() - 1;
+            } else {
+                newBox.height = box.height() - (endVertex.j - box.j());
+                newBox.j = endVertex.j;
+            }
+        }
+        if (match.bottom) {
+            if (endVertex.j - box.j() <= 0) {
+                newBox.height = 1;
+            } else {
+                newBox.height = endVertex.j - box.j();
+            }
+        }
+        if (match.left) {
+            if (endVertex.i >= box.i() + box.width()) {
+                newBox.height = 1;
+                newBox.i = box.i() + box.width() - 1;
+            } else {
+                newBox.width = box.width() - (endVertex.i - box.i());
+                newBox.i = endVertex.i;
+            }
+        }
+        if (match.right) {
+            if (endVertex.i - box.i() <= 0) {
+                newBox.width = 1;
+            } else {
+                newBox.width = endVertex.i - box.i();
+            }
+        }
+        return newBox;
+    };
     var selection = null;
     $affordanceCanvas.mousedown(function (e) {
         if (selection) {
@@ -110,44 +187,86 @@ function CaseListTile(options) {
         }
         selection = {};
         selection.start = getCursorPosition(e);
+        selection.startPx = getCursorPositionPx(e);
+        var edgeMatch = edgeUnderCursorPosition(selection.startPx, self.boxes());
         var box = boxUnderCursorPosition(selection.start, self.boxes());
-        if (box) {
+        if (edgeMatch) {
+            selection.isDrag = false;
+            selection.dragBox = null;
+            selection.isResize = true;
+            selection.resizeMatch = edgeMatch;
+        } else if (box) {
             selection.isDrag = true;
             selection.dragBox = box;
+            selection.isResize = false;
+            selection.resizeMatch = null;
         } else {
             selection.isDrag = false;
             selection.dragBox = null;
+            selection.isResize = false;
+            selection.resizeMatch = null;
         }
     });
     $affordanceCanvas.mousemove(function (e) {
-        if (!selection) {
-            // mouse is just moving around in the canvas
-            // no selection is happening
-            return;
-        }
-        var affordanceSelection = {
-            start: {i: selection.start.i, j: selection.start.j},
-            end: getCursorPosition(e)
-        };
-        if (selection.isDrag) {
-            var newPosition = getTransposedBox(selection.dragBox, affordanceSelection);
-            self.affordanceBoxes.splice(0, self.affordanceBoxes().length, {
-                i: ko.observable(newPosition.i),
-                j: ko.observable(newPosition.j),
-                width: ko.observable(selection.dragBox.width()),
-                height: ko.observable(selection.dragBox.height())
-            });
+        var loc = getCursorPosition(e);
+        var locPx = getCursorPositionPx(e);
+        if (selection) {
+            var affordanceSelection = {
+                start: {i: selection.start.i, j: selection.start.j},
+                end: loc
+            };
+            if (selection.isResize) {
+                var boxDimensions = getResizedBox(selection.resizeMatch, getClosestVertex(locPx));
+                self.affordanceBoxes.splice(0, self.affordanceBoxes().length, {
+                    i: ko.observable(boxDimensions.i),
+                    j: ko.observable(boxDimensions.j),
+                    width: ko.observable(boxDimensions.width),
+                    height: ko.observable(boxDimensions.height)
+                });
+            } else if (selection.isDrag) {
+                var newPosition = getTransposedBox(selection.dragBox, affordanceSelection);
+                self.affordanceBoxes.splice(0, self.affordanceBoxes().length, {
+                    i: ko.observable(newPosition.i),
+                    j: ko.observable(newPosition.j),
+                    width: ko.observable(selection.dragBox.width()),
+                    height: ko.observable(selection.dragBox.height())
+                });
+            } else {
+                var boxDimensions = getBoxFromSelection(affordanceSelection);
+                self.affordanceBoxes.splice(0, self.affordanceBoxes().length, {
+                    i: ko.observable(boxDimensions.i),
+                    j: ko.observable(boxDimensions.j),
+                    width: ko.observable(boxDimensions.width),
+                    height: ko.observable(boxDimensions.height)
+                });
+            }
         } else {
-            var boxDimensions = getBoxFromSelection(affordanceSelection);
-            self.affordanceBoxes.splice(0, self.affordanceBoxes().length, {
-                i: ko.observable(boxDimensions.i),
-                j: ko.observable(boxDimensions.j),
-                width: ko.observable(boxDimensions.width),
-                height: ko.observable(boxDimensions.height)
-            });
+            var match = null;
+            if (match = edgeUnderCursorPosition(locPx, self.boxes())) {
+                e.target.style.cursor = (function () {
+                    if (match.top && match.right || match.bottom && match.left) {
+                        return 'nesw-resize';
+                    }
+                    if (match.top && match.left || match.bottom && match.right) {
+                        return 'nwse-resize';
+                    }
+                    if (match.top || match.bottom) {
+                        return 'ns-resize';
+                    }
+                    if (match.left || match.right) {
+                        return 'ew-resize';
+                    }
+                    throw "this was supposed to be a match!";
+                }());
+            } else if (boxUnderCursorPosition(loc, self.boxes())) {
+                e.target.style.cursor = 'move';
+            } else {
+                e.target.style.cursor = 'default';
+            }
         }
     });
     $affordanceCanvas.mouseup(function (e) {
+        e.target.style.cursor = 'default';
         if (!selection) {
             // mousedown happened outside of canvas
             // so no selection is in progress
@@ -155,14 +274,25 @@ function CaseListTile(options) {
         }
         self.affordanceBoxes.splice(0, self.affordanceBoxes().length);
         selection.end = getCursorPosition(e);
-        // check if this was a drag
+        selection.endPx = getCursorPositionPx(e);
         var box;
-        if (selection.isDrag) {
+        if (selection.isResize) {
+            var endVertex = getClosestVertex(selection.endPx);
+            var match = selection.resizeMatch;
+            box = match.box;
+            var newDimensions = getResizedBox(match, endVertex);
+            box.i(newDimensions.i);
+            box.j(newDimensions.j);
+            box.width(newDimensions.width);
+            box.height(newDimensions.height);
+        } else if (selection.isDrag) {
             box = selection.dragBox;
             self.selectedBox(box);
             var newPosition = getTransposedBox(box, selection);
             box.i(newPosition.i);
             box.j(newPosition.j);
+        } else if (selection.startPx.x === selection.endPx.x && selection.startPx.y === selection.endPx.y) {
+            self.selectedBox(null);
         } else {
             var boxDimensions = getBoxFromSelection(selection);
             box = {
