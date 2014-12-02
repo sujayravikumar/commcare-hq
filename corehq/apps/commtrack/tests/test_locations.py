@@ -1,5 +1,5 @@
 from corehq.apps.users.models import CommCareUser
-from corehq.apps.locations.models import Location, SQLLocation
+from corehq.apps.locations.models import Location, SQLLocation, LocationAccess
 from casexml.apps.case.tests.util import check_user_has_case
 from casexml.apps.case.xml import V2
 from casexml.apps.case.mock import CaseBlock
@@ -14,6 +14,7 @@ class LocationsTest(CommTrackTest):
     user_definitions = [FIXED_USER]
 
     def setUp(self):
+        LocationAccess.objects.all().delete()
         super(LocationsTest, self).setUp()
         self.user = self.users[0]
 
@@ -48,7 +49,7 @@ class LocationsTest(CommTrackTest):
 
         self.check_supply_point(user, sp._id)
         self.assertTrue(len(user.locations), 2)
-        self.assertEqual(user.locations[1].name, 'secondloc')
+        self.assertTrue('secondloc' in [l.name for l in user.locations])
 
     def test_locations_can_be_removed(self):
         user = self.user

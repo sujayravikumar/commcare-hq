@@ -1335,10 +1335,15 @@ class LocationUserMixin(DocumentSchema):
 
     @property
     def locations(self):
-        from corehq.apps.locations.models import Location
+        from corehq.apps.locations.models import LocationAccess, Location
 
         def _gen():
-            location_ids = [sp.location_id for sp in self.get_linked_supply_points()]
+            mappings = LocationAccess.objects.filter(
+                user_id=self._id
+            )
+
+            location_ids = [loc.sql_location.location_id for loc in mappings]
+
             for doc in iter_docs(Location.get_db(), location_ids):
                 yield Location.wrap(doc)
 
@@ -1361,11 +1366,18 @@ class LocationUserMixin(DocumentSchema):
             )
 
     def add_location(self, location, create_sp_if_missing=False):
+        from corehq.apps.locations.models import LocationAccess, SQLLocation
         from corehq.apps.commtrack.models import SupplyPointCase
-
-        sp = SupplyPointCase.get_or_create_by_location(location)
-
         from corehq.apps.commtrack.util import submit_mapping_case_block
+
+        LocationAccess.objects.get_or_create(
+            user_id=self._id,
+            sql_location=SQLLocation.objects.get(location_id=location._id)
+        )
+
+        # create supply point case if needed
+        # TODO if needed!
+        sp = SupplyPointCase.get_or_create_by_location(location)
         submit_mapping_case_block(self, self.supply_point_index_mapping(sp))
 
     def submit_location_block(self, caseblock):
@@ -1380,7 +1392,9 @@ class LocationUserMixin(DocumentSchema):
 
     def remove_location(self, location):
         from corehq.apps.commtrack.models import SupplyPointCase
+        from corehq.apps.locations.models import LocationAccess
 
+        # TODO only do this if needed
         sp = SupplyPointCase.get_by_location(location)
 
         mapping = self.get_location_map_case()
@@ -1395,13 +1409,29 @@ class LocationUserMixin(DocumentSchema):
 
             self.submit_location_block(caseblock)
 
+        try:
+            LocationAccess.objects.get(
+                user_id=self._id,
+                sql_location__location_id=location._id
+            ).delete()
+        except LocationAccess.DoesNotExist:
+            pass
+
+
     def clear_locations(self):
+        from corehq.apps.locations.models import LocationAccess
+
+        LocationAccess.objects.filter(user_id=self._id).delete()
+
+        # clear supply point case magic if needed
+        # TODO if needed!
         mapping = self.get_location_map_case()
         if mapping:
             mapping.delete()
 
     def set_locations(self, locations):
-        from corehq.apps.commtrack.models import SupplyPointCase
+        from corehq.apps.commtrack.models import SupplyPointCase, SQLLocation
+        from corehq.apps.locations.models import LocationAccess
 
         if set([loc._id for loc in locations]) == set([loc._id for loc in self.locations]):
             # don't do anything if the list passed is the same
@@ -1416,9 +1446,16 @@ class LocationUserMixin(DocumentSchema):
 
         index = {}
         for location in locations:
+            LocationAccess.objects.create(
+                user_id=self._id,
+                sql_location=SQLLocation.objects.get(location_id=location._id)
+            )
+
+            # TODO only do this if needed
             sp = SupplyPointCase.get_by_location(location)
             index.update(self.supply_point_index_mapping(sp))
 
+        # TODO only do this if needed
         from corehq.apps.commtrack.util import location_map_case_id
         caseblock = CaseBlock(
             create=True,

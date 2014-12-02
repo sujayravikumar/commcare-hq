@@ -75,6 +75,11 @@ def _filter_for_archived(locations, include_archive_ancestors):
         return locations.filter(is_archived=False)
 
 
+class LocationAccess(models.Model):
+    user_id = models.CharField(max_length=255, db_index=True)
+    sql_location = models.ForeignKey(SQLLocation, null=True)
+
+
 class Location(CachedCouchDocumentMixin, Document):
     domain = StringProperty()
     name = StringProperty()
