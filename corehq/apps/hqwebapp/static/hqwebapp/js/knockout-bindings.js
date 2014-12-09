@@ -627,22 +627,9 @@ ko.bindingHandlers.jqueryElement = {
 };
 
 ko.bindingHandlers.__copyPasteSharedInit = function () {
-    var offScreen = {top: -10000, left: -10000};
-    var hiddenTextarea = $('<textarea></textarea>').css({
-        position: 'absolute',
-        width: 0,
-        height: 0
-    }).css(offScreen).appendTo('body');
-    var focusTextarea = function ($element, value) {
-        hiddenTextarea.css({top: $element.offset().top});
-        hiddenTextarea.val(value);
-        hiddenTextarea.focus();
-        hiddenTextarea.select();
-    };
-    var unfocusTextarea = function ($element) {
-        $element.focus();
-        return hiddenTextarea.val();
-    };
+
+    var ccClipboard;
+
     // Firefox only fires copy/paste when it thinks it's appropriate
     // Chrome doesn't fire copy/paste after key down has changed the focus
     // So we need implement both copy/paste as catching keystrokes Ctrl+C/V
@@ -652,25 +639,16 @@ ko.bindingHandlers.__copyPasteSharedInit = function () {
             $element = $(':focus');
             callback = $element.data('copyCallback');
             if (callback) {
-                focusTextarea($element, callback());
-                setTimeout(function () {
-                    unfocusTextarea($element);
-                }, 0);
+                ccClipboard = callback();
             }
         } else if (e.type === 'paste' || e.metaKey && String.fromCharCode(e.keyCode) === 'V') {
             $element = $(':focus');
             callback = $element.data('pasteCallback');
             if (callback) {
-                focusTextarea($element);
-                setTimeout(function () {
-                    var pasteValue = unfocusTextarea($element);
-                    // part of the above hack
-                    // on chrome this gets called twice,
-                    // the first time with a blank value
-                    if (pasteValue) {
-                        callback(pasteValue);
-                    }
-                }, 0);
+                if (ccClipboard){
+                    callback(ccClipboard);
+                    // This gets called twice on chrome (with the real value both times)
+                }
             }
         }
     });
