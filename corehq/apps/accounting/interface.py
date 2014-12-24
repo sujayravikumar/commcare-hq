@@ -658,9 +658,9 @@ class InvoiceInterface(GenericTabularReport):
     @property
     def report_context(self):
         context = super(InvoiceInterface, self).report_context
-        context.update(
-            adjust_balance_forms=self.adjust_balance_forms,
-        )
+        # context.update(
+        #     adjust_balance_forms=self.adjust_balance_forms,
+        # )
         return context
 
     @property
