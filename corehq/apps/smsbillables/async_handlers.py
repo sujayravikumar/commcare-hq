@@ -51,6 +51,42 @@ class SMSRatesAsyncHandler(BaseAsyncHandler):
             'rate': _("%s per 160 character SMS") % fmt_dollar_amount(usd_total),
         }
 
+
+# need to cache this gglobally
+def get_gateway_rates_by_country(country_code):
+    country_code = country_code or NONMATCHING_COUNTRY
+
+    backends = backends.extend(SMSBackend.view(
+        'sms/global_backends',
+        reduce=False,
+        include_docs=True,
+    ).all())  # needs error handling
+
+    rate_table = []
+    for backend in backends:
+        backend_api_id = get_backend_by_class_name(backend.doc_type).get_api_id()
+        from corehq.apps.sms.models import INCOMING, OUTGOING
+        rate_table.append(
+            {
+                "backend_gateway": backend.name,
+                "incoming_rate": get_rates(backend, backend_api_id, country_code, INCOMING),
+                "outgoing_rate": get_rates(backend, backend_api_id, country_code, OUTGOING),
+            }
+        )
+    return rate_table
+
+
+def get_rates(backend, backend_api_id, country_code, direction):
+    gateway_fee = SmsGatewayFee.get_by_criteria(
+        backend_api_id, direction, backend_instance=backend.id,
+        country_code=country_code,
+    )
+
+    usage_fee = SmsUsageFee.get_by_criteria(direction)
+    usd_gateway_fee = gateway_fee.amount / gateway_fee.currency.rate_to_default
+    return usage_fee.amount + usd_gateway_fee
+
+
 class SMSRatesSelect2AsyncHandler(BaseAsyncHandler):
     slug = 'sms_rate_calc'
     allowed_actions = [
