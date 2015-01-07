@@ -1597,7 +1597,7 @@ class MediaSuiteGenerator(SuiteGeneratorBase):
         PREFIX = 'jr://file/'
         # you have to call remove_unused_mappings
         # before iterating through multimedia_map
-        self.app.remove_unused_mappings()
+        #self.app.remove_unused_mappings()
         if self.app.multimedia_map is None:
             self.app.multimedia_map = {}
         for path, m in self.app.multimedia_map.items():

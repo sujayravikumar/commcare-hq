@@ -3084,6 +3084,13 @@ class Application(ApplicationBase, TranslationMixin, HQMediaMixin):
                 'value': 'sync',
             }
 
+        for logo in self.logo_refs:
+            if logo == 'hq_logo_android':
+                print self.logo_refs[logo]['path']
+                app_profile['properties']['brand-banner-home'] = app_profile['properties']['brand-banner-login'] = {
+                    'value': self.logo_refs[logo]['path'],
+                }
+
         if with_media:
             profile_url = self.media_profile_url if not is_odk else (self.odk_media_profile_url + '?latest=true')
         else:
