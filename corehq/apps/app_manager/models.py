@@ -3086,7 +3086,6 @@ class Application(ApplicationBase, TranslationMixin, HQMediaMixin):
 
         for logo in self.logo_refs:
             if logo == 'hq_logo_android':
-                print self.logo_refs[logo]['path']
                 app_profile['properties']['brand-banner-home'] = app_profile['properties']['brand-banner-login'] = {
                     'value': self.logo_refs[logo]['path'],
                 }
