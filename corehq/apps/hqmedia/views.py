@@ -363,7 +363,7 @@ class ProcessLogoFileUploadView(ProcessImageFileUploadView):
 
     @property
     def form_path(self):
-        return ("jr://file/commcare/image/data/%s%s" # change to logo
+        return ("jr://file/commcare/logo/data/%s%s"  # change to logo
                 % (self.filename, self.file_ext))
 
     @property
