@@ -469,6 +469,20 @@ Here's an example report column that shows the owner name from an associated `ow
 }
 ```
 
+### Percentage Columns
+
+You can use a special syntax to create percentage columns. These will show up as percentages instead of absolute totals in a report.
+
+```
+{
+    "type": "percentage",
+    "numerator": "births_with_danger_signs",
+    "denominator": "total_births",
+    "display": "% births with danger signs"
+}
+```
+
+
 ### Transforms
 
 Transforms can be used to transform the value returned by a column just before it reaches the user. Currently there are only two supported transform types. These are shown below:
