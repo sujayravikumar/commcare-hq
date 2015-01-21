@@ -3,16 +3,32 @@ from couchdbkit.ext.django.schema import Document, StringListProperty
 from couchdbkit.ext.django.schema import StringProperty, DictProperty, ListProperty
 from corehq.apps.cachehq.mixins import CachedCouchDocumentMixin
 from corehq.apps.userreports.exceptions import BadSpecError
-from corehq.apps.userreports.factory import FilterFactory, IndicatorFactory
+from corehq.apps.userreports.expressions.factory import ExpressionFactory
+from corehq.apps.userreports.filters.factory import FilterFactory
+from corehq.apps.userreports.indicators.factory import IndicatorFactory
 from corehq.apps.userreports.indicators import CompoundIndicator, ConfigurableIndicatorMixIn
 from corehq.apps.userreports.reports.factory import ReportFactory, ChartFactory, ReportFilterFactory
+from corehq.apps.userreports.reports.specs import FilterSpec
 from django.utils.translation import ugettext as _
+from corehq.apps.userreports.specs import EvaluationContext
 from dimagi.utils.couch.database import iter_docs
 from dimagi.utils.decorators.memoized import memoized
 from dimagi.utils.mixins import UnicodeMixIn
 
 
-class DataSourceConfiguration(UnicodeMixIn, ConfigurableIndicatorMixIn, CachedCouchDocumentMixin, Document):
+DELETED_DOC_TYPES = {
+    'CommCareCase': [
+        'CommCareCase-Deleted',
+    ],
+    'XFormInstance': [
+        'XFormInstance-Deleted',
+        'XFormArchived',
+        'XFormDeprecated',
+    ],
+}
+
+
+class DataSourceConfiguration(UnicodeMixIn, CachedCouchDocumentMixin, Document):
     """
     A data source configuration. These map 1:1 with database tables that get created.
     Each data source can back an arbitrary number of reports.
@@ -21,6 +37,7 @@ class DataSourceConfiguration(UnicodeMixIn, ConfigurableIndicatorMixIn, CachedCo
     referenced_doc_type = StringProperty(required=True)
     table_id = StringProperty(required=True)
     display_name = StringProperty()
+    base_item_expression = DictProperty()
     configured_filter = DictProperty()
     configured_indicators = ListProperty()
     named_filters = DictProperty()
@@ -28,8 +45,15 @@ class DataSourceConfiguration(UnicodeMixIn, ConfigurableIndicatorMixIn, CachedCo
     def __unicode__(self):
         return u'{} - {}'.format(self.domain, self.display_name)
 
-    @property
-    def filter(self):
+    def filter(self, document):
+        filter_fn = self._get_filter([self.referenced_doc_type])
+        return filter_fn(document, EvaluationContext(document))
+
+    def deleted_filter(self, document):
+        filter_fn = self._get_filter(DELETED_DOC_TYPES[self.referenced_doc_type])
+        return filter_fn(document, EvaluationContext(document))
+
+    def _get_filter(self, doc_types):
         extras = (
             [self.configured_filter]
             if self.configured_filter else []
@@ -41,9 +65,15 @@ class DataSourceConfiguration(UnicodeMixIn, ConfigurableIndicatorMixIn, CachedCo
                 'property_value': self.domain,
             },
             {
-                'type': 'property_match',
-                'property_name': 'doc_type',
-                'property_value': self.referenced_doc_type,
+                'type': 'or',
+                'filters': [
+                    {
+                        'type': 'property_match',
+                        'property_name': 'doc_type',
+                        'property_value': doc_type,
+                    }
+                    for doc_type in doc_types
+                ],
             },
         ]
         return FilterFactory.from_spec(
@@ -64,12 +94,18 @@ class DataSourceConfiguration(UnicodeMixIn, ConfigurableIndicatorMixIn, CachedCo
     def indicators(self):
         doc_id_indicator = IndicatorFactory.from_spec({
             "column_id": "doc_id",
-            "type": "raw",
+            "type": "expression",
             "display_name": "document id",
             "datatype": "string",
-            "property_name": "_id",
             "is_nullable": False,
             "is_primary_key": True,
+            "expression": {
+                "type": "root_doc",
+                "expression": {
+                    "type": "property_name",
+                    "property_name": "_id"
+                }
+            }
         }, self.named_filter_objects)
         return CompoundIndicator(
             self.display_name,
@@ -82,11 +118,26 @@ class DataSourceConfiguration(UnicodeMixIn, ConfigurableIndicatorMixIn, CachedCo
     def get_columns(self):
         return self.indicators.get_columns()
 
-    def get_values(self, item):
-        if self.filter.filter(item):
-            return self.indicators.get_values(item)
+    def get_items(self, document):
+        if self.filter(document):
+            if not self.base_item_expression:
+                return [document]
+            else:
+                parsed_expression = ExpressionFactory.from_spec(self.base_item_expression,
+                                                                context=self.named_filter_objects)
+                result = parsed_expression(document)
+                if result is None:
+                    return []
+                elif isinstance(result, list):
+                    return result
+                else:
+                    return [result]
         else:
             return []
+
+    def get_all_values(self, doc):
+        context = EvaluationContext(doc)
+        return [self.indicators.get_values(item, context) for item in self.get_items(doc)]
 
     def validate(self, required=True):
         super(DataSourceConfiguration, self).validate(required)
@@ -103,8 +154,8 @@ class DataSourceConfiguration(UnicodeMixIn, ConfigurableIndicatorMixIn, CachedCo
 
     @classmethod
     def all(cls):
-        ids = [res['id'] for res in cls.view('userreports/data_sources_by_domain',
-                                             reduce=False, include_docs=False)]
+        ids = [res['id'] for res in cls.get_db().view('userreports/data_sources_by_domain',
+                                                      reduce=False, include_docs=False)]
         for result in iter_docs(cls.get_db(), ids):
             yield cls.wrap(result)
 
@@ -154,11 +205,26 @@ class ReportConfiguration(UnicodeMixIn, CachedCouchDocumentMixin, Document):
         return None
 
     def validate(self, required=True):
+        def _check_for_duplicate_slugs(filters):
+            slugs = [FilterSpec.wrap(f).slug for f in filters]
+            # http://stackoverflow.com/questions/9835762/find-and-list-duplicates-in-python-list
+            duplicated_slugs = set(
+                [slug for slug in slugs if slugs.count(slug) > 1]
+            )
+            if len(duplicated_slugs) > 0:
+                raise BadSpecError(
+                    _('Filters cannot contain duplicate slugs: %s')
+                    % ', '.join(sorted(duplicated_slugs))
+                )
+
         super(ReportConfiguration, self).validate(required)
+
         # these calls implicitly do validation
         ReportFactory.from_spec(self)
         self.ui_filters
         self.charts
+
+        _check_for_duplicate_slugs(self.filters)
 
     @classmethod
     def by_domain(cls, domain):

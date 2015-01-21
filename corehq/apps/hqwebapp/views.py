@@ -3,6 +3,8 @@ from datetime import datetime
 import json
 import os
 import re
+import sys
+import traceback
 import uuid
 
 from django.conf import settings
@@ -29,14 +31,10 @@ from django.core.mail.message import EmailMessage
 from django.template import loader
 from django.template.context import RequestContext
 from restkit import Resource
-from corehq import toggles
 
 from corehq.apps.accounting.models import Subscription
 from corehq.apps.announcements.models import Notification
-from corehq.apps.app_manager.models import BUG_REPORTS_DOMAIN
-from corehq.apps.app_manager.models import import_app
-from corehq.apps.domain.decorators import require_superuser,\
-    login_and_domain_required
+from corehq.apps.domain.decorators import require_superuser, login_and_domain_required
 from corehq.apps.domain.utils import normalize_domain_name, get_domain_from_url
 from corehq.apps.hqwebapp.encoders import LazyEncoder
 from corehq.apps.hqwebapp.forms import EmailAuthenticationForm, CloudCareAuthenticationForm
@@ -156,10 +154,12 @@ def server_error(request, template_name='500.html'):
 
     # hat tip: http://www.arthurkoziel.com/2009/01/15/passing-mediaurl-djangos-500-error-view/
     t = loader.get_template(template_name)
+    type, exc, tb = sys.exc_info()
     return HttpResponseServerError(t.render(RequestContext(request,
         {'MEDIA_URL': settings.MEDIA_URL,
          'STATIC_URL': settings.STATIC_URL,
-         'domain': domain
+         'domain': domain,
+         '500traceback': ''.join(traceback.format_tb(tb)),
         })))
 
 
@@ -412,17 +412,12 @@ def bug_report(req):
         'message',
         'app_id',
         'cc',
-        'email'
+        'email',
+        '500traceback',
     )])
 
     report['user_agent'] = req.META['HTTP_USER_AGENT']
     report['datetime'] = datetime.utcnow()
-
-    if report['app_id']:
-        app = import_app(report['app_id'], BUG_REPORTS_DOMAIN)
-        report['copy_url'] = "%s%s" % (get_url_base(), reverse('view_app', args=[BUG_REPORTS_DOMAIN, app.id]))
-    else:
-        report['copy_url'] = None
 
     try:
         couch_user = CouchUser.get_by_username(report['username'])
@@ -454,7 +449,6 @@ def bug_report(req):
         u"domain: {domain}\n"
         u"software plan: {software_plan}\n"
         u"url: {url}\n"
-        u"copy url: {copy_url}\n"
         u"datetime: {datetime}\n"
         u"User Agent: {user_agent}\n"
         u"Message:\n\n"
@@ -474,7 +468,11 @@ def bug_report(req):
         reply_to = settings.SERVER_EMAIL
 
     if req.POST.get('five-hundred-report'):
-        message = "%s \n\n This messge was reported from a 500 error page! Please fix this ASAP (as if you wouldn't anyway)..." % message
+        extra_message = ("This messge was reported from a 500 error page! "
+                         "Please fix this ASAP (as if you wouldn't anyway)...")
+        traceback_info = "Traceback of this 500: \n%s" % report['500traceback']
+        message = "%s \n\n %s \n\n %s" % (message, extra_message, traceback_info)
+
     email = EmailMessage(
         subject=subject,
         body=message,

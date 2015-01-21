@@ -6,7 +6,7 @@ from corehq.apps.app_manager import id_strings
 import urllib
 from django.core.urlresolvers import reverse
 from lxml import etree
-from eulxml.xmlmap import StringField, XmlObject, IntegerField, NodeListField, NodeField
+from eulxml.xmlmap import StringField, XmlObject, IntegerField, NodeListField, NodeField, load_xmlobject_from_string
 from corehq.apps.app_manager.exceptions import UnknownInstanceError, ScheduleError
 from corehq.apps.app_manager.templatetags.xforms_extras import trans
 from corehq.apps.app_manager.const import CAREPLAN_GOAL, CAREPLAN_TASK, SCHEDULE_LAST_VISIT, SCHEDULE_PHASE
@@ -377,14 +377,29 @@ class Sort(AbstractTemplate):
     direction = StringField('@direction')
 
 
+class Style(XmlObject):
+    ROOT_NAME = 'style'
+
+    horz_align = StringField("@horz-align")
+    vert_align = StringField("@vert-align")
+    font_size = StringField("@font-size")
+    css_id = StringField("@css-id")
+    grid_height = StringField("grid/@grid-height")
+    grid_width = StringField("grid/@grid-width")
+    grid_x = StringField("grid/@grid-x")
+    grid_y = StringField("grid/@grid-y")
+
+
 class Field(OrderedXmlObject):
     ROOT_NAME = 'field'
     ORDER = ('header', 'template', 'sort_node')
 
     sort = StringField('@sort')
+    style = NodeField('style', Style)
     header = NodeField('header', Header)
     template = NodeField('template', Template)
     sort_node = NodeField('sort', Sort)
+    background = NodeField('background/text', Text)
 
 
 class DetailVariable(XmlObject):
@@ -424,7 +439,19 @@ class Detail(IdNode):
 
     title = NodeField('title/text', Text)
     fields = NodeListField('field', Field)
+    details = NodeListField('detail', "self")
     _variables = NodeField('variables', DetailVariableList)
+
+    def get_all_fields(self):
+        '''
+        Return all fields under this Detail instance and all fields under
+        any details that may be under this instance.
+        :return:
+        '''
+        all_fields = []
+        for detail in [self] + list(self.details):
+            all_fields.extend(list(detail.fields))
+        return all_fields
 
     def _init_variables(self):
         if self._variables is None:
@@ -445,12 +472,18 @@ class Detail(IdNode):
         if self._variables:
             for variable in self.variables:
                 result.add(variable.function)
-        for field in self.fields:
+        for field in self.get_all_fields():
             try:
                 result.add(field.header.text.xpath_function)
                 result.add(field.template.text.xpath_function)
             except AttributeError:
-                pass  # Its a Graph detail
+                # Its a Graph detail
+                # convert Template to GraphTemplate
+                s = etree.tostring(field.template.node)
+                template = load_xmlobject_from_string(s, xmlclass=GraphTemplate)
+                for series in template.graph.series:
+                    result.add(series.nodeset)
+
         result.discard(None)
         return result
 
@@ -816,12 +849,64 @@ class SuiteGenerator(SuiteGeneratorBase):
                 resource.descriptor = u"Translations: %s" % languages_mapping().get(lang, [unknown_lang_txt])[0]
             yield resource
 
+    def build_detail(self, module, detail_type, detail, detail_column_infos,
+                     tabs, id, title, start, end):
+        """
+        Recursively builds the Detail object.
+        (Details can contain other details for each of their tabs)
+        """
+        from corehq.apps.app_manager.detail_screen import get_column_generator
+        d = Detail(id=id, title=title)
+        if tabs:
+            tab_spans = detail.get_tab_spans()
+            for tab in tabs:
+                sub_detail = self.build_detail(
+                    module,
+                    detail_type,
+                    detail,
+                    detail_column_infos,
+                    [],
+                    None,
+                    Text(locale_id=self.id_strings.detail_tab_title_locale(
+                        module, detail_type, tab
+                    )),
+                    tab_spans[tab.id][0],
+                    tab_spans[tab.id][1]
+                )
+                if sub_detail:
+                    d.details.append(sub_detail)
+            if len(d.details):
+                return d
+            else:
+                return None
+
+        else:
+            # Base case (has no tabs)
+            variables = list(
+                self.detail_variables(module, detail, detail_column_infos[start:end])
+            )
+            if variables:
+                d.variables.extend(variables)
+            for column_info in detail_column_infos[start:end]:
+                fields = get_column_generator(
+                    self.app, module, detail,
+                    detail_type=detail_type, *column_info
+                ).fields
+                d.fields.extend(fields)
+            try:
+                if not self.app.enable_multi_sort:
+                    d.fields[0].sort = 'default'
+            except IndexError:
+                pass
+            else:
+                # only yield the Detail if it has Fields
+                return d
+
     @property
     @memoized
     def details(self):
 
         r = []
-        from corehq.apps.app_manager.detail_screen import get_column_generator
         if not self.app.use_custom_suite:
             for module in self.modules:
                 for detail_type, detail, enabled in module.get_details():
@@ -832,31 +917,25 @@ class SuiteGenerator(SuiteGeneratorBase):
                         )
 
                         if detail_column_infos:
-                            d = Detail(
-                                id=self.id_strings.detail(module, detail_type),
-                                title=Text(locale_id=self.id_strings.detail_title_locale(module, detail_type))
-                            )
-
-                            variables = list(self.detail_variables(module, detail, detail_column_infos))
-                            if variables:
-                                d.variables.extend(variables)
-
-                            for column_info in detail_column_infos:
-                                fields = get_column_generator(
-                                    self.app, module, detail,
-                                    detail_type=detail_type, *column_info
-                                ).fields
-                                d.fields.extend(fields)
-
-                            try:
-                                if not self.app.enable_multi_sort:
-                                    d.fields[0].sort = 'default'
-                            except IndexError:
-                                pass
-                            else:
-                                # only yield the Detail if it has Fields
+                            if detail.custom_xml:
+                                d = load_xmlobject_from_string(detail.custom_xml, xmlclass=Detail)
                                 r.append(d)
-
+                            else:
+                                d = self.build_detail(
+                                    module,
+                                    detail_type,
+                                    detail,
+                                    detail_column_infos,
+                                    list(detail.get_tabs()),
+                                    self.id_strings.detail(module, detail_type),
+                                    Text(locale_id=self.id_strings.detail_title_locale(
+                                        module, detail_type
+                                    )),
+                                    0,
+                                    len(detail_column_infos)
+                                )
+                                if d:
+                                    r.append(d)
         return r
 
     def detail_variables(self, module, detail, detail_column_infos):
@@ -1291,7 +1370,10 @@ class SuiteGenerator(SuiteGeneratorBase):
             else:
                 if action.parent_tag:
                     parent_action = form.actions.actions_meta_by_tag[action.parent_tag]['action']
-                    parent_filter = self.get_parent_filter(parent_action.parent_reference_id, parent_action.case_session_var)
+                    parent_filter = self.get_parent_filter(
+                        action.parent_reference_id,
+                        parent_action.case_session_var
+                    )
                 else:
                     parent_filter = ''
 
@@ -1515,7 +1597,11 @@ class MediaSuiteGenerator(SuiteGeneratorBase):
         PREFIX = 'jr://file/'
         # you have to call remove_unused_mappings
         # before iterating through multimedia_map
-        self.app.remove_unused_mappings()
+        self.app.remove_unused_mappings(
+            additional_permitted_paths=[
+                value['path'] for value in self.app.logo_refs.values()
+            ]
+        )
         if self.app.multimedia_map is None:
             self.app.multimedia_map = {}
         for path, m in self.app.multimedia_map.items():

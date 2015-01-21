@@ -220,11 +220,24 @@ def pretty_doc_info(doc_info):
     })
 
 
-@register.filter
-def toggle_enabled(request, toggle_name):
-    import corehq.toggles
-    toggle = getattr(corehq.toggles, toggle_name)
+def _toggle_enabled(module, request, toggle_or_toggle_name):
+    if isinstance(toggle_or_toggle_name, basestring):
+        toggle = getattr(module, toggle_or_toggle_name)
+    else:
+        toggle = toggle_or_toggle_name
     return (
         (hasattr(request, 'user') and toggle.enabled(request.user.username)) or
         (hasattr(request, 'domain') and toggle.enabled(request.domain))
     )
+
+
+@register.filter
+def toggle_enabled(request, toggle_or_toggle_name):
+    import corehq.toggles
+    return _toggle_enabled(corehq.toggles, request, toggle_or_toggle_name)
+
+
+@register.filter
+def feature_preview_enabled(request, toggle_name):
+    import corehq.feature_previews
+    return _toggle_enabled(corehq.feature_previews, request, toggle_name)

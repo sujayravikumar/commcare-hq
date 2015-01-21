@@ -1,5 +1,7 @@
+from corehq.apps.products.models import SQLProduct
 from corehq.apps.reports.sqlreport import SqlTabularReport
 from corehq.apps.reports.standard import CustomProjectReport, ProjectReportParametersMixin, MonthYearMixin
+from couchexport.models import Format
 from custom.ilsgateway.models import SupplyPointStatusTypes, OrganizationSummary
 from corehq.apps.reports.graph_models import PieChart
 from dimagi.utils.decorators.memoized import memoized
@@ -109,6 +111,8 @@ class MultiReport(SqlTabularReport, ILSMixin, CustomProjectReport, ProjectReport
     flush_layout = True
     with_tabs = False
     use_datatables = False
+    exportable = False
+    base_template = 'ilsgateway/base_template.html'
 
     @property
     @memoized
@@ -125,7 +129,8 @@ class MultiReport(SqlTabularReport, ILSMixin, CustomProjectReport, ProjectReport
         org_summary = OrganizationSummary.objects.filter(date__range=(self.datespan.startdate,
                                                                       self.datespan.enddate),
                                                          supply_point=self.request.GET.get('location_id'))
-        return dict(
+
+        config = dict(
             domain=self.domain,
             org_summary=org_summary[0] if len(org_summary) > 0 else None,
             startdate=self.datespan.startdate,
@@ -133,8 +138,29 @@ class MultiReport(SqlTabularReport, ILSMixin, CustomProjectReport, ProjectReport
             month=self.request_params['month'] if 'month' in self.request_params else '',
             year=self.request_params['year'] if 'year' in self.request_params else '',
             location_id=self.request.GET.get('location_id'),
-            soh_month=True if self.request.GET.get('soh_month', '') == 'True' else False
+            soh_month=True if self.request.GET.get('soh_month', '') == 'True' else False,
+            products=[],
+            program='',
+            prd_part_url=''
         )
+
+        if 'filter_by_program' in self.request.GET:
+            program = self.request.GET.get('filter_by_program', '')
+            if program:
+                product = self.request.GET.getlist('filter_by_product')
+                if product[0] != '':
+                    products = product
+                else:
+                    products = SQLProduct.objects.filter(program_id=program).values_list('product_id', flat=True)
+            else:
+                products = SQLProduct.objects.all().values_list('product_id', flat=True)
+            if len(products) > 1:
+                prd_part_url = '&filter_by_product='.join(products)
+            else:
+                prd_part_url = '&filter_by_product=%s' % products[0]
+            config.update(dict(products=products, program=program, prd_part_url=prd_part_url))
+
+        return config
 
     @property
     def report_context(self):
@@ -177,10 +203,38 @@ class MultiReport(SqlTabularReport, ILSMixin, CustomProjectReport, ProjectReport
         )
         return context
 
+    @property
+    def export_table(self):
+        self.export_format_override = self.request.GET.get('format', Format.XLS)
+        reports = [r['report_table'] for r in self.report_context['reports']]
+        return [self._export_table(r['title'], r['headers'], r['rows'], total_row=r['total_row'])
+                for r in reports if r['headers']]
+
+    def _export_table(self, export_sheet_name, headers, formatted_rows, total_row=None):
+        def _unformat_row(row):
+            return [col.get("sort_key", col) if isinstance(col, dict) else col for col in row]
+
+        table = headers.as_export_table
+        rows = [_unformat_row(row) for row in formatted_rows]
+        replace = ''
+
+        # make headers and subheaders consistent
+        for k, v in enumerate(table[0]):
+            if v != ' ':
+                replace = v
+            else:
+                table[0][k] = replace
+        table.extend(rows)
+        if total_row:
+            table.append(_unformat_row(total_row))
+
+        return [export_sheet_name, table]
+
 
 class DetailsReport(MultiReport):
     with_tabs = True
     flush_layout = True
+    exportable = True
 
     @classmethod
     def show_in_navigation(cls, domain=None, project=None, user=None):
