@@ -187,7 +187,7 @@ DEFAULT_APPS = (
     'djangular',
     'couchdbkit.ext.django',
     'crispy_forms',
-    'django.contrib.markup',
+    'markup_deprecated',
     'gunicorn',
     'raven.contrib.django.raven_compat',
     'compressor',
@@ -500,6 +500,10 @@ SMS_GATEWAY_PARAMS = "user=my_username&password=my_password&id=%(phone_number)s&
 
 # celery
 BROKER_URL = 'django://'  # default django db based
+
+from settingshelper import celery_failure_handler
+
+CELERY_ANNOTATIONS = {'*': {'on_failure': celery_failure_handler}}
 
 CELERY_MAIN_QUEUE = 'celery'
 
