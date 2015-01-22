@@ -34,7 +34,7 @@ CLASS_PATH = "mvp.models"
 class MVPDaysSinceLastTransmission(DynamicIndicatorDefinition):
     _class_path = CLASS_PATH
 
-    def get_value(self, user_ids, datespan=None):
+    def get_value(self, user_ids, datespan=None, is_debug=False):
         if datespan:
             enddate = datespan.enddate_utc
         else:
@@ -95,7 +95,7 @@ class MVPActiveCasesIndicatorDefinition(NoGroupCouchIndicatorDefBase):
         cases = self._get_cases_by_status(status, user_id, datespan)
         return [r['id'] for r in cases]
 
-    def get_value(self, user_ids, datespan=None):
+    def get_value(self, user_ids, datespan=None, is_debug=False):
         open_cases = []
         closed_on_closed_cases = []
         opened_on_closed_cases = []
@@ -111,7 +111,11 @@ class MVPActiveCasesIndicatorDefinition(NoGroupCouchIndicatorDefBase):
         closed_ids = closed_on_closed_ids.intersection(opened_on_closed_ids)
 
         all_cases = open_ids.union(closed_ids)
-        return len(all_cases)
+
+        value = len(all_cases)
+        if is_debug:
+            return value, list(all_cases)
+        return value
 
     def _format_datespan_by_case_status(self, datespan, status):
         datespan = copy.copy(datespan) # copy datespan
@@ -165,13 +169,18 @@ class MVPChildCasesByAgeIndicatorDefinition(MVPActiveCasesIndicatorDefinition):
                     logging.error("date of birth could not be parsed")
         return valid_case_ids
 
-    def get_value(self, user_ids, datespan=None):
+    def get_value(self, user_ids, datespan=None, is_debug=False):
         if self.show_active_only:
-            return super(MVPChildCasesByAgeIndicatorDefinition, self).get_value(user_ids, datespan=datespan)
+            return super(MVPChildCasesByAgeIndicatorDefinition, self).get_value(
+                user_ids, datespan=datespan, is_debug=is_debug)
         else:
             results = self.get_raw_results(user_ids, datespan)
             all_cases = self._filter_by_age(results, datespan)
-        return len(all_cases)
+
+        value = len(all_cases)
+        if is_debug:
+            return value, list(all_cases)
+        return value
 
     @classmethod
     def get_nice_name(cls):

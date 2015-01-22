@@ -28,11 +28,16 @@ class CasePillow(HQPillow):
     es_index = CASE_INDEX
     default_mapping = CASE_MAPPING
 
+    def get_unique_id(self):
+        # todo: this should be changed the next time someone touches this pillow
+        # return CASE_INDEX
+        return self.calc_meta()
+
     def change_trigger(self, changes_dict):
         doc_dict, lock = lock_manager(
             super(CasePillow, self).change_trigger(changes_dict)
         )
-        if doc_dict['doc_type'] == 'CommCareCase-Deleted':
+        if doc_dict and doc_dict['doc_type'] == 'CommCareCase-Deleted':
             if self.doc_exists(doc_dict):
                 self.get_es().delete(path=self.get_doc_path_typed(doc_dict))
             return None

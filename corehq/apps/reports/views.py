@@ -1,9 +1,14 @@
+from StringIO import StringIO
 import os
 import json
 import tempfile
 import re
+import zipfile
+import cStringIO
 from datetime import datetime, timedelta, date
 from urllib2 import URLError
+from unidecode import unidecode
+from dateutil.parser import parse
 
 from django.conf import settings
 from django.contrib import messages
@@ -23,9 +28,12 @@ from django.core.files.base import ContentFile
 from django.http.response import HttpResponse, HttpResponseNotFound
 from django.views.decorators.http import require_GET
 import pytz
+from casexml.apps.stock.models import StockTransaction
 from corehq import toggles, Domain
 from casexml.apps.case.cleanup import rebuild_case, close_case
+from corehq.apps.products.models import SQLProduct
 from corehq.apps.data_interfaces.dispatcher import DataInterfaceDispatcher
+from corehq.apps.reports.display import FormType
 from corehq.util.couch import get_document_or_404
 
 import couchexport
@@ -42,15 +50,16 @@ from couchexport.tasks import rebuild_schemas
 from couchexport.util import SerializableFunction
 from dimagi.utils.chunked import chunked
 from dimagi.utils.couch.bulk import wrapped_docs
+from dimagi.utils.couch.database import iter_docs
 from dimagi.utils.couch.loosechange import parse_date
 from dimagi.utils.decorators.datespan import datespan_in_request
 from dimagi.utils.export import WorkBook
-from dimagi.utils.parsing import json_format_datetime, string_to_boolean
+from dimagi.utils.parsing import json_format_datetime, string_to_boolean, string_to_datetime, json_format_date
 from dimagi.utils.web import json_request, json_response
 from soil import DownloadBase
 from soil.tasks import prepare_download
 from dimagi.utils.couch.cache.cache_core import get_redis_client
-from couchexport.export import Format
+from couchexport.export import Format, export_from_tables
 from casexml.apps.case.models import CommCareCase
 from casexml.apps.case.templatetags.case_tags import case_inline_display
 from casexml.apps.case.xml import V2
@@ -66,8 +75,13 @@ from corehq.apps.export.custom_export_helpers import CustomExportHelper
 from corehq.apps.groups.models import Group
 from corehq.apps.hqcase.export import export_cases_and_referrals
 from corehq.apps.reports.dispatcher import ProjectReportDispatcher
-from corehq.apps.reports.models import ReportConfig, ReportNotification, FakeFormExportSchema, \
+from corehq.apps.reports.models import (
+    ReportConfig,
+    ReportNotification,
+    FakeFormExportSchema,
+    FormExportSchema,
     HQGroupExportConfiguration
+)
 from corehq.apps.reports.standard.cases.basic import CaseListReport
 from corehq.apps.reports.tasks import create_metadata_export
 from corehq.apps.reports import util
@@ -100,6 +114,18 @@ require_form_view_permission = require_permission(Permissions.view_report, 'core
 require_case_view_permission = require_permission(Permissions.view_report, 'corehq.apps.reports.standard.cases.basic.CaseListReport', login_decorator=None)
 
 require_can_view_all_reports = require_permission(Permissions.view_reports)
+
+
+def can_view_attachments(request):
+    return (
+        request.couch_user.has_permission(
+            request.domain, 'view_report',
+            data='corehq.apps.reports.standard.cases.basic.CaseListReport'
+        )
+        or toggles.ALLOW_CASE_ATTACHMENTS_VIEW.enabled(request.user.username)
+        or toggles.ALLOW_CASE_ATTACHMENTS_VIEW.enabled(request.domain)
+    )
+
 
 @login_and_domain_required
 def default(request, domain):
@@ -168,7 +194,6 @@ def export_data(req, domain):
     except ValueError:
         return HttpResponseBadRequest()
 
-    group, users = util.get_group_params(domain, **json_request(req.GET))
     include_errors = string_to_boolean(req.GET.get("include_errors", False))
 
     kwargs = {"format": req.GET.get("format", Format.XLS_2007),
@@ -190,6 +215,7 @@ def export_data(req, domain):
                 return False
         filter = _ufilter
     else:
+        group = util.get_group(**json_request(req.GET))
         filter = SerializableFunction(util.group_filter, group=group)
 
     errors_filter = instances if not include_errors else None
@@ -393,7 +419,13 @@ def export_all_form_metadata_async(req, domain):
     datespan = req.datespan if req.GET.get("startdate") and req.GET.get("enddate") else None
     group_id = req.GET.get("group")
     ufilter =  UserTypeFilter.get_user_filter(req)[0]
-    users = list(util.get_all_users_by_domain(domain=domain, group=group_id, user_filter=ufilter, simplified=True))
+    users = util.get_all_users_by_domain(
+        domain=domain,
+        group=group_id,
+        user_filter=ufilter,
+        simplified=True,
+        include_inactive=True
+    )
     user_ids = filter(None, [u["user_id"] for u in users])
     format = req.GET.get("format", Format.XLS_2007)
     filename = "%s_forms" % domain
@@ -826,11 +858,23 @@ def case_details(request, domain, case_id):
         "case_display_options": {
             "display": request.project.get_case_display(case),
             "timezone": timezone,
-            "get_case_url": lambda case_id: reverse(
-                case_details, args=[domain, case_id])
+            "get_case_url": lambda case_id: reverse(case_details, args=[domain, case_id]),
+            "show_transaction_export": toggles.STOCK_TRANSACTION_EXPORT.enabled(request.user.username),
         },
         "show_case_rebuild": toggles.CASE_REBUILD.enabled(request.user.username),
     })
+
+
+@login_and_domain_required
+@require_GET
+def case_attachments(request, domain, case_id):
+    if not can_view_attachments(request):
+        return HttpResponseForbidden(_("You don't have permission to access this page."))
+
+    case = get_document_or_404(CommCareCase, domain, case_id)
+    return render(request, 'reports/reportdata/case_attachments.html',
+                  {'domain': domain, 'case': case})
+
 
 @require_case_view_permission
 @login_and_domain_required
@@ -892,6 +936,52 @@ def undo_close_case_view(request, domain, case_id):
     return HttpResponseRedirect(reverse('case_details', args=[domain, case_id]))
 
 
+@require_case_view_permission
+@login_and_domain_required
+@require_GET
+def export_case_transactions(request, domain, case_id):
+    case = get_document_or_404(CommCareCase, domain, case_id)
+    products_by_id = dict(SQLProduct.objects.filter(domain=domain).values_list('product_id', 'name'))
+
+    headers = [
+        _('case id'),
+        _('case name'),
+        _('section'),
+        _('date'),
+        _('product_id'),
+        _('product_name'),
+        _('transaction amount'),
+        _('type'),
+        _('ending balance'),
+    ]
+
+    def _make_row(transaction):
+        return [
+            transaction.case_id,
+            case.name,
+            transaction.section_id,
+            transaction.report.date if transaction.report_id else '',
+            transaction.product_id,
+            products_by_id.get(transaction.product_id, _('unknown product')),
+            transaction.quantity,
+            transaction.type,
+            transaction.stock_on_hand,
+        ]
+
+    query_set = StockTransaction.objects.select_related('report')\
+        .filter(case_id=case_id).order_by('section_id', 'report__date')
+
+    formatted_table = [
+        [
+            'stock transactions',
+            [headers] + [_make_row(txn) for txn in query_set]
+        ]
+    ]
+    tmp = StringIO()
+    export_from_tables(formatted_table, tmp, 'xlsx')
+    return export_response(tmp, 'xlsx', '{}-stock-transactions'.format(case.name))
+
+
 def generate_case_export_payload(domain, include_closed, format, group, user_filter, process=None):
     """
     Returns a FileWrapper object, which only the file backend in django-soil supports
@@ -913,7 +1003,13 @@ def generate_case_export_payload(domain, include_closed, format, group, user_fil
             return len(self.all_case_ids)
 
     # todo deal with cached user dict here
-    users = get_all_users_by_domain(domain, group=group, user_filter=user_filter)
+    group = Group.get(group) if group else None
+    users = get_all_users_by_domain(
+        domain,
+        group=group,
+        user_filter=user_filter,
+        include_inactive=True
+    )
     groups = Group.get_case_sharing_groups(domain)
 
     fd, path = tempfile.mkstemp()
@@ -923,8 +1019,9 @@ def generate_case_export_payload(domain, include_closed, format, group, user_fil
             domain,
             stream_cases(case_ids),
             workbook,
+            filter_group=group,
             users=users,
-            groups=groups,
+            all_groups=groups,
             process=process
         )
         export_users(users, workbook)
@@ -988,6 +1085,7 @@ def _get_form_context(request, domain, instance_id):
         "timezone": timezone,
         "instance": instance,
         "user": request.couch_user,
+        "request": request,
     }
     context['form_render_options'] = context
     return context
@@ -1012,7 +1110,8 @@ def _get_form_or_404(id):
 @require_GET
 def form_data(request, domain, instance_id):
     context = _get_form_context(request, domain, instance_id)
-
+    instance = context['instance']
+    context['form_meta'] = FormType(domain, instance.xmlns, instance.app_id).metadata
     try:
         form_name = context['instance'].form["@name"]
     except KeyError:
@@ -1164,3 +1263,85 @@ def export_report(request, domain, export_hash, format):
     else:
         return HttpResponseNotFound(_("That report was not found. Please remember"
                                       " that download links expire after 24 hours."))
+
+
+def find_question_id(form, value):
+    for k, v in form.iteritems():
+        if isinstance(v, dict):
+            ret = find_question_id(v, value)
+            if ret:
+                return [k] + ret
+        else:
+            if v == value:
+                return [k]
+
+    return None
+
+
+@require_form_view_permission
+@login_and_domain_required
+@require_GET
+def form_multimedia_export(request, domain):
+    try:
+        xmlns = request.GET["xmlns"]
+        startdate = request.GET["startdate"]
+        enddate = request.GET["enddate"]
+        enddate = json_format_date(string_to_datetime(enddate) + timedelta(days=1))
+        app_id = request.GET.get("app_id", None)
+        export_id = request.GET.get("export_id", None)
+        zip_name = request.GET.get("name", None)
+    except (KeyError, ValueError):
+        return HttpResponseBadRequest()
+
+    def filename(form, question_id, extension):
+        meta = form['form'].get('meta', dict())
+        return "%s-%s-%s-%s%s" % (form['form'].get('@name', 'unknown form'),
+                                  unidecode(question_id),
+                                  meta.get('username', 'unknown_user'),
+                                  form['_id'], extension)
+
+    if not app_id:
+        zip_name = 'Unrelated Form'
+    key = [domain, app_id, xmlns]
+    stream_file = cStringIO.StringIO()
+    zf = zipfile.ZipFile(stream_file, mode='w', compression=zipfile.ZIP_STORED)
+    size = 22  # overhead for a zipfile
+    unknown_number = 0
+    form_ids = {f['id'] for f in XFormInstance.get_db().view("attachments/attachments",
+                                         start_key=key + [startdate],
+                                         end_key=key + [enddate, {}],
+                                         reduce=False)}
+
+    properties = set()
+    if export_id:
+        schema = FormExportSchema.get(export_id)
+        for table in schema.tables:
+            # - in question id is replaced by . in excel exports
+            properties |= {c.display.replace('.', '-') for c in table.columns}
+
+    for form in iter_docs(XFormInstance.get_db(), form_ids):
+        f = XFormInstance.wrap(form)
+        if not zip_name:
+            zip_name = unidecode(form['form'].get('@name', 'unknown form'))
+        for key in form['_attachments'].keys():
+            if form['_attachments'][key]['content_type'] == 'text/xml':
+                continue
+            extension = unicode(os.path.splitext(key)[1])
+            try:
+                question_id = unicode('-'.join(find_question_id(form['form'], key)))
+            except TypeError:
+                question_id = unicode('unknown' + str(unknown_number))
+                unknown_number += 1
+            if not properties or question_id in properties:
+                fname = filename(form, question_id, extension)
+                zi = zipfile.ZipInfo(fname, parse(form['received_on']).timetuple())
+                zf.writestr(zi, f.fetch_attachment(key, stream=True).read())
+                # includes overhead for file in zipfile
+                size += f['_attachments'][key]['length'] + 88 + 2 * len(fname)
+
+    zf.close()
+
+    response = HttpResponse(stream_file.getvalue(), mimetype="application/zip")
+    response['Content-Length'] = size
+    response['Content-Disposition'] = 'attachment; filename=%s.zip' % zip_name
+    return response

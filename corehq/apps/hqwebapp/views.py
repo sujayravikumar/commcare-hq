@@ -3,6 +3,8 @@ from datetime import datetime
 import json
 import os
 import re
+import sys
+import traceback
 import uuid
 
 from django.conf import settings
@@ -32,10 +34,7 @@ from restkit import Resource
 
 from corehq.apps.accounting.models import Subscription
 from corehq.apps.announcements.models import Notification
-from corehq.apps.app_manager.models import BUG_REPORTS_DOMAIN
-from corehq.apps.app_manager.models import import_app
-from corehq.apps.domain.decorators import require_superuser,\
-    login_and_domain_required
+from corehq.apps.domain.decorators import require_superuser, login_and_domain_required
 from corehq.apps.domain.utils import normalize_domain_name, get_domain_from_url
 from corehq.apps.hqwebapp.encoders import LazyEncoder
 from corehq.apps.hqwebapp.forms import EmailAuthenticationForm, CloudCareAuthenticationForm
@@ -44,6 +43,7 @@ from corehq.apps.reports.util import is_mobile_worker_with_report_access
 from corehq.apps.users.models import CouchUser
 from corehq.apps.users.util import format_username
 from corehq.apps.hqwebapp.doc_info import get_doc_info
+from corehq.util.context_processors import get_domain_type
 from dimagi.utils.couch.database import get_db
 from dimagi.utils.decorators.memoized import memoized
 from dimagi.utils.logging import notify_exception
@@ -77,6 +77,26 @@ def couch_check():
     except:
         xforms = None
     return (isinstance(xforms, list), None)
+
+
+def celery_check():
+    try:
+        from celery import Celery
+        from django.conf import settings
+        app = Celery()
+        app.config_from_object(settings)
+        i = app.control.inspect()
+        ping = i.ping()
+        if not ping:
+            chk = (False, 'No running Celery workers were found.')
+        else:
+            chk = (True, None)
+    except IOError as e:
+        chk = (False, "Error connecting to the backend: " + str(e))
+    except ImportError as e:
+        chk = (False, str(e))
+
+    return chk
 
 
 def hb_check():
@@ -134,10 +154,12 @@ def server_error(request, template_name='500.html'):
 
     # hat tip: http://www.arthurkoziel.com/2009/01/15/passing-mediaurl-djangos-500-error-view/
     t = loader.get_template(template_name)
+    type, exc, tb = sys.exc_info()
     return HttpResponseServerError(t.render(RequestContext(request,
         {'MEDIA_URL': settings.MEDIA_URL,
          'STATIC_URL': settings.STATIC_URL,
-         'domain': domain
+         'domain': domain,
+         '500traceback': ''.join(traceback.format_tb(tb)),
         })))
 
 
@@ -166,20 +188,18 @@ def redirect_to_default(req, domain=None):
         else:
             domains = Domain.active_for_user(req.user)
         if 0 == len(domains) and not req.user.is_superuser:
-            return redirect('registration_domain')
+            return redirect('registration_domain', domain_type=get_domain_type(None, req))
         elif 1 == len(domains):
             if domains[0]:
                 domain = domains[0].name
-                if req.couch_user.is_commcare_user():
-                    if not is_mobile_worker_with_report_access(
-                            req.couch_user, domain):
-                        url = reverse("cloudcare_main", args=[domain, ""])
-                    else:
-                        url = reverse("saved_reports", args=[domain])
-                elif req.couch_user.can_view_reports(domain) or req.couch_user.get_viewable_reports(domain):
-                    url = reverse('corehq.apps.reports.views.default', args=[domain])
+
+                if (req.couch_user.is_commcare_user()
+                    and not is_mobile_worker_with_report_access(
+                        req.couch_user, domain)):
+                    url = reverse("cloudcare_main", args=[domain, ""])
                 else:
-                    url = reverse('corehq.apps.app_manager.views.default', args=[domain])
+                    url = reverse('dashboard_default', args=[domain])
+
             else:
                 raise Http404
         else:
@@ -223,8 +243,11 @@ def password_change(req):
 
 
 def server_up(req):
-    '''View that just returns "success", which can be hooked into server
-       monitoring tools like: pingdom'''
+    '''
+    Hit serverup.txt to check any of the below item with always_check: True
+    Hit serverup.txt?celery (or heartbeat) to check a specific service
+    View that just returns "success", which can be hooked into server monitoring tools like: pingdom
+    '''
 
 
     checkers = {
@@ -232,6 +255,11 @@ def server_up(req):
             "always_check": False,
             "message": "* celery heartbeat is down",
             "check_func": hb_check
+        },
+        "celery": {
+            "always_check": False,
+            "message": "* celery is down",
+            "check_func": celery_check
         },
         "postgres": {
             "always_check": True,
@@ -298,7 +326,7 @@ def _login(req, domain, template_name):
         req.POST._mutable = True
         req.POST['username'] = format_username(req.POST['username'], domain)
         req.POST._mutable = False
-    
+
     req.base_template = settings.BASE_TEMPLATE
 
     context = {}
@@ -349,7 +377,7 @@ def logout(req):
 
     # we don't actually do anything with the response here:
     django_logout(req, **{"template_name": settings.BASE_TEMPLATE})
-    
+
     if referer and domain and is_mobile_url(referer):
         mobile_mainnav_url = reverse('custom_project_report_dispatcher', args=[domain, 'mobile/mainnav'])
         mobile_login_url = reverse('domain_mobile_login', kwargs={'domain': domain})
@@ -383,25 +411,24 @@ def bug_report(req):
         'url',
         'message',
         'app_id',
-        'cc'
+        'cc',
+        'email',
+        '500traceback',
     )])
 
     report['user_agent'] = req.META['HTTP_USER_AGENT']
     report['datetime'] = datetime.utcnow()
 
-    if report['app_id']:
-        app = import_app(report['app_id'], BUG_REPORTS_DOMAIN)
-        report['copy_url'] = "%s%s" % (get_url_base(), reverse('view_app', args=[BUG_REPORTS_DOMAIN, app.id]))
-    else:
-        report['copy_url'] = None
-
     try:
         couch_user = CouchUser.get_by_username(report['username'])
         full_name = couch_user.full_name
-        email = couch_user.get_email()
+        if couch_user.is_commcare_user():
+            email = report['email']
+        else:
+            email = couch_user.get_email()
     except Exception:
         full_name = None
-        email = None
+        email = report['email']
     report['full_name'] = full_name
     report['email'] = email or report['username']
 
@@ -422,7 +449,6 @@ def bug_report(req):
         u"domain: {domain}\n"
         u"software plan: {software_plan}\n"
         u"url: {url}\n"
-        u"copy url: {copy_url}\n"
         u"datetime: {datetime}\n"
         u"User Agent: {user_agent}\n"
         u"Message:\n\n"
@@ -442,7 +468,11 @@ def bug_report(req):
         reply_to = settings.SERVER_EMAIL
 
     if req.POST.get('five-hundred-report'):
-        message = "%s \n\n This messge was reported from a 500 error page! Please fix this ASAP (as if you wouldn't anyway)..." % message
+        extra_message = ("This messge was reported from a 500 error page! "
+                         "Please fix this ASAP (as if you wouldn't anyway)...")
+        traceback_info = "Traceback of this 500: \n%s" % report['500traceback']
+        message = "%s \n\n %s \n\n %s" % (message, extra_message, traceback_info)
+
     email = EmailMessage(
         subject=subject,
         body=message,

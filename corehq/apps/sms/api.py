@@ -5,6 +5,8 @@ import math
 
 from dimagi.utils.modules import to_function
 from dimagi.utils.logging import notify_exception
+from corehq import privileges
+from corehq.apps.accounting.utils import domain_has_privilege
 from corehq.apps.sms.util import clean_phone_number, format_message_list, clean_text
 from corehq.apps.sms.models import SMSLog, OUTGOING, INCOMING, ForwardingRule, FORWARD_ALL, FORWARD_BY_KEYWORD, WORKFLOW_KEYWORD
 from corehq.apps.sms.mixin import MobileBackend, VerifiedNumber
@@ -52,12 +54,12 @@ def add_msg_tags(msg, metadata):
 
 def log_sms_exception(msg):
     direction = "OUT" if msg.direction == OUTGOING else "IN"
-    if msg._id:
-        message = "[SMS %s] Error processing SMS %s" % (direction, msg._id)
-    else:
-        message = ("[SMS %s] Error processing SMS for domain %s on %s" %
-            (direction, msg.domain, msg.date))
-    notify_exception(None, message=message)
+    message = "[SMS %s] Error processing SMS" % direction
+    notify_exception(None, message=message, details={
+        'domain': msg.domain,
+        'date': msg.date,
+        'message_id': msg._id,
+    })
 
 
 def send_sms(domain, contact, phone_number, text, metadata=None):
@@ -244,28 +246,29 @@ def process_sms_registration(msg):
     if keyword1 in REGISTRATION_KEYWORDS and keyword2 != "":
         domain = Domain.get_by_name(keyword2, strict=True)
         if domain is not None:
-            if keyword3 in REGISTRATION_MOBILE_WORKER_KEYWORDS and domain.sms_mobile_worker_registration_enabled:
-                #TODO: Register a PendingMobileWorker object that must be approved by a domain admin
-                pass
-            elif domain.sms_case_registration_enabled:
-                register_sms_contact(
-                    domain=domain.name,
-                    case_type=domain.sms_case_registration_type,
-                    case_name="unknown",
-                    user_id=domain.sms_case_registration_user_id,
-                    contact_phone_number=strip_plus(msg.phone_number),
-                    contact_phone_number_is_verified="1",
-                    owner_id=domain.sms_case_registration_owner_id,
-                )
-                msg.domain = domain.name
-                msg.save()
-                registration_processed = True
-    
+            if domain_has_privilege(domain, privileges.INBOUND_SMS):
+                if keyword3 in REGISTRATION_MOBILE_WORKER_KEYWORDS and domain.sms_mobile_worker_registration_enabled:
+                    #TODO: Register a PendingMobileWorker object that must be approved by a domain admin
+                    pass
+                elif domain.sms_case_registration_enabled:
+                    register_sms_contact(
+                        domain=domain.name,
+                        case_type=domain.sms_case_registration_type,
+                        case_name="unknown",
+                        user_id=domain.sms_case_registration_user_id,
+                        contact_phone_number=strip_plus(msg.phone_number),
+                        contact_phone_number_is_verified="1",
+                        owner_id=domain.sms_case_registration_owner_id,
+                    )
+                    registration_processed = True
+            msg.domain = domain.name
+            msg.save()
+
     return registration_processed
 
 def incoming(phone_number, text, backend_api, timestamp=None, 
              domain_scope=None, backend_message_id=None, delay=True,
-             backend_attributes=None):
+             backend_attributes=None, raw_text=None):
     """
     entry point for incoming sms
 
@@ -289,6 +292,7 @@ def incoming(phone_number, text, backend_api, timestamp=None,
         domain_scope = domain_scope,
         backend_api = backend_api,
         backend_message_id = backend_message_id,
+        raw_text=raw_text,
     )
     if backend_attributes:
         for k, v in backend_attributes.items():
@@ -323,21 +327,22 @@ def process_incoming(msg, delay=True):
             )
 
     if v is not None and v.verified:
-        for h in settings.SMS_HANDLERS:
-            try:
-                handler = to_function(h)
-            except:
-                notify_exception(None, message=('error loading sms handler: %s' % h))
-                continue
+        if domain_has_privilege(msg.domain, privileges.INBOUND_SMS):
+            for h in settings.SMS_HANDLERS:
+                try:
+                    handler = to_function(h)
+                except:
+                    notify_exception(None, message=('error loading sms handler: %s' % h))
+                    continue
 
-            try:
-                was_handled = handler(v, msg.text, msg=msg)
-            except Exception, e:
-                log_sms_exception(msg)
-                was_handled = False
+                try:
+                    was_handled = handler(v, msg.text, msg=msg)
+                except Exception, e:
+                    log_sms_exception(msg)
+                    was_handled = False
 
-            if was_handled:
-                break
+                if was_handled:
+                    break
     else:
         if not process_sms_registration(msg):
             import verify

@@ -13,9 +13,11 @@ from dimagi.utils.couch import CriticalSection
 from django.utils.translation import ugettext as _, ugettext_noop
 from corehq import privileges
 from corehq.apps.accounting.decorators import requires_privilege_with_fallback
-from corehq.apps.app_manager.models import Application
-from corehq.apps.app_manager.util import get_case_properties
+from corehq.apps.app_manager.models import Application, Form
+from corehq.apps.app_manager.util import (get_case_properties,
+    get_correct_app_class)
 from corehq.apps.hqwebapp.views import CRUDPaginatedViewMixin
+from dimagi.utils.logging import notify_exception
 
 from corehq.apps.reminders.forms import (
     CaseReminderForm,
@@ -33,6 +35,7 @@ from corehq.apps.reminders.forms import (
     KEYWORD_RECIPIENT_CHOICES,
     ComplexScheduleCaseReminderForm,
     NewKeywordForm,
+    NO_RESPONSE,
 )
 from corehq.apps.reminders.models import (
     CaseReminderHandler,
@@ -51,6 +54,7 @@ from corehq.apps.reminders.models import (
     QUESTION_RETRY_CHOICES,
     REMINDER_TYPE_ONE_TIME,
     REMINDER_TYPE_DEFAULT,
+    REMINDER_TYPE_SURVEY_MANAGEMENT,
     SEND_NOW, SEND_LATER,
     METHOD_SMS,
     METHOD_SMS_SURVEY,
@@ -75,6 +79,10 @@ from corehq.apps.sms.util import close_task
 from dimagi.utils.timezones import utils as tz_utils
 from corehq.apps.reports import util as report_utils
 from dimagi.utils.couch.database import is_bigcouch, bigcouch_quorum_count, iter_docs
+
+ACTION_ACTIVATE = 'activate'
+ACTION_DEACTIVATE = 'deactivate'
+ACTION_DELETE = 'delete'
 
 reminders_framework_permission = lambda *args, **kwargs: (
     require_permission(Permissions.edit_data)(
@@ -558,14 +566,14 @@ class CreateScheduledReminderView(BaseMessagingSectionView):
 
     @property
     def available_languages(self):
-        default_langs = ['en']
-        try:
-            translation_doc = StandaloneTranslationDoc.get_obj(self.domain, "sms")
-            return (translation_doc.langs or default_langs
-                    if translation_doc is not None else default_langs)
-        except ResourceNotFound:
-            pass
-        return default_langs
+        """
+        Returns a the list of language codes available for the domain, or
+        [] if no languages are specified.
+        """
+        translation_doc = StandaloneTranslationDoc.get_obj(self.domain, "sms")
+        if translation_doc and translation_doc.langs:
+            return translation_doc.langs
+        return []
 
     @property
     def is_previewer(self):
@@ -593,8 +601,7 @@ class CreateScheduledReminderView(BaseMessagingSectionView):
     @property
     def available_case_types(self):
         case_types = []
-        for app_doc in iter_docs(Application.get_db(), self.app_ids):
-            app = Application.wrap(app_doc)
+        for app in self.apps:
             case_types.extend([m.case_type for m in app.modules])
         return set(case_types)
 
@@ -617,52 +624,103 @@ class CreateScheduledReminderView(BaseMessagingSectionView):
         return [d['id'] for d in data]
 
     @property
+    @memoized
+    def apps(self):
+        result = []
+        for app_doc in iter_docs(Application.get_db(), self.app_ids):
+            app = get_correct_app_class(app_doc).wrap(app_doc)
+            if not app.is_remote_app():
+                result.append(app)
+        return result
+
+    @property
     def search_term(self):
         return self.request.POST.get('term')
 
     @property
     def search_case_type_response(self):
-        filtered_case_types = self._filter_by_term(self.available_case_types)
-        return self._format_response(filtered_case_types)
+        return list(self.available_case_types)
+
+    def clean_dict_list(self, dict_list):
+        """
+        Takes a dict of {string: list} and returns the same result, only
+        removing any duplicate entries in each of the lists.
+        """
+        result = {}
+        for key in dict_list:
+            result[key] = list(set(dict_list[key]))
+        return result
+
+    @property
+    def search_form_by_id_response(self):
+        """
+        Returns a dict of {"id": [form unique id], "text": [full form path]}
+        """
+        form_unique_id = self.search_term
+        try:
+            form = Form.get_form(form_unique_id)
+            assert form.get_app().domain == self.domain
+            return {
+                'text': form.full_path_name,
+                'id': form_unique_id,
+            }
+        except:
+            return {}
 
     @property
     def search_case_property_response(self):
-        if not self.case_type:
-            return []
-        case_properties = ['name']
-        for app_doc in iter_docs(Application.get_db(), self.app_ids):
-            app = Application.wrap(app_doc)
-            for properties in get_case_properties(app, [self.case_type]).values():
-                case_properties.extend(properties)
-        case_properties = self._filter_by_term(set(case_properties))
-        return self._format_response(case_properties)
+        """
+        Returns a dict of {case type: [case properties...]}
+        """
+        result = {}
+        for app in self.apps:
+            case_types = list(set([m.case_type for m in app.modules]))
+            for case_type in case_types:
+                if case_type not in result:
+                    result[case_type] = ['name']
+                for properties in get_case_properties(app, [case_type]).values():
+                    result[case_type].extend(properties)
+        return self.clean_dict_list(result)
+
+    def get_parent_child_types(self):
+        """
+        Returns a dict of {parent case type: [subcase types...]}
+        """
+        parent_child_types = {}
+        for app in self.apps:
+            for module in app.get_modules():
+                case_type = module.case_type
+                if case_type not in parent_child_types:
+                    parent_child_types[case_type] = []
+                if module.module_type == 'basic':
+                    for form in module.get_forms():
+                        for subcase in form.actions.subcases:
+                            parent_child_types[case_type].append(subcase.case_type)
+                elif module.module_type == 'advanced':
+                    for form in module.get_forms():
+                        for subcase in form.actions.get_open_subcase_actions(case_type):
+                            parent_child_types[case_type].append(subcase.case_type)
+        return self.clean_dict_list(parent_child_types)
 
     @property
     def search_subcase_property_response(self):
-        if not self.case_type:
-            return []
-        subcase_properties = ['name']
-        for app_doc in iter_docs(Application.get_db(), self.app_ids):
-            app = Application.wrap(app_doc)
-            for module in app.get_modules():
-                if module.module_type == 'basic':
-                    if not module.case_type == self.case_type:
-                        continue
-                    for form in module.get_forms():
-                        for subcase in form.actions.subcases:
-                            subcase_properties.extend(subcase.case_properties.keys())
-                elif module.module_type == 'advanced':
-                    for form in module.get_forms():
-                        for subcase in form.actions.get_open_subcase_actions(self.case_type):
-                            subcase_properties.extend(subcase.case_properties.keys())
-        subcase_properties = self._filter_by_term(set(subcase_properties))
-        return self._format_response(subcase_properties)
+        """
+        Returns a dict of {parent case type: [subcase properties]}
+        """
+        result = {}
+        parent_child_types = self.get_parent_child_types()
+        all_case_properties = self.search_case_property_response
+
+        for parent_type in parent_child_types:
+            result[parent_type] = []
+            for subcase_type in parent_child_types[parent_type]:
+                result[parent_type].extend(all_case_properties[subcase_type])
+        return self.clean_dict_list(result)
 
     @property
     def search_forms_response(self):
         forms = []
-        for app_doc in iter_docs(Application.get_db(), self.app_ids):
-            app = Application.wrap(app_doc)
+        for app in self.apps:
             for module in app.get_modules():
                 for form in module.get_forms():
                     forms.append({
@@ -695,6 +753,7 @@ class CreateScheduledReminderView(BaseMessagingSectionView):
             'search_case_property',
             'search_subcase_property',
             'search_forms',
+            'search_form_by_id',
         ]:
             return HttpResponse(json.dumps(getattr(self, '%s_response' % self.action)))
         if self.schedule_form.is_valid():
@@ -730,6 +789,26 @@ class EditScheduledReminderView(CreateScheduledReminderView):
         return self.page_title
 
     @property
+    def available_languages(self):
+        """
+        When editing a reminder, add in any languages that are used by the
+        reminder but that are not in the result from
+        CreateScheduledReminderView's available_languages property.
+
+        This is needed to be backwards-compatible with reminders created
+        with the old ui that would let you specify any language, regardless
+        of whether it was in the domain's list of languages or not.
+        """
+        result = super(EditScheduledReminderView, self).available_languages
+        handler = self.reminder_handler
+        for event in handler.events:
+            if event.message:
+                for (lang, text) in event.message.items():
+                    if lang not in result:
+                        result.append(lang)
+        return result
+
+    @property
     @memoized
     def schedule_form(self):
         initial = self.reminder_form_class.compute_initial(
@@ -762,8 +841,11 @@ class EditScheduledReminderView(CreateScheduledReminderView):
     @memoized
     def reminder_handler(self):
         try:
-            return CaseReminderHandler.get(self.handler_id)
-        except ResourceNotFound:
+            handler = CaseReminderHandler.get(self.handler_id)
+            assert handler.domain == self.domain
+            assert handler.doc_type == "CaseReminderHandler"
+            return handler
+        except (ResourceNotFound, AssertionError):
             raise Http404()
 
     @property
@@ -784,6 +866,23 @@ class EditScheduledReminderView(CreateScheduledReminderView):
 
     def process_schedule_form(self):
         self.schedule_form.save(self.reminder_handler)
+
+    def rule_in_progress(self):
+        messages.error(self.request, _("Please wait until the rule finishes "
+            "processing before making further changes."))
+        return HttpResponseRedirect(reverse(RemindersListView.urlname, args=[self.domain]))
+
+    def get(self, *args, **kwargs):
+        if self.reminder_handler.locked:
+            return self.rule_in_progress()
+        else:
+            return super(EditScheduledReminderView, self).get(*args, **kwargs)
+
+    def post(self, *args, **kwargs):
+        if self.reminder_handler.locked:
+            return self.rule_in_progress()
+        else:
+            return super(EditScheduledReminderView, self).post(*args, **kwargs)
 
 
 class AddStructuredKeywordView(BaseMessagingSectionView):
@@ -846,7 +945,7 @@ class AddStructuredKeywordView(BaseMessagingSectionView):
                 self.keyword.initiator_doc_type_filter.append('CommCareCase')
 
             self.keyword.actions = []
-            if self.keyword_form.cleaned_data['sender_content_type'] != 'none':
+            if self.keyword_form.cleaned_data['sender_content_type'] != NO_RESPONSE:
                 self.keyword.actions.append(
                     SurveyKeywordAction(
                         recipient=RECIPIENT_SENDER,
@@ -866,7 +965,7 @@ class AddStructuredKeywordView(BaseMessagingSectionView):
                         named_args_separator=self.keyword_form.cleaned_data['named_args_separator'],
                     )
                 )
-            if self.keyword_form.cleaned_data['other_recipient_content_type'] != 'none':
+            if self.keyword_form.cleaned_data['other_recipient_content_type'] != NO_RESPONSE:
                 self.keyword.actions.append(
                     SurveyKeywordAction(
                         recipient=self.keyword_form.cleaned_data['other_recipient_type'],
@@ -932,6 +1031,7 @@ class EditStructuredKeywordView(AddStructuredKeywordView):
             'description': self.keyword.description,
             'delimiter': self.keyword.delimiter,
             'override_open_sessions': self.keyword.override_open_sessions,
+            'sender_content_type': NO_RESPONSE,
         }
         is_case_filter = "CommCareCase" in self.keyword.initiator_doc_type_filter
         is_user_filter = "CommCareUser" in self.keyword.initiator_doc_type_filter
@@ -1189,6 +1289,7 @@ def add_survey(request, domain, survey_id=None):
                                     sample_id = sample["sample_id"],
                                     survey_incentive = sample["incentive"],
                                     submit_partial_forms = True,
+                                    reminder_type=REMINDER_TYPE_SURVEY_MANAGEMENT,
                                 )
                                 handler.save()
                                 wave.reminder_definitions[sample["sample_id"]] = handler._id
@@ -1291,6 +1392,7 @@ def add_survey(request, domain, survey_id=None):
                                 sample_id = sample_id,
                                 survey_incentive = sample_data[sample_id]["incentive"],
                                 submit_partial_forms = True,
+                                reminder_type=REMINDER_TYPE_SURVEY_MANAGEMENT,
                             )
                             handler.save()
                             wave.reminder_definitions[sample_id] = handler._id
@@ -1606,27 +1708,40 @@ class RemindersListView(BaseMessagingSectionView):
             'url': reverse(EditScheduledReminderView.urlname, args=[self.domain, reminder._id]),
         }
 
-    def get_action_response(self, active):
+    def get_action_response(self, action):
         try:
-            self.reminder.active = active
-            self.reminder.save()
+            assert self.reminder.domain == self.domain
+            assert self.reminder.doc_type == "CaseReminderHandler"
+            if self.reminder.locked:
+                return {
+                    'success': False,
+                    'locked': True,
+                }
+
+            if action in [ACTION_ACTIVATE, ACTION_DEACTIVATE]:
+                self.reminder.active = (action == ACTION_ACTIVATE)
+                self.reminder.save()
+            elif action == ACTION_DELETE:
+                self.reminder.retire()
             return {
                 'success': True,
-                'reminder': self._fmt_reminder_data(self.reminder),
             }
         except Exception as e:
+            msg = ("Couldn't process action '%s' for reminder definition"
+                % action)
+            notify_exception(None, message=msg, details={
+                'domain': self.domain,
+                'handler_id': self.reminder_id,
+            })
             return {
                 'success': False,
-                'error': e,
             }
 
     def post(self, *args, **kwargs):
         action = self.request.POST.get('action')
-        if action in ['activate', 'deactivate']:
-            return HttpResponse(json.dumps(self.get_action_response(action == 'activate')))
-        raise {
-            'success': False,
-        }
+        if action in [ACTION_ACTIVATE, ACTION_DEACTIVATE, ACTION_DELETE]:
+            return HttpResponse(json.dumps(self.get_action_response(action)))
+        return HttpResponse(status=400)
 
 
 class KeywordsListView(BaseMessagingSectionView, CRUDPaginatedViewMixin):

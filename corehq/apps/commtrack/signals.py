@@ -11,52 +11,32 @@ from corehq.apps.domain.signals import commcare_domain_post_save
 from corehq.apps.locations.models import Location
 from corehq.apps.sms.api import send_sms_to_verified_number
 from dimagi.utils import create_unique_filter
-from corehq.apps.commtrack.processing import process_stock_signal_catcher
-from couchforms.signals import successful_form_received
 from custom.openlmis.commtrack import requisition_receipt, requisition_approved
 
 supply_point_modified = Signal(providing_args=['supply_point', 'created'])
 
 requisition_modified = Signal(providing_args=['cases'])
 
+
 def attach_locations(xform, cases):
     """
     Given a received form and cases, update the location of that form to the location
     of its cases (if they have one).
     """
-
     # todo: this won't change locations if you are trying to do that via XML.
     # this is mainly just a performance thing so you don't have to do extra lookups
     # every time you touch a case
-
     if cases:
-        found_loc = None
-        for case in cases:
-            loc = None
-            if not case.location_:
-                if case.type == const.SUPPLY_POINT_CASE_TYPE:
-                    loc_id = getattr(case, 'location_id', None)
-                    if loc_id:
-                        loc = Location.get(loc_id)
-                        case.bind_to_location(loc)
-                elif case.type == const.REQUISITION_CASE_TYPE:
-                    req = RequisitionCase.wrap(case._doc)
-                    prod = req.get_product_case()
-                    if prod and prod.location_ and prod.location_ != case.location_:
-                        case.location_ = prod.location_
-                        case.save()
-
-            if loc and found_loc and loc != found_loc:
+        location_ids = [getattr(case, 'location_id', None) for case in cases]
+        unique_location_ids = set(filter(None, location_ids))
+        if unique_location_ids:
+            if len(unique_location_ids) != 1:
                 raise Exception(
                     'Submitted a commtrack case with multiple locations in a single form. '
                     'This is currently not allowed.'
                 )
-            found_loc = loc
-
-        case = cases[0]
-        if case.location_ is not None:
-            # should probably store this in computed_
-            xform.location_ = list(case.location_)
+            location_id = unique_location_ids.pop()
+            xform.location_id = location_id
 
 
 def send_notifications(xform, cases):
@@ -128,4 +108,3 @@ def bootstrap_commtrack_settings_if_necessary_signal(sender, **kwargs):
     bootstrap_commtrack_settings_if_necessary(kwargs['domain'])
 
 commcare_domain_post_save.connect(bootstrap_commtrack_settings_if_necessary_signal)
-successful_form_received.connect(process_stock_signal_catcher)

@@ -29,10 +29,11 @@ Common Output:
 """
 import datetime
 from dateutil.relativedelta import relativedelta
-from django.db.models import Q
+from django.db.models import Q, Count, Sum
 from django.utils.translation import ugettext as _
 
 from corehq.apps.accounting.models import Subscription, SoftwarePlanEdition
+from corehq.apps.products.models import SQLProduct
 from corehq.apps.domain.models import Domain
 from corehq.apps.es.cases import CaseES
 from corehq.apps.es.domains import DomainES
@@ -44,6 +45,7 @@ from corehq.apps.hqadmin.reporting.exceptions import (
     HistoTypeNotFoundException,
     IntervalNotFoundException,
 )
+from corehq.apps.locations.models import SQLLocation
 from corehq.apps.sms.mixin import SMSBackend
 from corehq.elastic import (
     ADD_TO_ES_FILTER,
@@ -57,13 +59,17 @@ from corehq.elastic import (
 from casexml.apps.stock.models import StockReport, StockTransaction
 from corehq.util.dates import get_timestamp_millis
 
-LARGE_ES_NUMBER = 10 ** 6
+CASE_COUNT_UPPER_BOUND = 1000 * 1000 * 10
+COUNTRY_COUNT_UPPER_BOUND = 1000 * 1000 * 10
+DOMAIN_COUNT_UPPER_BOUND = 1000 * 1000 * 10
+USER_COUNT_UPPER_BOUND = 1000 * 1000 * 10
 
 
 def add_params_to_query(query, params):
     if params:
         for k in params:
-            query = query.filter({"terms": {k: params[k]}})
+            if k != 'search':
+                query = query.filter({"terms": {k: params[k]}})
     return query
 
 
@@ -133,16 +139,18 @@ def get_project_spaces(facets=None):
     real_domain_query = (
         DomainES()
         .fields(["name"])
-        .size(LARGE_ES_NUMBER)
+        .size(DOMAIN_COUNT_UPPER_BOUND)
     )
     if facets:
         real_domain_query = add_params_to_query(real_domain_query, facets)
     real_domain_query_results = real_domain_query.run().raw_hits
-    return [_['fields']['name'] for _ in real_domain_query_results]
+    domain_names = [_['fields']['name'] for _ in real_domain_query_results]
+    if 'search' in facets:
+        return list(set(domain_names) & set(facets['search']))
+    return domain_names
 
 
-def get_sms_query(begin, end, facet_name, facet_terms, domains,
-        size=LARGE_ES_NUMBER):
+def get_sms_query(begin, end, facet_name, facet_terms, domains, size):
     return (SMSES()
             .domain(domains)
             .received(gte=begin, lte=end)
@@ -162,7 +170,7 @@ def get_active_countries_stats_data(domains, datespan, interval,
         f = timestamp - relativedelta(days=30)
         form_query = (FormES()
             .domain(domains)
-            .terms_facet('domain', 'domains', size=LARGE_ES_NUMBER)
+            .terms_facet('domain', 'domains', size=DOMAIN_COUNT_UPPER_BOUND)
             .submitted(gte=f, lte=t)
             .size(0))
 
@@ -170,7 +178,7 @@ def get_active_countries_stats_data(domains, datespan, interval,
         domains = [x['term'] for x in domains]
         countries = (DomainES()
                 .in_domains(domains)
-                .terms_facet('countries', 'countries', size=LARGE_ES_NUMBER))
+                .terms_facet('countries', 'countries', size=COUNTRY_COUNT_UPPER_BOUND))
 
         c = len(countries.run().facet('countries', 'terms'))
         if c > 0:
@@ -181,8 +189,19 @@ def get_active_countries_stats_data(domains, datespan, interval,
 
 def domains_matching_plan(software_plan_edition, start, end):
     matching_subscriptions = Subscription.objects.filter(
-        ((Q(date_start__gte=start) & Q(date_start__lte=end))
-            | (Q(date_end__gte=start) & Q(date_end__lte=end))),
+        Q(date_start__lte=end) & Q(date_end__gte=start),
+        plan_version__plan__edition=software_plan_edition,
+    )
+
+    return {
+        subscription.subscriber.domain
+        for subscription in matching_subscriptions
+    }
+
+
+def plans_on_date(software_plan_edition, date):
+    matching_subscriptions = Subscription.objects.filter(
+        Q(date_start__lte=date) & Q(date_end__gte=date),
         plan_version__plan__edition=software_plan_edition,
     )
 
@@ -194,12 +213,10 @@ def domains_matching_plan(software_plan_edition, start, end):
 
 def get_subscription_stats_data(domains, datespan, interval,
         software_plan_edition=None):
-    # intentionally passing timestamp in twice to get subscription info on that
-    # particular day. not in a range
     return [
         get_data_point(
-            len(set(domains) & domains_matching_plan(
-                software_plan_edition, timestamp, timestamp)),
+            len(set(domains) & plans_on_date(
+                software_plan_edition, timestamp)),
             timestamp
         )
         for timestamp in daterange(
@@ -229,7 +246,8 @@ def get_active_domain_stats_data(domains, datespan, interval,
         if add_form_domains:
             form_query = (FormES()
                 .domain(domains_in_interval)
-                .terms_facet('domain', 'domains', size=LARGE_ES_NUMBER)
+                .terms_facet('domain', 'domains',
+                             size=DOMAIN_COUNT_UPPER_BOUND)
                 .submitted(gte=f, lte=t)
                 .size(0))
             if restrict_to_mobile_submissions:
@@ -239,7 +257,8 @@ def get_active_domain_stats_data(domains, datespan, interval,
                 form_query.run().facet('domains', "terms")
             }
         if add_sms_domains:
-            sms_query = (get_sms_query(f, t, 'domains', 'domain', domains)
+            sms_query = (get_sms_query(f, t, 'domains', 'domain', domains,
+                                       DOMAIN_COUNT_UPPER_BOUND)
                 .incoming_messages())
             active_domains |= {
                 term_and_count['term'] for term_and_count in
@@ -252,21 +271,38 @@ def get_active_domain_stats_data(domains, datespan, interval,
     return format_return_data(histo_data, 0, datespan)
 
 
-def get_active_sms_users_data(domains, datespan, interval, datefield='date',
-        additional_params_es={}):
+def get_active_users_data(domains, datespan, interval, datefield='date',
+        additional_params_es={}, include_forms=False):
     """
     Returns list of timestamps and how many users of SMS were active in the
     30 days before each timestamp
     """
     histo_data = []
+    mobile_users = set(
+        UserES()
+        .show_inactive()
+        .mobile_users()
+        .domain(domains)
+        .run().doc_ids
+    )
     for timestamp in daterange(interval, datespan.startdate, datespan.enddate):
         t = timestamp
         f = timestamp - relativedelta(days=30)
         sms_query = get_sms_query(f, t, 'users', 'couch_recipient',
-                domains)
+                domains, USER_COUNT_UPPER_BOUND)
         if additional_params_es:
             sms_query = add_params_to_query(sms_query, additional_params_es)
-        users = sms_query.run().facet('users', "terms")
+        users = {u['term'] for u in sms_query.run().facet('users', "terms")}
+        if include_forms:
+            users |= {
+                u['term'] for u in FormES()
+                .user_facet(size=USER_COUNT_UPPER_BOUND)
+                .submitted(gte=f, lte=t)
+                .size(0)
+                .run()
+                .facets.user.result
+                if u['term'] in mobile_users
+            }
         c = len(users)
         if c > 0:
             histo_data.append(get_data_point(c, timestamp))
@@ -292,7 +328,8 @@ def get_active_dimagi_owned_gateway_projects(domains, datespan, interval,
     for timestamp in daterange(interval, datespan.startdate, datespan.enddate):
         t = timestamp
         f = timestamp - relativedelta(days=30)
-        sms_query = get_sms_query(f, t, 'domains', 'domain', domains)
+        sms_query = get_sms_query(f, t, 'domains', 'domain', domains,
+                                  DOMAIN_COUNT_UPPER_BOUND)
         d = sms_query.filter(backend_filter).run()
         c = len(d.facet('domains', 'terms'))
         if c > 0:
@@ -312,7 +349,8 @@ def get_countries_stats_data(domains, datespan, interval,
         countries = (DomainES()
                 .in_domains(domains)
                 .created(lte=timestamp)
-                .terms_facet('countries', 'countries', size=LARGE_ES_NUMBER)
+                .terms_facet('countries', 'countries',
+                             size=COUNTRY_COUNT_UPPER_BOUND)
                 .size(0))
 
         c = len(countries.run().facet('countries', 'terms'))
@@ -330,7 +368,8 @@ def get_total_clients_data(domains, datespan, interval, datefield='opened_on'):
     sms_cases = (SMSES()
             .to_commcare_case()
             .domain(domains)
-            .terms_facet('couch_recipient', 'cases', size=LARGE_ES_NUMBER)
+            .terms_facet('couch_recipient', 'cases',
+                         size=CASE_COUNT_UPPER_BOUND)
             .size(0))
 
     cases = [u['term'] for u in sms_cases.run().facet('cases', 'terms')]
@@ -362,7 +401,7 @@ def get_mobile_workers_data(domains, datespan, interval,
     sms_users = (SMSES()
             .to_commcare_user()
             .domain(domains)
-            .terms_facet('couch_recipient', 'users', LARGE_ES_NUMBER)
+            .terms_facet('couch_recipient', 'users', USER_COUNT_UPPER_BOUND)
             .size(0))
 
     users = [u['term'] for u in sms_users.run().facet('users', 'terms')]
@@ -438,11 +477,11 @@ def get_sms_only_domain_stats_data(domains, datespan, interval,
 
     sms = (SMSES()
             .domain(domains)
-            .terms_facet('domain', 'domains', size=LARGE_ES_NUMBER)
+            .terms_facet('domain', 'domains', size=DOMAIN_COUNT_UPPER_BOUND)
             .size(0))
     forms = (FormES()
              .domain(domains)
-             .terms_facet('domain', 'domains', size=LARGE_ES_NUMBER)
+             .terms_facet('domain', 'domains', size=DOMAIN_COUNT_UPPER_BOUND)
              .size(0))
 
     sms_domains = {x['term'] for x in sms.run().facet('domains', 'terms')}
@@ -475,7 +514,7 @@ def get_commconnect_domain_stats_data(domains, datespan, interval,
     """
     sms = (SMSES()
            .domain(domains)
-           .terms_facet('domain', 'domains', size=LARGE_ES_NUMBER)
+           .terms_facet('domain', 'domains', size=DOMAIN_COUNT_UPPER_BOUND)
            .size(0))
 
     if additional_params_es:
@@ -623,8 +662,31 @@ def get_user_stats(domains, datespan, interval, **kwargs):
     return get_other_stats("users", domains, datespan, interval, **kwargs)
 
 
-def get_users_all_stats(domains, datespan, interval, **kwargs):
-    return get_other_stats("users_all", domains, datespan, interval, **kwargs)
+def get_users_all_stats(domains, datespan, interval,
+                        user_type_mobile=None,
+                        require_submissions=False):
+    query = UserES().domain(domains).show_inactive().size(0)
+    if user_type_mobile:
+        query = query.mobile_users()
+    elif user_type_mobile is not None:
+        query = query.web_users()
+    if require_submissions:
+        query = query.user_ids(get_submitted_users())
+
+    histo_data = (
+        query
+        .created(gte=datespan.startdate, lte=datespan.enddate)
+        .date_histogram('date', 'created_on', interval)
+        .run().facet('date', 'entries')
+    )
+
+    users_before_date = len(
+        query
+        .created(lt=datespan.startdate)
+        .run().doc_ids
+    )
+
+    return format_return_data(histo_data, users_before_date, datespan)
 
 
 def get_other_stats(histo_type, domains, datespan, interval,
@@ -675,6 +737,32 @@ def get_other_stats(histo_type, domains, datespan, interval,
     return stats_data
 
 
+def get_products_stats_data(domains, datespan, interval,
+        datefield='created_at'):
+    """
+    Number of products by created time
+    """
+    # groups products by the interval and returns the time interval and count
+    ret = (SQLProduct.objects
+                     .filter(domain__in=domains,
+                             created_at__gte=datespan.startdate,
+                             created_at__lte=datespan.enddate)
+                     .extra({
+                         interval:
+                             "EXTRACT(EPOCH FROM date_trunc('%s', %s))*1000" %
+                             (interval, datefield)})
+                     .values(interval).annotate(Count('id')))
+
+    ret = [{"time": int(r[interval]), "count": r['id__count']} for r in ret]
+
+    initial = (SQLProduct.objects
+                     .filter(domain__in=domains,
+                             created_at__lt=datespan.startdate)
+                     .count())
+
+    return format_return_data(ret, initial, datespan)
+
+
 def get_user_ids(user_type_mobile):
     """
     Returns the set of mobile user IDs if user_type_mobile is True,
@@ -685,48 +773,34 @@ def get_user_ids(user_type_mobile):
         query = query.mobile_users()
     else:
         query = query.web_users()
-    return {doc_id for doc_id in query.run().doc_ids}
+    return set(query.run().doc_ids)
 
 
-def get_user_type_filters(histo_type, user_type_mobile, require_submissions):
-    result = {'terms': {}}
-    if histo_type == 'forms':
-        result['terms']["form.meta.userID"] = list(
-            get_user_ids(user_type_mobile)
+def get_submitted_users():
+    real_form_users = {
+        user_count['term'] for user_count in (
+            FormES()
+            .user_facet(size=USER_COUNT_UPPER_BOUND)
+            .size(0)
+            .run()
+            .facets.user.result
         )
-    elif histo_type == 'users_all':
-        existing_users = get_user_ids(user_type_mobile)
+    }
 
-        if require_submissions:
-            LARGE_NUMBER = 1000 * 1000 * 10
-            real_form_users = {
-                user_count['term'] for user_count in (
-                    FormES()
-                    .user_facet()
-                    .size(0)
-                    .run()
-                    .facets.user.result
-                )
-            }
-
-            real_sms_users = {
-                user_count['term'] for user_count in (
-                    SMSES()
-                    .terms_facet('couch_recipient', 'user', LARGE_NUMBER)
-                    .incoming_messages()
-                    .size(0)
-                    .run()
-                    .facets.user.result
-                )
-            }
-
-            filtered_real_users = (
-                existing_users & (real_form_users | real_sms_users)
+    real_sms_users = {
+        user_count['term'] for user_count in (
+            SMSES()
+            .terms_facet(
+                'couch_recipient', 'user', USER_COUNT_UPPER_BOUND
             )
-        else:
-            filtered_real_users = existing_users
-        result['terms']['_id'] = list(filtered_real_users)
-    return result
+            .incoming_messages()
+            .size(0)
+            .run()
+            .facets.user.result
+        )
+    }
+
+    return real_form_users | real_sms_users
 
 
 def get_case_owner_filters():
@@ -835,15 +909,13 @@ def get_general_stats_data(domains, histo_type, datespan, interval="day",
         user_type_mobile=None, is_cumulative=True, require_submissions=True,
         supply_points=False):
     additional_filters = []
-    if user_type_mobile is not None:
-        additional_filters.append(
-            get_user_type_filters(
-                histo_type,
-                user_type_mobile,
-                require_submissions,
-            )
-        )
-    if histo_type == 'active_cases':
+    if histo_type == 'forms' and user_type_mobile is not None:
+        additional_filters.append({
+            'terms': {
+                'form.meta.userID': list(get_user_ids(user_type_mobile))
+            }
+        })
+    if histo_type == 'active_cases' and not supply_points:
         additional_filters.append(get_case_owner_filters())
     if supply_points:
         additional_filters.append({'terms': {'type': ['supply-point']}})
@@ -875,17 +947,104 @@ def get_general_stats_data(domains, histo_type, datespan, interval="day",
     }
 
 
+def _sql_to_json_data(domains, sql_data, datespan, individual_domain_limit=16):
+    """
+    Helper function to transform sql queries into what the admin reports
+    framework likes. Handles initial values and historical data
+
+    sql_data needs {'timestamp': t, 'domain': d}
+    """
+    all_domains = len(domains) > individual_domain_limit
+    start = get_timestamp_millis(datespan.startdate)
+
+    if all_domains:
+        histo_data = {"All Domains": dict()}
+        init_ret = {"All Domains": 0}
+        ret = {"All Domains": list()}
+    else:
+        histo_data = {d: dict() for d in domains}
+        init_ret = {d: 0 for d in domains}
+        ret = {d: list() for d in domains}
+
+    for data in sql_data:
+        tstamp = get_timestamp_millis(data['timestamp'])
+        domain = "All Domains" if all_domains else data['domain']
+
+        if tstamp < start:
+            init_ret[domain] += 1
+        else:
+            if tstamp not in histo_data[domain]:
+                histo_data[domain][tstamp] = 1
+            else:
+                histo_data[domain][tstamp] += 1
+
+    for k, v in histo_data.iteritems():
+        for l, w in v.iteritems():
+            ret[k].append({'count': w, 'time': l})
+
+    return init_ret, ret
+
+
+def get_unique_locations_data(domains, datespan, interval,
+        datefield='created_at', individual_domain_limit=16):
+    locations = (SQLLocation.objects
+                            .filter(domain__in=domains,
+                                    created_at__lte=datespan.enddate)
+                            .extra({"timestamp":
+                                    "date_trunc('%s', %s)" %
+                                    (interval, datefield)})
+                            .values("timestamp", "domain"))
+
+    domains = {l["domain"] for l in locations}
+
+    init_ret, ret = _sql_to_json_data(domains, locations, datespan,
+            individual_domain_limit=individual_domain_limit)
+
+    return {
+        'histo_data': ret,
+        'initial_values': init_ret,
+        'startdate': datespan.startdate_key_utc,
+        'enddate': datespan.enddate_key_utc,
+    }
+
+
+def get_location_type_data(domains, datespan, interval,
+        datefield='created_at', individual_domain_limit=16):
+    locations = (SQLLocation.objects
+                            .filter(domain__in=domains,
+                                    created_at__lte=datespan.enddate)
+                            .extra({"timestamp":
+                                    "date_trunc('%s', %s)" %
+                                    (interval, datefield)})
+                            .values("timestamp", "domain", "location_type")
+                            .order_by("location_type", "created_at")
+                            .distinct("location_type"))
+
+    domains = {l["domain"] for l in locations}
+
+    init_ret, ret = _sql_to_json_data(domains, locations, datespan,
+            individual_domain_limit=individual_domain_limit)
+
+    return {
+        'histo_data': ret,
+        'initial_values': init_ret,
+        'startdate': datespan.startdate_key_utc,
+        'enddate': datespan.enddate_key_utc,
+    }
+
+
 HISTO_TYPE_TO_FUNC = {
     "active_cases": get_active_cases_stats,
     "active_countries": get_active_countries_stats_data,
     "active_dimagi_gateways": get_active_dimagi_owned_gateway_projects,
     "active_domains": get_active_domain_stats_data,
-    "active_mobile_users": get_active_sms_users_data,
+    "active_mobile_users": get_active_users_data,
     "cases": get_case_stats,
     "commtrack_forms": commtrack_form_submissions,
     "countries": get_countries_stats_data,
     "domains": get_domain_stats_data,
     "forms": get_form_stats,
+    "location_types": get_location_type_data,
     "mobile_clients": get_total_clients_data,
     "mobile_workers": get_mobile_workers_data,
     "real_sms_messages": get_real_sms_messages_data,
@@ -893,6 +1052,8 @@ HISTO_TYPE_TO_FUNC = {
     "sms_only_domains": get_sms_only_domain_stats_data,
     "stock_transactions": get_stock_transaction_stats_data,
     "subscriptions": get_all_subscriptions_stats_data,
+    "total_products": get_products_stats_data,
+    "unique_locations": get_unique_locations_data,
     "users": get_user_stats,
     "users_all": get_users_all_stats,
 }

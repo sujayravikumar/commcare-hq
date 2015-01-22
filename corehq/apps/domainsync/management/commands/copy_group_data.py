@@ -6,10 +6,14 @@ import itertools
 from casexml.apps.case.models import CommCareCase
 from casexml.apps.phone.models import SyncLog
 from corehq.apps.domain.models import Domain
+from corehq.apps.domainsync.config import DocumentTransform, save
 from corehq.apps.groups.models import Group
 from corehq.apps.users.models import CouchUser, UserRole
 from couchforms.models import XFormInstance
 from dimagi.utils.chunked import chunked
+
+
+CHUNK_SIZE = 100
 
 
 class Command(LabelCommand):
@@ -51,7 +55,8 @@ class Command(LabelCommand):
             sourcedb.view('domain/domains', key=group.domain, include_docs=True,
                           reduce=False, limit=1).one()['doc']
         )
-        domain.save(force_update=True)
+        dt = DocumentTransform(domain._obj, sourcedb)
+        save(dt, Domain.get_db())
 
         owners = [group_id]
         if include_user_owned:
@@ -73,7 +78,6 @@ class Command(LabelCommand):
             )
             return [res['id'] for res in results]
 
-        CHUNK_SIZE = 100
         print 'getting case ids'
 
         case_ids = get_case_ids(owners)

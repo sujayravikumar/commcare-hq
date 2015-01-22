@@ -115,8 +115,8 @@ class UnknownUsersPillow(BulkPillow):
 
     def get_fields_from_emitted_dict(self, emitted_dict):
         domain = emitted_dict['key'][1]
-        user_id = emitted_dict['value']['user_id']
-        username = emitted_dict['value']['username']
+        user_id = emitted_dict['value'].get('user_id')
+        username = emitted_dict['value'].get('username')
         xform_id = emitted_dict['id']
         return user_id, username, domain, xform_id
 
@@ -127,6 +127,10 @@ class UnknownUsersPillow(BulkPillow):
         username = form_meta.get('username')
         xform_id = doc.get('_id')
         return user_id, username, domain, xform_id
+
+    @memoized
+    def _user_exists(self, user_id):
+        return self.user_db.doc_exist(user_id)
 
     def change_trigger(self, changes_dict):
         if 'key' in changes_dict:
@@ -139,7 +143,7 @@ class UnknownUsersPillow(BulkPillow):
             user_id = None
 
         es_path = USER_INDEX + "/user/"
-        if (user_id and not self.user_db.doc_exist(user_id)
+        if (user_id and not self._user_exists(user_id)
                 and not self.es.head(es_path + user_id)):
             doc_type = "AdminUser" if username == "admin" else "UnknownUser"
             doc = {

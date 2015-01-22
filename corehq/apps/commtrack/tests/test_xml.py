@@ -4,12 +4,13 @@ from lxml import etree
 import os
 import random
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from casexml.apps.case.mock import CaseBlock
 from casexml.apps.case.xml import V2
 from casexml.apps.phone.restore import RestoreConfig
 from casexml.apps.phone.tests.utils import synclog_id_from_restore_payload
-from corehq.apps.commtrack.models import ConsumptionConfig, StockRestoreConfig, RequisitionCase, Product, StockState
+from corehq.apps.commtrack.models import ConsumptionConfig, StockRestoreConfig, RequisitionCase, StockState
+from corehq.apps.products.models import Product
 from corehq.apps.consumption.shortcuts import set_default_monthly_consumption_for_domain
 from couchforms.models import XFormInstance
 from dimagi.utils.parsing import json_format_datetime
@@ -162,11 +163,11 @@ class CommTrackSubmissionTest(CommTrackTest):
     def setUp(self):
         super(CommTrackSubmissionTest, self).setUp()
         self.user = self.users[0]
-        loc2 = make_loc('loc1')
+        loc2 = make_loc('loc2')
         self.sp2 = make_supply_point(self.domain.name, loc2)
 
     @override_settings(CASEXML_FORCE_DOMAIN_CHECK=False)
-    def submit_xml_form(self, xml_method, **submit_extras):
+    def submit_xml_form(self, xml_method, timestamp=None, **submit_extras):
         instance_id = uuid.uuid4().hex
         instance = submission_wrap(
             instance_id,
@@ -175,6 +176,7 @@ class CommTrackSubmissionTest(CommTrackTest):
             self.sp,
             self.sp2,
             xml_method,
+            timestamp=timestamp,
         )
         submit_form_locally(
             instance=instance,
@@ -492,7 +494,10 @@ class CommTrackArchiveSubmissionTest(CommTrackSubmissionTest):
 
     def testArchiveLastForm(self):
         initial_amounts = [(p._id, float(100)) for p in self.products]
-        self.submit_xml_form(balance_submission(initial_amounts))
+        self.submit_xml_form(
+            balance_submission(initial_amounts),
+            timestamp=datetime.now() + timedelta(-30)
+        )
 
         final_amounts = [(p._id, float(50)) for i, p in enumerate(self.products)]
         second_form_id = self.submit_xml_form(balance_submission(final_amounts))
@@ -504,7 +509,10 @@ class CommTrackArchiveSubmissionTest(CommTrackSubmissionTest):
             self.assertEqual(3, StockState.objects.filter(case_id=self.sp._id).count())
             for state in StockState.objects.filter(case_id=self.sp._id):
                 self.assertEqual(Decimal(50), state.stock_on_hand)
-                self.assertIsNotNone(state.daily_consumption)
+                self.assertEqual(
+                    round(float(state.daily_consumption), 2),
+                    1.67
+                )
 
         # check initial setup
         _assert_initial_state()

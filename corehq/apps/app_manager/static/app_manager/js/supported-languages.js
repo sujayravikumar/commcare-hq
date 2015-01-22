@@ -1,11 +1,12 @@
 var SupportedLanguages = (function () {
-    function Language(langcode, deploy) {
+    function Language(langcode, deploy, languages) {
         var self = this;
         this.langcode = ko.observable(deploy === undefined ? '' : langcode);
         this.originalLangcode = ko.observable(deploy === undefined ? '' : langcode);
         this.deploy = ko.observable(deploy === undefined ? true : deploy);
         this.message_content = ko.observable('');
         this.show_error = ko.observable();
+        this.languages = languages;
         this.message = ko.computed(function () {
             if (self.message_content() === '') {
                 if (self.langcode()) {
@@ -23,6 +24,10 @@ var SupportedLanguages = (function () {
                 }
             }
             return self.message_content();
+        });
+
+        this.isDefaultLang = ko.computed(function () {
+            return self.languages()[0] === self;
         });
     }
     function SupportedLanguages(options) {
@@ -100,8 +105,8 @@ var SupportedLanguages = (function () {
         this.languages = ko.observableArray([]);
         this.removedLanguages = ko.observableArray([]);
         function newLanguage(langcode, deploy) {
-            var language = new Language(langcode, deploy);
-            language.langcode.subscribe(changeSaveButton)
+            var language = new Language(langcode, deploy, self.languages);
+            language.langcode.subscribe(changeSaveButton);
             language.deploy.subscribe(changeSaveButton);
             language.langcode.subscribe(function () { self.validateLanguage(language); });
             return language;
@@ -112,9 +117,7 @@ var SupportedLanguages = (function () {
         };
         this.removeLanguage = function (language) {
             self.languages.remove(language);
-            if (language.originalLangcode()) {
-                self.removedLanguages.push(language);
-            }
+            self.removedLanguages.push(language);
         };
         this.unremoveLanguage = function (language) {
             self.removedLanguages.remove(language);
@@ -127,6 +130,9 @@ var SupportedLanguages = (function () {
         }
         this.languages.subscribe(changeSaveButton);
 
+        this.canSortLanguages = ko.computed(function () {
+             return self.editing() && self.languages().length > 1;
+        });
 
         this.validateGeneral = function () {
             var message = "";
@@ -164,9 +170,9 @@ var SupportedLanguages = (function () {
                 self.languages()[i].originalLangcode();
                 if (message || language == self.languages()[i]) {
                     continue;
-                } else if (language === self.languages()[i].langcode()) {
+                } else if (language.langcode() === self.languages()[i].langcode()) {
                     message = "Language appears twice";
-                } else if (language === self.languages()[i].originalLangcode()) {
+                } else if (language.originalLangcode() === self.languages()[i].originalLangcode()) {
                     message = "This conflicts with a current language";
                 }
             }

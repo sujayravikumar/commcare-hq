@@ -35,7 +35,6 @@ class UserGenerationCache(GenerationCache):
         "domain/old_users",
         "domain/docs",
         "sms/phones_to_domains",
-        "migration/user_id_by_username",
         "eula_reports/non_eulized_users"
     ]
 
@@ -125,4 +124,20 @@ class CommtrackConfigGenerationCache(GenerationCache):
     doc_types = ['CommtrackConfig']
     views = [
         'commtrack/domain_config',
+    ]
+
+
+class UserReportsDataSourceCache(GenerationCache):
+    generation_key = '#gen#userreports#datasource#'
+    doc_types = ['DataSourceConfiguration']
+    views = [
+        'userreports/data_sources_by_domain',
+    ]
+
+
+class UserReportsReportConfigCache(GenerationCache):
+    generation_key = '#gen#userreports#reportconfig#'
+    doc_types = ['ReportConfiguration']
+    views = [
+        'userreports/report_configs_by_domain',
     ]

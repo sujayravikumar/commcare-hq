@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.conf.urls.defaults import patterns, url, include
+from django.conf.urls import patterns, url, include
 from django.views.generic import TemplateView, RedirectView
 from corehq.apps.domain.utils import legacy_domain_re
 
@@ -34,7 +34,6 @@ domain_specific = patterns('',
     # the receiver needs to accept posts at an endpoint that might
     # not have a slash, so don't include it at the root urlconf
     (r'^receiver', include('corehq.apps.receiverwrapper.urls')),
-    (r'^migration/', include('corehq.apps.migration.urls')),
     (r'^settings/', include(settings_domain_specific)),
     (r'^users/', include(users_redirect)),
     (r'^domain/', include(domain_redirect)),
@@ -57,9 +56,12 @@ domain_specific = patterns('',
     (r'^importer/', include('corehq.apps.importer.urls')),
     (r'^sqlextract/', include('ctable_view.urls')),
     (r'^fri/', include('custom.fri.urls')),
+    (r'^ilsgateway/', include('custom.ilsgateway.urls')),
+    (r'^ewsghana/', include('custom.ewsghana.urls')),
     (r'^', include('custom.m4change.urls')),
     (r'^', include('custom.uth.urls')),
     (r'^dashboard/', include('corehq.apps.dashboard.urls')),
+    (r'^configurable_reports/', include('corehq.apps.userreports.urls')),
 )
 
 urlpatterns = patterns('',
@@ -123,6 +125,7 @@ urlpatterns = patterns('',
     url(r'^pro_bono/$', ProBonoStaticView.as_view(),
         name=ProBonoStaticView.urlname),
     url(r'^loadtest/', include('corehq.apps.loadtestendpoints.urls')),
+    (r'^public/', include('corehq.apps.public.urls')),
 ) + patterns('', *LOCAL_APP_URLS)
 
 # django rosetta support if configured

@@ -1,10 +1,17 @@
-#from django.conf.urls.defaults import patterns, url
-from corehq.apps.users.views import DefaultProjectUserSettingsView, EditWebUserView, EditMyAccountDomainView, ListWebUsersView, InviteWebUserView
-from corehq.apps.users.views.mobile.groups import EditGroupsView, EditGroupMembersView
-from corehq.apps.users.views.mobile.users import UploadCommCareUsers, EditCommCareUserView, ListCommCareUsersView, AsyncListCommCareUsersView, CreateCommCareUserView, ConfirmBillingAccountForExtraUsersView, \
-    UserUploadStatusView
-from django.conf.urls.defaults import *
+from django.conf.urls import *
+
 from corehq.apps.domain.utils import grandfathered_domain_re
+
+from .views import (DefaultProjectUserSettingsView, EditWebUserView,
+    EditMyAccountDomainView, ListWebUsersView, InviteWebUserView,
+    NewListWebUsersView,
+)
+from .views.mobile.custom_data_fields import UserFieldsView
+from .views.mobile.groups import EditGroupsView, EditGroupMembersView
+from .views.mobile.users import (UploadCommCareUsers, EditCommCareUserView,
+    ListCommCareUsersView, AsyncListCommCareUsersView, CreateCommCareUserView,
+    ConfirmBillingAccountForExtraUsersView, UserUploadStatusView)
+
 
 urlpatterns = patterns('corehq.apps.users.views',
     url(r'^$', DefaultProjectUserSettingsView.as_view(), name=DefaultProjectUserSettingsView.urlname),
@@ -31,6 +38,8 @@ urlpatterns = patterns('corehq.apps.users.views',
     url(r'^web/delete_invitation/$', 'delete_invitation', name='delete_invitation'),
     url(r'^web/location_restriction_for_users/$', 'location_restriction_for_users', name='location_restriction_for_users'),
     url(r'^web/$', ListWebUsersView.as_view(), name=ListWebUsersView.urlname),
+    url(r'^web_new/$', NewListWebUsersView.as_view(),
+        name=NewListWebUsersView.urlname),
     url(r'^join/(?P<invitation_id>[\w-]+)/$', 'accept_invitation', name='domain_accept_invitation'),
     url(r'^web/role/save/$', 'post_user_role', name='post_user_role'),
     url(r'^web/role/delete/$', 'delete_user_role', name='delete_user_role'),
@@ -41,6 +50,7 @@ urlpatterns = patterns('corehq.apps.users.views',
 ) + \
 patterns("corehq.apps.users.views.mobile.users",
     url(r'^commcare/$', ListCommCareUsersView.as_view(), name=ListCommCareUsersView.urlname),
+    url(r'^commcare/fields/$', UserFieldsView.as_view(), name=UserFieldsView.urlname),
     url(r'^commcare/account/(?P<couch_user_id>[\w-]+)/$', EditCommCareUserView.as_view(), name=EditCommCareUserView.urlname),
     url(r'^commcare/account/(?P<couch_user_id>[\w-]+)/user_data/$', 'update_user_data', name='update_user_data'),
     url(r'^commcare/account/(?P<couch_user_id>[\w-]+)/groups/$', 'update_user_groups', name='update_user_groups'),

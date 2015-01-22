@@ -11,6 +11,8 @@ from corehq.apps.hqpillow_retry.views import PillowErrorsReport
 from corehq.apps.reports.standard import (monitoring, inspect, export,
     deployments, sms, ivr)
 from corehq.apps.receiverwrapper import reports as receiverwrapper
+from corehq.apps.userreports.models import ReportConfiguration
+from corehq.apps.userreports.reports.view import ConfigurableReport
 import phonelog.reports as phonelog
 from corehq.apps.reports.commtrack import standard as commtrack_reports
 from corehq.apps.reports.commtrack import maps as commtrack_maps
@@ -27,7 +29,11 @@ def REPORTS(project):
     from corehq.apps.reports.standard.cases.careplan import make_careplan_reports
     from corehq.apps.reports.standard.maps import DemoMapReport, DemoMapReport2, DemoMapCaseList
 
-    reports = [
+    reports = []
+
+    reports.extend(_get_configurable_reports(project))
+
+    reports.extend([
         (ugettext_lazy("Monitor Workers"), (
             monitoring.WorkerActivityReport,
             monitoring.DailyFormStatsReport,
@@ -44,15 +50,17 @@ def REPORTS(project):
             deployments.ApplicationStatusReport,
             receiverwrapper.SubmissionErrorReport,
             phonelog.FormErrorReport,
-            phonelog.DeviceLogDetailsReport
+            phonelog.DeviceLogDetailsReport,
+            deployments.SyncHistoryReport,
         )),
         (ugettext_lazy("Demos for Previewers"), (
             DemoMapReport, DemoMapReport2, DemoMapCaseList,
         )),
-    ]
+    ])
 
     if project.commtrack_enabled:
         reports.insert(0, (ugettext_lazy("Commtrack"), (
+            commtrack_reports.SimplifiedInventoryReport,
             commtrack_reports.InventoryReport,
             commtrack_reports.CurrentStockStatusReport,
             commtrack_maps.StockStatusMapReport,
@@ -89,25 +97,23 @@ def REPORTS(project):
         ])
 
     messaging_reports += getattr(Domain.get_module_by_name(project.name), 'MESSAGING_REPORTS', ())
+    messaging = (ugettext_lazy("Messaging"), messaging_reports)
+    reports.append(messaging)
 
-    messaging = (lambda project, user: (
-        ugettext_lazy("Logs") if project.commtrack_enabled else ugettext_lazy("Messaging")), messaging_reports)
-
-    if project.commconnect_enabled:
-        reports.insert(0, messaging)
-    else:
-        reports.append(messaging)
-
-    reports.extend(dynamic_reports(project))
+    reports.extend(_get_dynamic_reports(project))
 
     return reports
 
-def dynamic_reports(project):
+
+def _get_dynamic_reports(project):
     """include any reports that can be configured/customized with static parameters for this domain"""
     for reportset in project.dynamic_reports:
-        yield (reportset.section_title, filter(None, (make_dynamic_report(report, [reportset.section_title]) for report in reportset.reports)))
+        yield (reportset.section_title,
+               filter(None,
+                      (_make_dynamic_report(report, [reportset.section_title]) for report in reportset.reports)))
 
-def make_dynamic_report(report_config, keyprefix):
+
+def _make_dynamic_report(report_config, keyprefix):
     """create a report class the descends from a generic report class but has specific parameters set"""
     # a unique key to distinguish this particular configuration of the generic report
     report_key = keyprefix + [report_config.report, report_config.name]
@@ -132,6 +138,30 @@ def make_dynamic_report(report_config, keyprefix):
 
     # dynamically create a report class
     return type('DynamicReport%s' % slug, (metaclass,), kwargs)
+
+
+def _get_configurable_reports(project):
+    """
+    User configurable reports
+    """
+    configs = ReportConfiguration.by_domain(project.name)
+    if configs:
+        def _make_report_class(config):
+            from corehq.apps.reports.generic import GenericReportView
+
+            # this is really annoying.
+            # the report metadata should really be pulled outside of the report classes
+            @classmethod
+            def get_url(cls, domain):
+                return reverse(ConfigurableReport.slug, args=[domain, config._id])
+
+            return type('DynamicReport{}'.format(config._id), (GenericReportView, ), {
+                'name': config.title,
+                'description': config.description or None,
+                'get_url': get_url,
+            })
+
+        yield (_('Project Reports'), [_make_report_class(config) for config in configs])
 
 
 
@@ -282,7 +312,7 @@ TABS = (
     ProjectInfoTab,
     ReportsTab,
     ProjectDataTab,
-    CommTrackSetupTab,
+    SetupTab,
     ProjectUsersTab,
     ApplicationsTab,
     CloudcareTab,

@@ -48,6 +48,7 @@ class AccountingInterface(AddItemInterface):
               'corehq.apps.accounting.interface.SalesforceAccountIDFilter',
               'corehq.apps.accounting.interface.AccountTypeFilter',
               'corehq.apps.accounting.interface.ActiveStatusFilter',
+              'corehq.apps.accounting.interface.DimagiContactFilter',
               ]
     hide_filters = False
 
@@ -67,6 +68,7 @@ class AccountingInterface(AddItemInterface):
             DataTablesColumn("Date Created"),
             DataTablesColumn("Account Type"),
             DataTablesColumn("Active Status"),
+            DataTablesColumn("Dimagi Contact"),
         )
 
     @property
@@ -99,6 +101,11 @@ class AccountingInterface(AddItemInterface):
             filters.update(
                 is_active=is_active == ActiveStatusFilter.active,
             )
+        dimagi_contact = DimagiContactFilter.get_value(self.request, self.domain)
+        if dimagi_contact is not None:
+            filters.update(
+                dimagi_contact=dimagi_contact,
+            )
 
         for account in BillingAccount.objects.filter(**filters):
             rows.append([
@@ -107,6 +114,7 @@ class AccountingInterface(AddItemInterface):
                 account.date_created.date(),
                 account.account_type,
                 "Active" if account.is_active else "Inactive",
+                account.dimagi_contact,
             ])
         return rows
 
@@ -411,6 +419,7 @@ class InvoiceInterface(GenericTabularReport):
     @property
     def headers(self):
         header = DataTablesHeader(
+            DataTablesColumn("Invoice #"),
             DataTablesColumn("Account Name (Fogbugz Client Name)"),
             DataTablesColumn("Subscription"),
             DataTablesColumn("Project Space"),
@@ -467,6 +476,7 @@ class InvoiceInterface(GenericTabularReport):
                 contact_info = BillingContactInfo()
 
             columns = [
+                invoice.invoice_number,
                 format_datatables_data(
                     mark_safe(
                         '<a href="%(account_url)s">%(name)s</a>' % {
@@ -650,9 +660,10 @@ class InvoiceInterface(GenericTabularReport):
     @property
     def report_context(self):
         context = super(InvoiceInterface, self).report_context
-        context.update(
-            adjust_balance_forms=self.adjust_balance_forms,
-        )
+        if self.request.GET.items():  # A performance improvement
+            context.update(
+                adjust_balance_forms=self.adjust_balance_forms,
+            )
         return context
 
     @property
@@ -668,7 +679,9 @@ class InvoiceInterface(GenericTabularReport):
     def view_response(self):
         if self.request.method == 'POST':
             if self.adjust_balance_form.is_valid():
-                self.adjust_balance_form.adjust_balance()
+                self.adjust_balance_form.adjust_balance(
+                    web_user=self.request.user.username,
+                )
         return super(InvoiceInterface, self).view_response
 
     @property

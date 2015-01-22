@@ -1,11 +1,13 @@
 import copy
 import logging
 
-from couchdbkit.resource import ResourceNotFound
+from couchdbkit import ResourceNotFound
+import datetime
 import redis
-from casexml.apps.case.signals import cases_received
+from casexml.apps.case.signals import cases_received, case_post_save
+from corehq.toggles import LOOSE_SYNC_TOKEN_VALIDATION
+from casexml.apps.case.util import iter_cases
 from couchforms.models import XFormInstance
-from dimagi.utils.chunked import chunked
 from casexml.apps.case.exceptions import (
     IllegalCaseId,
     NoDomainProvided,
@@ -17,7 +19,6 @@ from dimagi.utils.couch.database import iter_docs
 from casexml.apps.case import const
 from casexml.apps.case.models import CommCareCase
 from casexml.apps.case.xml.parser import case_update_from_block
-from casexml.apps.phone.models import SyncLog
 from dimagi.utils.logging import notify_exception
 
 
@@ -29,46 +30,59 @@ def process_cases(xform, config=None):
     reconciling the case update history after the case is processed.
     """
 
-    config = config or CaseProcessingConfig()
+    assert getattr(settings, 'UNIT_TESTING', False)
     domain = get_and_check_xform_domain(xform)
 
     with CaseDbCache(domain=domain, lock=True, deleted_ok=True) as case_db:
-        return _process_cases(xform, config, case_db)
+        cases = process_cases_with_casedb(xform, case_db, config=config)
+
+    docs = [xform] + cases
+    now = datetime.datetime.utcnow()
+    for case in cases:
+        case.server_modified_on = now
+    XFormInstance.get_db().bulk_save(docs)
+    for case in cases:
+        case_post_save.send(CommCareCase, case=case)
+    return cases
 
 
-def _process_cases(xform, config, case_db):
+def process_cases_with_casedb(xform, case_db, config=None):
+    config = config or CaseProcessingConfig()
     cases = get_or_update_cases(xform, case_db).values()
 
     if config.reconcile:
         for c in cases:
             c.reconcile_actions(rebuild=True)
 
-    # attach domain and export tag if domain is there
-    if hasattr(xform, "domain"):
-        domain = xform.domain
+    # attach domain and export tag
+    domain = xform.domain
 
-        def attach_extras(case):
-            case.domain = domain
-            if domain:
-                assert hasattr(case, 'type')
-                case['#export_tag'] = ["domain", "type"]
-            return case
+    def attach_extras(case):
+        case.domain = domain
+        if domain:
+            assert hasattr(case, 'type')
+            case['#export_tag'] = ["domain", "type"]
+        return case
 
-        cases = [attach_extras(case) for case in cases]
+    cases = [attach_extras(case) for case in cases]
 
     # handle updating the sync records for apps that use sync mode
+    try:
+        relevant_log = xform.get_sync_token()
+    except ResourceNotFound:
+        if LOOSE_SYNC_TOKEN_VALIDATION.enabled(xform.domain):
+            relevant_log = None
+        else:
+            raise
 
-    last_sync_token = getattr(xform, 'last_sync_token', None)
-    if last_sync_token:
-        relevant_log = SyncLog.get(last_sync_token)
+    if relevant_log:
         # in reconciliation mode, things can be unexpected
         relevant_log.strict = config.strict_asserts
         from casexml.apps.case.util import update_sync_log_with_checks
-        update_sync_log_with_checks(relevant_log, xform, cases,
+        update_sync_log_with_checks(relevant_log, xform, cases, case_db,
                                     case_id_blacklist=config.case_id_blacklist)
 
-        if config.reconcile:
-            relevant_log.reconcile_cases()
+        if config.reconcile and relevant_log.reconcile_cases():
             relevant_log.save()
 
     try:
@@ -84,17 +98,10 @@ def _process_cases(xform, config, case_db):
     for case in cases:
         if not case.check_action_order():
             try:
-                case.reconcile_actions(rebuild=True)
+                case.reconcile_actions(rebuild=True, xforms={xform._id: xform})
             except ReconciliationError:
                 pass
-        case.force_save()
-
-    # set flags for indicator pillows and save
-    xform.initial_processing_complete = True
-    # if there are pillows or other _changes listeners competing to update
-    # this form, override them. this will create a new entry in the feed
-    # that they can re-pick up on
-    xform.save(force_update=True)
+        case_db.mark_changed(case)
 
     return cases
 
@@ -120,13 +127,21 @@ class CaseDbCache(object):
     to the database. Also provides some type checking safety.
     """
     def __init__(self, domain=None, strip_history=False, deleted_ok=False,
-                 lock=False):
-        self.cache = {}
+                 lock=False, wrap=True, initial=None):
+        if initial:
+            self.cache = {case['_id']: case for case in initial}
+        else:
+            self.cache = {}
+
         self.domain = domain
         self.strip_history = strip_history
         self.deleted_ok = deleted_ok
         self.lock = lock
+        self.wrap = wrap
+        if self.lock and not self.wrap:
+            raise ValueError('Currently locking only supports explicitly wrapping cases!')
         self.locks = []
+        self._changed = set()
 
     def __enter__(self):
         return self
@@ -140,12 +155,12 @@ class CaseDbCache(object):
                     pass
 
     def validate_doc(self, doc):
-        if self.domain and doc.domain != self.domain:
+        if self.domain and doc['domain'] != self.domain:
             raise IllegalCaseId("Bad case id")
-        elif doc.doc_type == 'CommCareCase-Deleted':
+        elif doc['doc_type'] == 'CommCareCase-Deleted':
             if not self.deleted_ok:
-                raise IllegalCaseId("Case [%s] is deleted " % doc.get_id)
-        elif doc.doc_type != 'CommCareCase':
+                raise IllegalCaseId("Case [%s] is deleted " % doc['_id'])
+        elif doc['doc_type'] != 'CommCareCase':
             raise IllegalCaseId(
                 "Bad case doc type! "
                 "This usually means you are using a bad value for case_id."
@@ -159,7 +174,7 @@ class CaseDbCache(object):
 
         try:
             if self.strip_history:
-                case_doc = CommCareCase.get_lite(case_id)
+                case_doc = CommCareCase.get_lite(case_id, wrap=self.wrap)
             elif self.lock:
                 try:
                     case_doc, lock = CommCareCase.get_locked_obj(_id=case_id)
@@ -168,14 +183,17 @@ class CaseDbCache(object):
                 else:
                     self.locks.append(lock)
             else:
-                case_doc = CommCareCase.get(case_id)
+                if self.wrap:
+                    case_doc = CommCareCase.get(case_id)
+                else:
+                    case_doc = CommCareCase.get_db().get(case_id)
         except ResourceNotFound:
             return None
 
         self.validate_doc(case_doc)
         self.cache[case_id] = case_doc
         return case_doc
-        
+
     def set(self, case_id, case):
         self.cache[case_id] = case
         
@@ -186,19 +204,24 @@ class CaseDbCache(object):
         return case_id in self.cache
 
     def populate(self, case_ids):
+        """
+        Populates a set of IDs in the cache in bulk.
+        Use this if you know you are going to need to access these later for performance gains.
+        Does NOT overwrite what is already in the cache if there is already something there.
+        """
+        case_ids = set(case_ids) - set(self.cache.keys())
+        for case in iter_cases(case_ids, self.strip_history, self.wrap):
+            self.set(case['_id'], case)
 
-        def _iter_raw_cases(case_ids):
-            if self.strip_history:
-                for ids in chunked(case_ids, 100):
-                    for row in CommCareCase.get_db().view("case/get_lite", keys=ids, include_docs=False):
-                        yield row['value']
-            else:
-                for raw_case in iter_docs(CommCareCase.get_db(), case_ids):
-                    yield raw_case
+    def mark_changed(self, case):
+        assert self.cache.get(case.case_id) is case
+        self._changed.add(case['_id'])
 
-        for raw_case in  _iter_raw_cases(case_ids):
-            case = CommCareCase.wrap(raw_case)
-            self.set(case._id, case)
+    def get_changed(self):
+        return [self.cache[case_id] for case_id in self._changed]
+
+    def clear_changed(self):
+        self._changed = set()
 
 
 def get_and_check_xform_domain(xform):
@@ -244,14 +267,16 @@ def get_or_update_cases(xform, case_db):
         if case.indices:
             for index in case.indices:
                 # call get and not doc_exists to force domain checking
+                # see CaseDbCache.validate_doc
                 referenced_case = case_db.get(index.referenced_id)
 
                 if not referenced_case:
-                    raise IllegalCaseId(
-                        ("Submitted index against an unknown case id: %s. "
-                         "This is not allowed. Most likely your case "
-                         "database is corrupt and you should restore your "
-                         "phone directly from the server.") % index.referenced_id)
+                    # just log, don't raise an error or modify the index
+                    logging.error(
+                        "Case '%s' references non-existent case '%s'",
+                        case.get_id,
+                        index.referenced_id,
+                    )
 
     [_validate_indices(case) for case in case_db.cache.values()]
 

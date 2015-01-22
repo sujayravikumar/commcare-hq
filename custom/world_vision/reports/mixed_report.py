@@ -8,22 +8,19 @@ from custom.world_vision.sqldata.main_sqldata import AnteNatalCareServiceOvervie
     ImmunizationOverview
 from custom.world_vision.sqldata.mother_sqldata import MotherRegistrationDetails, ClosedMotherCasesBreakdown, \
     PregnantMotherBreakdownByTrimester, DeliveryLiveBirthDetails, DeliveryStillBirthDetails, PostnatalCareOverview, \
-    CauseOfMaternalDeaths
+    CauseOfMaternalDeaths, AnteNatalCareServiceOverviewExtended
 from dimagi.utils.decorators.memoized import memoized
 
 
 class MixedTTCReport(TTCReport):
-    report_title = 'Mother/Child Report'
-    name = 'Mother/Child Report'
+    report_title = 'TTC Overview Report'
+    name = 'TTC Overview Report'
     slug = 'mother_child_report'
-    title = "Mother/Child Report"
+    title = "TTC Overview Report"
     fields = [WVDatespanFilter, LocationFilter]
     default_rows = 10
     exportable = True
-
-    @classmethod
-    def show_in_navigation(cls, domain=None, project=None, user=None):
-        return False
+    is_mixed_report = True
 
     @property
     @memoized
@@ -36,14 +33,13 @@ class MixedTTCReport(TTCReport):
             AnteNatalCareServiceOverview(config=config),
             DeliveryPlaceDetails(config=config),
             DeliveryLiveBirthDetails(config=config),
-            DeliveryStillBirthDetails(config=config),
             PostnatalCareOverview(config=config),
+            AnteNatalCareServiceOverviewExtended(config=config),
             CauseOfMaternalDeaths(config=config),
             ChildRegistrationDetails(config=config),
             ClosedChildCasesBreakdown(config=config),
             ImmunizationOverview(config=config),
             ChildrenDeaths(config=config),
-            ChildrenDeathDetails(config=config),
             NutritionMeanMedianBirthWeightDetails(config=config),
             NutritionBirthWeightDetails(config=config),
             NutritionFeedingDetails(config=config),

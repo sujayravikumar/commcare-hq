@@ -1,5 +1,5 @@
 import sys
-from django.conf.urls.defaults import *
+from django.conf.urls import *
 from django.contrib.auth.views import password_reset
 from django.shortcuts import render_to_response
 from django.template import RequestContext
@@ -20,7 +20,7 @@ from corehq.apps.domain.views import (
     FeaturePreviewsView, ConfirmSubscriptionRenewalView,
     InvoiceStripePaymentView, CreditsStripePaymentView, SMSRatesView,
     AddFormRepeaterView, AddOpsUserAsDomainAdminView,
-)
+    FeatureFlagsView)
 
 #
 # After much reading, I discovered that Django matches URLs derived from the environment
@@ -65,19 +65,24 @@ urlpatterns =\
     patterns('corehq.apps.domain.views',
         url(r'^domain/select/$', 'select', name='domain_select'),
         url(r'^domain/autocomplete/(?P<field>\w+)/$', 'autocomplete_fields', name='domain_autocomplete_fields'),
+        url(r'^domain/incomplete_email/$', 'incomplete_email'),
     ) +\
     patterns('django.contrib.auth.views',
         url(r'^accounts/password_change/$', 'password_change', auth_pages_path('password_change_form.html'), name='password_change'),
-        url(r'^accounts/password_change_done/$', 'password_change_done', auth_pages_path('password_change_done.html') ),
+        url(r'^accounts/password_change_done/$', 'password_change_done', auth_pages_path('password_change_done.html'),
+            name='password_change_done'),
 
         url(r'^accounts/password_reset_email/$', exception_safe_password_reset, extend(auth_pages_path('password_reset_form.html'),
                                                                                        { 'password_reset_form': ConfidentialPasswordResetForm,
                                                                                          'from_email':settings.DEFAULT_FROM_EMAIL}),
-                                                                                name='password_reset_email'),
-        url(r'^accounts/password_reset_email/done/$', 'password_reset_done', auth_pages_path('password_reset_done.html') ),
+            name='password_reset_email'),
+        url(r'^accounts/password_reset_email/done/$', 'password_reset_done', auth_pages_path('password_reset_done.html'),
+            name='password_reset_done'),
 
-        url(r'^accounts/password_reset_confirm/(?P<uidb36>[0-9A-Za-z]+)-(?P<token>.+)/$', 'password_reset_confirm', auth_pages_path('password_reset_confirm.html'), name="confirm_password_reset" ),
-        url(r'^accounts/password_reset_confirm/done/$', 'password_reset_complete', auth_pages_path('password_reset_complete.html') ) 
+        url(r'^accounts/password_reset_confirm/(?P<uidb36>[0-9A-Za-z]+)-(?P<token>.+)/$', 'password_reset_confirm',
+            auth_pages_path('password_reset_confirm.html'), name="confirm_password_reset" ),
+        url(r'^accounts/password_reset_confirm/done/$', 'password_reset_complete', auth_pages_path('password_reset_complete.html'),
+            name='password_reset_complete')
     )
 
 
@@ -128,5 +133,6 @@ domain_settings = patterns(
     url(r'^internal/calculations/$', EditInternalCalculationsView.as_view(), name=EditInternalCalculationsView.urlname),
     url(r'^internal/calculated_properties/$', 'calculated_properties', name='calculated_properties'),
     url(r'^previews/$', FeaturePreviewsView.as_view(), name=FeaturePreviewsView.urlname),
+    url(r'^flags/$', FeatureFlagsView.as_view(), name=FeatureFlagsView.urlname),
     url(r'^sms_rates/$', SMSRatesView.as_view(), name=SMSRatesView.urlname),
 )
