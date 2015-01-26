@@ -5,7 +5,7 @@ from couchdbkit import Database
 from django.core.management.base import BaseCommand
 from django.db.models import get_apps
 from corehq.preindex import get_preindex_plugins
-from dimagi.utils.couch.database import get_design_docs
+from dimagi.utils.couch.database import get_design_docs, is_bigcouch, bigcouch_quorum_count
 from dimagi.utils.couch.sync_docs import get_app_sync_info
 
 
@@ -48,6 +48,10 @@ class Command(BaseCommand):
                 print '\n'.join(sorted(to_delete))
 
         if designs_to_delete:
+            kwargs = {}
+            if is_bigcouch():
+                kwargs['w'] = bigcouch_quorum_count()
+
             if options['noinput'] or raw_input('\n'.join([
                     '\n\nReally delete all the above design docs?',
                     'If any of these views are actually live, bad things will happen. '
@@ -55,7 +59,7 @@ class Command(BaseCommand):
                     '',
             ])).lower() == 'delete designs':
                 for db, design_docs in designs_to_delete.items():
-                    db.delete_docs(design_docs)
+                    db.delete_docs(design_docs, **kwargs)
             else:
                 print 'aborted!'
         else:
