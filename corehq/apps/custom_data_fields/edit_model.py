@@ -7,45 +7,17 @@ from django.utils.translation import ugettext as _
 from django import forms
 
 from dimagi.utils.decorators.memoized import memoized
+from dimagi.utils.forms import FormListForm
 
 from .models import (CustomDataFieldsDefinition, CustomDataField,
                      validate_reserved_words)
 
 
-class CustomDataFieldsForm(forms.Form):
+class CustomDataFieldsForm(FormListForm):
     """
     The main form for editing a custom data definition
     """
-    data_fields = forms.CharField(widget=forms.HiddenInput)
-
-    def verify_no_duplicates(self, data_fields):
-        errors = set()
-        slugs = [field['slug'].lower()
-                 for field in data_fields if 'slug' in field]
-        for slug in slugs:
-            if slugs.count(slug) > 1:
-                errors.add(_("Key '{}' was duplicated, key names must be "
-                             "unique.").format(slug))
-        return errors
-
-    def clean_data_fields(self):
-        raw_data_fields = json.loads(self.cleaned_data['data_fields'])
-        errors = set()
-        data_fields = []
-        for raw_data_field in raw_data_fields:
-            data_field_form = CustomDataFieldForm(raw_data_field)
-            data_field_form.is_valid()
-            data_fields.append(data_field_form.cleaned_data)
-            if data_field_form.errors:
-                errors.update([error[0]
-                               for error in data_field_form.errors.values()])
-
-        errors.update(self.verify_no_duplicates(data_fields))
-
-        if errors:
-            raise ValidationError('<br/>'.join(sorted(errors)))
-
-        return data_fields
+    child_form_class = CustomDataFieldForm
 
 
 class XmlSlugField(forms.SlugField):
@@ -148,7 +120,7 @@ class CustomDataModelMixin(object):
         else:
             serialized = json.dumps([field.to_json()
                                      for field in self.get_custom_fields()])
-            return CustomDataFieldsForm({'data_fields': serialized})
+            return CustomDataFieldsForm({'child_form_data': serialized})
 
     def post(self, request, *args, **kwargs):
         if self.form.is_valid():
