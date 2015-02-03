@@ -1,5 +1,6 @@
 from StringIO import StringIO
 import datetime
+import re
 from celery.utils.log import get_task_logger
 from django.core.urlresolvers import reverse
 from django.http import HttpResponse, Http404
@@ -857,11 +858,21 @@ class GenericTabularReport(GenericReportView):
         3. str(cell)
         """
         headers = self.headers
+        # Using regex instead of an HTML parser gives us speed, but sacrifices
+        # accuracy. i.e. This will strip the tags '<foo bar="baz">qux</foo>'
+        # but will also strip "< 2 and 3 >" from "1 < 2 and 3 > 2". We are
+        # assuming reports do not contain "<" followed by ">" as part of valid
+        # values -- and we need to remember this assumption. If we want
+        # reports to support more complex values, we should use an HTML parser
+        # instead of regex.
+        html_tag = re.compile('<[^>]*?>')
 
         def _unformat_row(row):
             def _unformat_val(val):
                 if isinstance(val, dict):
                     return val.get('raw', val.get('sort_key', val))
+                elif isinstance(val, basestring):
+                    return html_tag.sub('', val)  # Strip HTML tags from val
                 return val
 
             return [_unformat_val(val) for val in row]
