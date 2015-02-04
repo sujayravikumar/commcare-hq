@@ -75,6 +75,7 @@
 
   <ul class="nav nav-tabs">
     <li class="active"><a href="#basic-info" data-toggle="tab">{% trans "Basic" %}</a></li>
+    <li><a href="#mobile-workers" data-toggle="tab">{% trans "Mobile Workers" %}</a></li>
 
     {% if products_per_location_form %}
       <li><a href="#products" data-toggle="tab">{% trans "Products" %}</a></li>
@@ -114,6 +115,14 @@
             {% trans 'Location' %}
           </button>
         </div>
+      </form>
+    </div>
+
+    <div class="tab-pane" id="mobile-workers">
+      <form class="form disable-on-submit" id="edit_mobile_workers" action="" method='post'>
+        <legend>{% trans 'Specify Mobile Workers Per Location' %}</legend>
+        {% crispy mobile_worker_form %}
+        <input type="hidden" name="form_type" value="location-mobile-workers" />
       </form>
     </div>
 

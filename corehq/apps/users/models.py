@@ -1440,11 +1440,9 @@ class LocationUserMixin(DocumentSchema):
         """
         from corehq.apps.commtrack.models import SupplyPointCase
 
-        sp = SupplyPointCase.get_by_location(location)
-
-        mapping = self.get_location_map_case()
-
         if not location.location_type_object.administrative:
+            sp = SupplyPointCase.get_by_location(location)
+            mapping = self.get_location_map_case()
             if mapping and location._id in [loc._id for loc in self.locations]:
                 caseblock = CaseBlock(
                     create=False,

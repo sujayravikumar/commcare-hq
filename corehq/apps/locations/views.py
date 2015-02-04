@@ -1,5 +1,4 @@
 import json
-import urllib
 import logging
 
 from django.contrib import messages
@@ -25,10 +24,12 @@ from corehq.apps.commtrack.views import BaseCommTrackManageView
 from corehq.apps.consumption.shortcuts import get_default_monthly_consumption
 from corehq.apps.custom_data_fields import CustomDataModelMixin
 from corehq.apps.domain.decorators import domain_admin_required, login_and_domain_required
+from corehq.apps.domain.models import Domain
 from corehq.apps.facilities.models import FacilityRegistry
 from corehq.apps.hqwebapp.utils import get_bulk_upload_form
 from corehq.apps.products.models import Product, SQLProduct
 from corehq.apps.users.forms import MultipleSelectionForm
+from corehq.apps.users.models import CommCareUser
 from custom.openlmis.tasks import bootstrap_domain_task
 
 from .models import Location
@@ -205,6 +206,7 @@ class NewLocationView(BaseLocationView):
             'products_per_location_form': self.products_form,
             'location': self.location,
             'consumption': consumption,
+            'mobile_worker_form': self.mobile_worker_form,
         }
 
     def form_valid(self):
@@ -228,12 +230,55 @@ class NewLocationView(BaseLocationView):
         self.sql_location.save()
         return self.form_valid()
 
+    def mobile_worker_list(self, include_docs=False):
+        result = CommCareUser.get_db().view(
+            'locations/users_by_location_id',
+            startkey=[self.location_id],
+            endkey=[self.location_id, {}],
+            include_docs=include_docs
+        ).all()
+
+        return [user['id'] for user in result]
+
+    @property
+    @memoized
+    def mobile_worker_form(self):
+        form = MultipleSelectionForm(initial={
+            'selected_ids': self.mobile_worker_list(),
+        })
+        form.fields['selected_ids'].choices = [
+            (u.user_id, u.username)
+            for u in CommCareUser.by_domain(self.domain, doc_type='CommCareUser')
+        ]
+        return form
+
+    def mobile_workers_form_post(self, request, *args, **kwargs):
+        # set everything that was in the selected list
+        user_ids = request.POST.getlist('selected_ids', [])
+        for user_id in user_ids:
+            user = CommCareUser.get(user_id)
+            user.set_location(self.location_form.location)
+
+        # and clear everything that was not
+        all_users = self.mobile_worker_list()
+
+        for user_id in set(all_users).difference(set(user_ids)):
+            user = CommCareUser.get(user_id)
+            if user.location_id == self.location._id:
+                user.clear_locations()
+                user.location_id = None
+                user.save()
+
+        return self.form_valid()
+
     def post(self, request, *args, **kwargs):
         if self.request.POST['form_type'] == "location-settings":
             return self.settings_form_post(request, *args, **kwargs)
         elif (self.request.POST['form_type'] == "location-products"
               and toggles.PRODUCTS_PER_LOCATION.enabled(request.domain)):
             return self.products_form_post(request, *args, **kwargs)
+        elif self.request.POST['form_type'] == "location-mobile-workers":
+            return self.mobile_workers_form_post(request, *args, **kwargs)
         else:
             raise Http404
 
