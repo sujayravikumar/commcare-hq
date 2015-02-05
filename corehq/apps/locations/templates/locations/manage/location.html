@@ -23,7 +23,8 @@
 
         // for product per location selection
         $(function () {
-            $("#id_selected_ids").width(800).height(400).multiselect();
+            $("#web_selected_ids").width(800).height(400).multiselect();
+            $("#mobile_selected_ids").width(800).height(400).multiselect();
         });
     </script>
 {% endblock %}
@@ -76,6 +77,7 @@
   <ul class="nav nav-tabs">
     <li class="active"><a href="#basic-info" data-toggle="tab">{% trans "Basic" %}</a></li>
     <li><a href="#mobile-workers" data-toggle="tab">{% trans "Mobile Workers" %}</a></li>
+    <li><a href="#web-users" data-toggle="tab">{% trans "Web Users" %}</a></li>
 
     {% if products_per_location_form %}
       <li><a href="#products" data-toggle="tab">{% trans "Products" %}</a></li>
@@ -123,6 +125,14 @@
         <legend>{% trans 'Specify Mobile Workers Per Location' %}</legend>
         {% crispy mobile_worker_form %}
         <input type="hidden" name="form_type" value="location-mobile-workers" />
+      </form>
+    </div>
+
+    <div class="tab-pane" id="web-users">
+      <form class="form disable-on-submit" id="edit_web_users" action="" method='post'>
+        <legend>{% trans 'Specify Web Users Per Location' %}</legend>
+        {% crispy web_user_form %}
+        <input type="hidden" name="form_type" value="location-web-users" />
       </form>
     </div>
 

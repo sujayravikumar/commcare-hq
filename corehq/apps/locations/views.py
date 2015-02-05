@@ -29,7 +29,7 @@ from corehq.apps.facilities.models import FacilityRegistry
 from corehq.apps.hqwebapp.utils import get_bulk_upload_form
 from corehq.apps.products.models import Product, SQLProduct
 from corehq.apps.users.forms import MultipleSelectionForm
-from corehq.apps.users.models import CommCareUser
+from corehq.apps.users.models import CommCareUser, WebUser
 from custom.openlmis.tasks import bootstrap_domain_task
 
 from .models import Location
@@ -207,6 +207,7 @@ class NewLocationView(BaseLocationView):
             'location': self.location,
             'consumption': consumption,
             'mobile_worker_form': self.mobile_worker_form,
+            'web_user_form': self.web_user_form,
         }
 
     def form_valid(self):
@@ -233,8 +234,18 @@ class NewLocationView(BaseLocationView):
     def mobile_worker_list(self, include_docs=False):
         result = CommCareUser.get_db().view(
             'locations/users_by_location_id',
-            startkey=[self.location_id],
-            endkey=[self.location_id, {}],
+            startkey=[self.location_id, 'CommCareUser'],
+            endkey=[self.location_id, 'CommCareUser', {}],
+            include_docs=include_docs
+        ).all()
+
+        return [user['id'] for user in result]
+
+    def web_user_list(self, include_docs=False):
+        result = CommCareUser.get_db().view(
+            'locations/users_by_location_id',
+            startkey=[self.location_id, 'WebUser'],
+            endkey=[self.location_id, 'WebUser', {}],
             include_docs=include_docs
         ).all()
 
@@ -245,10 +256,22 @@ class NewLocationView(BaseLocationView):
     def mobile_worker_form(self):
         form = MultipleSelectionForm(initial={
             'selected_ids': self.mobile_worker_list(),
-        })
+        }, auto_id='mobile_%s')
         form.fields['selected_ids'].choices = [
             (u.user_id, u.username)
             for u in CommCareUser.by_domain(self.domain, doc_type='CommCareUser')
+        ]
+        return form
+
+    @property
+    @memoized
+    def web_user_form(self):
+        form = MultipleSelectionForm(initial={
+            'selected_ids': self.web_user_list(),
+        }, auto_id='web_%s')
+        form.fields['selected_ids'].choices = [
+            (u.user_id, u.username)
+            for u in WebUser.by_domain(self.domain, doc_type='WebUser')
         ]
         return form
 
@@ -271,6 +294,25 @@ class NewLocationView(BaseLocationView):
 
         return self.form_valid()
 
+    def web_users_form_post(self, request, *args, **kwargs):
+        # set everything that was in the selected list
+        user_ids = request.POST.getlist('selected_ids', [])
+        for user_id in user_ids:
+            user = WebUser.get(user_id)
+            user.location_id = self.location._id
+            user.save()
+
+        # and clear everything that was not
+        all_users = self.web_user_list()
+
+        for user_id in set(all_users).difference(set(user_ids)):
+            user = WebUser.get(user_id)
+            if user.location_id == self.location._id:
+                user.location_id = None
+                user.save()
+
+        return self.form_valid()
+
     def post(self, request, *args, **kwargs):
         if self.request.POST['form_type'] == "location-settings":
             return self.settings_form_post(request, *args, **kwargs)
@@ -279,6 +321,8 @@ class NewLocationView(BaseLocationView):
             return self.products_form_post(request, *args, **kwargs)
         elif self.request.POST['form_type'] == "location-mobile-workers":
             return self.mobile_workers_form_post(request, *args, **kwargs)
+        elif self.request.POST['form_type'] == "location-web-users":
+            return self.web_users_form_post(request, *args, **kwargs)
         else:
             raise Http404
 
