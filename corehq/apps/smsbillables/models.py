@@ -27,23 +27,38 @@ class SmsGatewayFeeCriteria(models.Model):
     backend_instance = models.CharField(max_length=255, db_index=True, null=True)
     direction = models.CharField(max_length=10, db_index=True, choices=DIRECTION_CHOICES)
     country_code = models.IntegerField(max_length=5, null=True, blank=True, db_index=True)
+    prefix = models.CharField(max_length=10, blank=True, default="", db_index=True)
 
     @classmethod
-    def get_most_specific(cls, backend_api_id, direction, backend_instance=None, country_code=None):
+    def get_most_specific(cls, backend_api_id, direction, backend_instance=None, country_code=None, national_number=None):
         """
         Gets the most specific criteria available based on (and in order of preference for optional):
         - backend_api_id
         - direction
         - backend_instance (optional)
-        - country_code (optional)
+        - country_code and prefix (optional)
         """
         all_possible_criteria = cls.objects.filter(backend_api_id=backend_api_id, direction=direction)
 
         if all_possible_criteria.count() == 0:
             return None
 
+        national_number = national_number or ""
+
+        def get_criteria_with_longest_matching_prefix(criteria_query):
+            criteria_query.extra(order_by=['LENGTH(`prefix`)'])
+            if set(criteria.prefix for criteria in criteria_query) != criteria_query.count():
+                # TODO - subclass Exception
+                raise Exception
+            for criteria in criteria_query:
+                if national_number.startswith(criteria.prefix):
+                    return criteria
+            return None
+
         try:
-            return all_possible_criteria.get(country_code=country_code, backend_instance=backend_instance)
+            return get_criteria_with_longest_matching_prefix(
+                all_possible_criteria.filter(country_code=country_code, backend_instance=backend_instance)
+            )
         except ObjectDoesNotExist:
             pass
         try:
@@ -51,7 +66,9 @@ class SmsGatewayFeeCriteria(models.Model):
         except ObjectDoesNotExist:
             pass
         try:
-            return all_possible_criteria.get(country_code=country_code, backend_instance=None)
+            return get_criteria_with_longest_matching_prefix(
+                all_possible_criteria.filter(country_code=country_code, backend_instance=None)
+            )
         except ObjectDoesNotExist:
             pass
         try:
@@ -97,10 +114,14 @@ class SmsGatewayFee(models.Model):
 
 
     @classmethod
-    def get_by_criteria(cls, backend_api_id, direction, backend_instance=None, country_code=None):
-        criteria = SmsGatewayFeeCriteria.get_most_specific(backend_api_id, direction,
-                                                           backend_instance=backend_instance,
-                                                           country_code=country_code)
+    def get_by_criteria(cls, backend_api_id, direction, backend_instance=None, country_code=None, national_number=None):
+        criteria = SmsGatewayFeeCriteria.get_most_specific(
+            backend_api_id,
+            direction,
+            backend_instance=backend_instance,
+            country_code=country_code,
+            national_number=national_number,
+        )
         return cls.get_by_criteria_obj(criteria)
 
     @classmethod
@@ -243,7 +264,10 @@ class SmsBillable(models.Model):
         country_code = get_country_code(phone_number)
 
         billable.gateway_fee = SmsGatewayFee.get_by_criteria(
-            backend_api_id, direction, backend_instance=backend_instance, country_code=country_code
+            backend_api_id,
+            direction,
+            backend_instance=backend_instance,
+            country_code=country_code,
         )
         if billable.gateway_fee is not None:
             conversion_rate = billable.gateway_fee.currency.rate_to_default
