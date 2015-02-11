@@ -351,6 +351,7 @@ class EditBasicProjectInfoView(BaseEditProjectInfoView):
                 'commconnect_enabled',
                 'survey_management_enabled',
                 'sms_case_registration_enabled',
+                'sms_mobile_worker_registration_enabled',
                 'sms_case_registration_type',
                 'sms_case_registration_owner_id',
                 'sms_case_registration_user_id',

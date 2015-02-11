@@ -464,6 +464,11 @@ class DomainMetadataForm(DomainGlobalSettingsForm, SnapshotSettingsMixin):
         required=False,
         choices=[]
     )
+    sms_mobile_worker_registration_enabled = BooleanField(
+        label=_("SMS Mobile Worker Registration"),
+        required=False,
+        help_text=_("Turn this on to allow mobile worker registration through SMS")
+    )
     restrict_superusers = BooleanField(
         label=_("Restrict Superuser Access"),
         required=False,
@@ -551,6 +556,7 @@ class DomainMetadataForm(DomainGlobalSettingsForm, SnapshotSettingsMixin):
             domain.sms_case_registration_owner_id = self.cleaned_data.get('sms_case_registration_owner_id')
             domain.sms_case_registration_user_id = self.cleaned_data.get('sms_case_registration_user_id')
             domain.restrict_superusers = self.cleaned_data.get('restrict_superusers', False)
+            domain.sms_mobile_worker_registration_enabled = self.cleaned_data.get('sms_mobile_worker_registration_enabled', False)
             cloudcare_releases = self.cleaned_data.get('cloudcare_releases')
             if cloudcare_releases and domain.cloudcare_releases != 'default':
                 # you're never allowed to change from default

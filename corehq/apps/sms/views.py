@@ -1425,6 +1425,8 @@ class SMSSettingsView(BaseMessagingSectionView):
                     domain_obj.sms_case_registration_owner_id,
                 "sms_case_registration_user_id":
                     domain_obj.sms_case_registration_user_id,
+                "sms_mobile_worker_registration_enabled":
+                    domain_obj.sms_mobile_worker_registration_enabled
             }
             form = SettingsForm(initial=initial, cchq_domain=self.domain,
                 cchq_is_previewer=self.previewer)
@@ -1459,6 +1461,8 @@ class SMSSettingsView(BaseMessagingSectionView):
                  "restricted_sms_times_json"),
                 ("sms_conversation_times",
                  "sms_conversation_times_json"),
+                ("sms_mobile_worker_registration_enabled",
+                 "sms_mobile_worker_registration_enabled"),
             ]
             if self.previewer:
                 field_map.append(
