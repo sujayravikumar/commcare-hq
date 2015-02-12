@@ -1118,7 +1118,7 @@ SMS_LOADED_BACKENDS = [
     "corehq.apps.sms.test_backend.TestSMSBackend",
     "corehq.apps.sms.backend.test.TestBackend",
     "corehq.apps.grapevine.api.GrapevineBackend",
-    # "corehq.apps.twilio.models.TwilioBackend",
+    "corehq.apps.twilio.models.TwilioBackend",
     "corehq.apps.megamobile.api.MegamobileBackend",
 ]
 
