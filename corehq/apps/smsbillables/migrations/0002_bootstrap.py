@@ -5,6 +5,17 @@ from django.core.management import call_command
 from south.db import db
 from south.v2 import DataMigration
 from django.db import models
+from corehq.apps.smsbillables.management.commands.bootstrap_grapevine_gateway import \
+    bootstrap_grapevine_gateway
+from corehq.apps.smsbillables.management.commands.bootstrap_mach_gateway import \
+    bootstrap_mach_gateway
+from corehq.apps.smsbillables.management.commands.bootstrap_tropo_gateway import \
+    bootstrap_tropo_gateway
+from corehq.apps.smsbillables.management.commands.bootstrap_twilio_gateway import \
+    bootstrap_twilio_gateway
+from corehq.apps.smsbillables.management.commands.bootstrap_unicel_gateway import \
+    bootstrap_unicel_gateway
+
 
 class Migration(DataMigration):
 
@@ -13,11 +24,12 @@ class Migration(DataMigration):
         orm['accounting.Currency'].objects.get_or_create(code=settings.DEFAULT_CURRENCY)
         orm['accounting.Currency'].objects.get_or_create(code='EUR')
         orm['accounting.Currency'].objects.get_or_create(code='INR')
-        call_command('bootstrap_grapevine_gateway')
-        call_command('bootstrap_mach_gateway')
-        call_command('bootstrap_tropo_gateway')
-        call_command('bootstrap_twilio_gateway')
-        call_command('bootstrap_unicel_gateway')
+
+        bootstrap_grapevine_gateway(orm)
+        bootstrap_mach_gateway(orm)
+        bootstrap_tropo_gateway(orm)
+        bootstrap_twilio_gateway(orm)
+        bootstrap_unicel_gateway(orm)
         call_command('bootstrap_usage_fees')
 
     def backwards(self, orm):
