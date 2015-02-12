@@ -43,21 +43,21 @@ class SmsGatewayFeeCriteria(models.Model):
         if all_possible_criteria.count() == 0:
             return None
 
-        national_number = national_number or ""
+        national_number = str(national_number) if national_number is not None else ""
 
-        def get_criteria_with_longest_matching_prefix(criteria_query):
-            criteria_query.extra(order_by=['LENGTH(`prefix`)'])
-            if set(criteria.prefix for criteria in criteria_query) != criteria_query.count():
+        def get_criteria_with_longest_matching_prefix(criteria_list):
+            if len(set(criteria.prefix for criteria in criteria_list)) != len(criteria_list):
                 # TODO - subclass Exception
                 raise Exception
-            for criteria in criteria_query:
+            criteria_list.sort(key=(lambda criteria: len(criteria.prefix)), reverse=True)
+            for criteria in criteria_list:
                 if national_number.startswith(criteria.prefix):
                     return criteria
-            return None
+            raise ObjectDoesNotExist
 
         try:
             return get_criteria_with_longest_matching_prefix(
-                all_possible_criteria.filter(country_code=country_code, backend_instance=backend_instance)
+                list(all_possible_criteria.filter(country_code=country_code, backend_instance=backend_instance))
             )
         except ObjectDoesNotExist:
             pass
@@ -67,7 +67,7 @@ class SmsGatewayFeeCriteria(models.Model):
             pass
         try:
             return get_criteria_with_longest_matching_prefix(
-                all_possible_criteria.filter(country_code=country_code, backend_instance=None)
+                list(all_possible_criteria.filter(country_code=country_code, backend_instance=None))
             )
         except ObjectDoesNotExist:
             pass
