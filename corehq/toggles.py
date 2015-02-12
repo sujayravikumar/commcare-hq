@@ -298,3 +298,9 @@ VELLUM_HELP_TEXT = StaticToggle(
     'add_help_text',
     "Adds a help text in the form builder"
 )
+
+SMS_FEEDBACK = StaticToggle(
+    'sms_feedback',
+    'SMS performance feedback UI',
+    [NAMESPACE_DOMAIN, NAMESPACE_USER]
+)
