@@ -1,81 +1,92 @@
 import uuid
 from celery.task import task
+from casexml.apps.phone.xml import get_case_xml
 from corehq.apps.hqcase.utils import submit_case_blocks, make_creating_casexml
 from corehq.apps.users.models import CommCareUser
+from casexml.apps.case import const
 from casexml.apps.case.models import CommCareCase
+from dimagi.utils.couch.database import iter_docs
 from soil import DownloadBase
 
 
 @task
-def explode_case_task(user_id, domain, factor):
-    explode_cases(user_id, domain, factor, explode_case_task)
+def explode_case_task(user_id, domain, factor, include_attachments=False):
+    return explode_cases(user_id, domain, factor, include_attachments, task=explode_case_task)
 
 
-def explode_cases(user_id, domain, factor, task=None):
+def explode_cases(user_id, domain, factor, include_attachments=False, task=None):
     user = CommCareUser.get_by_user_id(user_id, domain)
     keys = [[domain, owner_id, False] for owner_id in user.get_owner_ids()]
-    messages = list()
+    messages = []
     if task:
-        DownloadBase.set_progress(explode_case_task, 0, 0)
+        DownloadBase.set_progress(task, 0, 0)
     count = 0
+    case_ids = [res['id'] for res in CommCareCase.get_db().view(
+        'hqcase/by_owner',
+        keys=keys,
+        include_docs=False,
+        reduce=False
+    )]
+    if include_attachments:
+        for case_doc in iter_docs(CommCareCase.get_db(), case_ids):
+            case = CommCareCase.wrap(case_doc)
+            for i in range(factor - 1):
+                new_case_id = uuid.uuid4().hex
+                case_block, attachments = make_creating_casexml(case, new_case_id)
+                submit_case_blocks(case_block, domain, attachments=attachments)
+                if task:
+                    DownloadBase.set_progress(explode_case_task, count + 1, 0)
+    else:
+        # when not using attachments we can use a simpler, optimized version
+        # and also preserve parent/child relationships
+        processed = {}  # will map old IDs to lists of new IDs
+        pending = []
 
-    old_to_new = dict()
-    child_cases = list()
+        def can_process(case):
+            return not case.indices or all([index.referenced_id in processed for index in case.indices])
 
-    # copy parents
-    for case in CommCareCase.view('hqcase/by_owner',
-                                  keys=keys,
-                                  include_docs=True,
-                                  reduce=False):
-        # save children for later
-        if case.indices:
-            child_cases.append(case)
-            continue
-        old_to_new[case._id] = list()
-        for i in range(factor - 1):
-            new_case_id = uuid.uuid4().hex
-            # add new parent ids to the old to new id mapping
-            old_to_new[case._id].append(new_case_id)
-            submit_case(case, new_case_id, domain)
+        def explode(case):
+            # uses closures
+            old_case_id = case._id
+            old_indices = [index.referenced_id for index in case.indices]
+            new_ids = []
+            new_case_blocks = []
+            for i in range(factor - 1):
+                # make a copy
+                new_id = uuid.uuid4().hex
+                case._id = new_id
+                for index_num, index in enumerate(case.indices):
+                    index.referenced_id = processed[old_indices[index_num]][i]
+                # todo: this doesn't properly handle closed cases
+                new_case_blocks.append(get_case_xml(
+                    case,
+                    (const.CASE_ACTION_CREATE, const.CASE_ACTION_UPDATE),
+                    version='2.0'
+                ))
+                new_ids.append(new_id)
+
+            processed[old_case_id] = new_ids
+            submit_case_blocks(new_case_blocks, domain)
+
+        for case_doc in iter_docs(CommCareCase.get_db(), case_ids):
+            case = CommCareCase.wrap(case_doc)
+            if can_process(case):
+                explode(case)
+            else:
+                pending.append(case)
+
+        max_iterations = len(pending) * len(pending)  # worst case scenario is n^2
+        count = 0
+        while pending:
+            if count > max_iterations:
+                raise Exception('cases had inconsistent references to each other.')
+
+            case = pending.pop(0)
+            if can_process(case):
+                explode(case)
+            else:
+                pending.append(case)
             count += 1
-            if task:
-                DownloadBase.set_progress(explode_case_task, count, 0)
-
-    max_iterations = len(child_cases) ** 2
-    iterations = 0
-    while len(child_cases) > 0:
-        if iterations > max_iterations:
-            raise Exception('cases had inconsistent references to each other')
-        iterations += 1
-        # take the first case
-        case = child_cases.pop(0)
-        can_process = True
-        parent_ids = dict()
-
-        for index in case.indices:
-            ref_id = index.referenced_id
-            # if the parent hasn't been processed
-            if ref_id not in old_to_new.keys():
-                # append it to the backand break out
-                child_cases.append(case)
-                can_process = False
-                break
-            # update parent ids that this case needs
-            parent_ids.update({ref_id: old_to_new[ref_id]})
-        # keep processing
-        if not can_process:
-            continue
-
-        old_to_new[case._id] = list()
-        for i in range(factor - 1):
-            # grab the parents for this round of exploding
-            parents = {k: v[i] for k, v in parent_ids.items()}
-            new_case_id = uuid.uuid4().hex
-            old_to_new[case._id].append(new_case_id)
-            submit_case(case, new_case_id, domain, parents)
-            count += 1
-            if task:
-                DownloadBase.set_progress(explode_case_task, count, 0)
 
     messages.append("All of %s's cases were exploded by a factor of %d" % (user.raw_username, factor))
 
