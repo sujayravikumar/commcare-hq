@@ -133,6 +133,8 @@ def bootstrap_moz_gateway(orm):
         criteria_class=sms_gateway_fee_criteria_class,
     )
 
+    logger.info("Updated Moz gateway fees.")
+
 
 class Command(LabelCommand):
     help = "bootstrap MOZ global SMS backend gateway fees"
