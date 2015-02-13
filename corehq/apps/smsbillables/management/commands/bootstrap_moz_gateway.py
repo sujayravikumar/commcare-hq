@@ -7,7 +7,7 @@ from django.core.management.base import LabelCommand
 from corehq.apps.accounting.models import Currency
 from corehq.apps.sms.backend.http_api import HttpBackend
 from corehq.apps.sms.models import INCOMING, OUTGOING
-from corehq.apps.smsbillables.models import SmsGatewayFee
+from corehq.apps.smsbillables.models import SmsGatewayFee, SmsGatewayFeeCriteria
 
 
 logger = logging.getLogger('accounting')
@@ -15,6 +15,8 @@ logger = logging.getLogger('accounting')
 
 def bootstrap_moz_gateway(orm):
     mzn, _ = (orm['accounting.Currency'] if orm else Currency).objects.get_or_create(code='MZN')
+    sms_gateway_fee_class = orm['smsbillables.SmsGatewayFee'] if orm else SmsGatewayFee
+    sms_gateway_fee_criteria_class = orm['smsbillables.SmsGatewayFeeCriteria'] if orm else SmsGatewayFeeCriteria
 
     SmsGatewayFee.create_new(
         'SISLOG',
@@ -23,6 +25,8 @@ def bootstrap_moz_gateway(orm):
         country_code='258',
         prefix='82',
         currency=mzn,
+        fee_class=sms_gateway_fee_class,
+        criteria_class=sms_gateway_fee_criteria_class,
     )
     SmsGatewayFee.create_new(
         'SISLOG',
@@ -31,6 +35,8 @@ def bootstrap_moz_gateway(orm):
         country_code='258',
         prefix='83',
         currency=mzn,
+        fee_class=sms_gateway_fee_class,
+        criteria_class=sms_gateway_fee_criteria_class,
     )
     SmsGatewayFee.create_new(
         'SISLOG',
@@ -39,6 +45,8 @@ def bootstrap_moz_gateway(orm):
         country_code='258',
         prefix='84',
         currency=mzn,
+        fee_class=sms_gateway_fee_class,
+        criteria_class=sms_gateway_fee_criteria_class,
     )
     SmsGatewayFee.create_new(
         'SISLOG',
@@ -47,6 +55,8 @@ def bootstrap_moz_gateway(orm):
         country_code='258',
         prefix='86',
         currency=mzn,
+        fee_class=sms_gateway_fee_class,
+        criteria_class=sms_gateway_fee_criteria_class,
     )
     SmsGatewayFee.create_new(
         'SISLOG',
@@ -55,6 +65,8 @@ def bootstrap_moz_gateway(orm):
         country_code='258',
         prefix='87',
         currency=mzn,
+        fee_class=sms_gateway_fee_class,
+        criteria_class=sms_gateway_fee_criteria_class,
     )
 
     backend_id = '7ddf3301c093b793c6020ebf755adb6f'
@@ -73,6 +85,8 @@ def bootstrap_moz_gateway(orm):
         country_code='258',
         prefix='82',
         currency=mzn,
+        fee_class=sms_gateway_fee_class,
+        criteria_class=sms_gateway_fee_criteria_class,
     )
     SmsGatewayFee.create_new(
         backend.get_api_id(),
@@ -82,6 +96,8 @@ def bootstrap_moz_gateway(orm):
         country_code='258',
         prefix='83',
         currency=mzn,
+        fee_class=sms_gateway_fee_class,
+        criteria_class=sms_gateway_fee_criteria_class,
     )
     SmsGatewayFee.create_new(
         backend.get_api_id(),
@@ -91,6 +107,8 @@ def bootstrap_moz_gateway(orm):
         country_code='258',
         prefix='84',
         currency=mzn,
+        fee_class=sms_gateway_fee_class,
+        criteria_class=sms_gateway_fee_criteria_class,
     )
     SmsGatewayFee.create_new(
         backend.get_api_id(),
@@ -100,6 +118,8 @@ def bootstrap_moz_gateway(orm):
         country_code='258',
         prefix='86',
         currency=mzn,
+        fee_class=sms_gateway_fee_class,
+        criteria_class=sms_gateway_fee_criteria_class,
     )
     SmsGatewayFee.create_new(
         backend.get_api_id(),
@@ -109,6 +129,8 @@ def bootstrap_moz_gateway(orm):
         country_code='258',
         prefix='87',
         currency=mzn,
+        fee_class=sms_gateway_fee_class,
+        criteria_class=sms_gateway_fee_criteria_class,
     )
 
 
