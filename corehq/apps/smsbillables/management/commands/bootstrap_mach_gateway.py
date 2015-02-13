@@ -28,7 +28,7 @@ def bootstrap_mach_gateway(orm):
                 country_code = int(table.cell_value(row, 0))
                 if not(country_code in data):
                     data[country_code] = []
-                subscribers = table.cell_value(row,10).replace('.', '')
+                subscribers = table.cell_value(row, 10).replace('.', '')
                 try:
                     data[country_code].append(
                         (table.cell_value(row, 9), int(subscribers)))
@@ -45,14 +45,26 @@ def bootstrap_mach_gateway(orm):
             total_subscribers += subscribers
             weighted_price += price * subscribers
         weighted_price = weighted_price / total_subscribers
-        SmsGatewayFee.create_new(MachBackend.get_api_id(), OUTGOING, weighted_price,
-                                 country_code=country_code, currency=currency_class.objects.get(code="EUR"),
-                                 fee_class=sms_gateway_fee_class, criteria_class=sms_gateway_fee_criteria_class)
+        SmsGatewayFee.create_new(
+            MachBackend.get_api_id(),
+            OUTGOING,
+            weighted_price,
+            country_code=country_code,
+            currency=currency_class.objects.get(code="EUR"),
+            fee_class=sms_gateway_fee_class,
+            criteria_class=sms_gateway_fee_criteria_class,
+        )
 
     # Fee for invalid phonenumber
-    SmsGatewayFee.create_new(MachBackend.get_api_id(), OUTGOING, 0.0225,
-                             country_code=None, currency=currency_class.objects.get(code="EUR"),
-                             fee_class=sms_gateway_fee_class, criteria_class=sms_gateway_fee_criteria_class)
+    SmsGatewayFee.create_new(
+        MachBackend.get_api_id(),
+        OUTGOING,
+        0.0225,
+        country_code=None,
+        currency=currency_class.objects.get(code="EUR"),
+        fee_class=sms_gateway_fee_class,
+        criteria_class=sms_gateway_fee_criteria_class,
+    )
 
     logger.info("Updated MACH/Syniverse gateway fees.")
 

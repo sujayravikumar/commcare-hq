@@ -14,32 +14,39 @@ def bootstrap_tropo_gateway(orm):
     sms_gateway_fee_class = orm['smsbillables.SmsGatewayFee'] if orm else SmsGatewayFee
     sms_gateway_fee_criteria_class = orm['smsbillables.SmsGatewayFeeCriteria'] if orm else SmsGatewayFeeCriteria
 
-
-    SmsGatewayFee.create_new(TropoBackend.get_api_id(), INCOMING, 0.01,
-                             currency=currency,
-                             fee_class=sms_gateway_fee_class,
-                             criteria_class=sms_gateway_fee_criteria_class)
+    SmsGatewayFee.create_new(
+        TropoBackend.get_api_id(),
+        INCOMING,
+        0.01,
+        currency=currency,
+        fee_class=sms_gateway_fee_class,
+        criteria_class=sms_gateway_fee_criteria_class,
+    )
 
     rates_csv = open('corehq/apps/smsbillables/management/'
                      'pricing_data/tropo_international_rates_2013-12-19.csv', 'r')
     for line in rates_csv.readlines():
         data = line.split(',')
         if data[1] == 'Fixed Line' and data[4] != '\n':
-            SmsGatewayFee.create_new(TropoBackend.get_api_id(),
-                                     OUTGOING,
-                                     float(data[4].rstrip()),
-                                     country_code=int(data[2]),
-                                     currency=currency,
-                                     fee_class=sms_gateway_fee_class,
-                                     criteria_class=sms_gateway_fee_criteria_class)
+            SmsGatewayFee.create_new(
+                TropoBackend.get_api_id(),
+                OUTGOING,
+                float(data[4].rstrip()),
+                country_code=int(data[2]),
+                currency=currency,
+                fee_class=sms_gateway_fee_class,
+                criteria_class=sms_gateway_fee_criteria_class,
+            )
     rates_csv.close()
 
     # Fee for invalid phonenumber
-    SmsGatewayFee.create_new(TropoBackend.get_api_id(), OUTGOING, 0.01,
-                             country_code=None,
-                             currency=currency,
-                             fee_class=sms_gateway_fee_class,
-                             criteria_class=sms_gateway_fee_criteria_class)
+    SmsGatewayFee.create_new(
+        TropoBackend.get_api_id(), OUTGOING, 0.01,
+        country_code=None,
+        currency=currency,
+        fee_class=sms_gateway_fee_class,
+        criteria_class=sms_gateway_fee_criteria_class,
+    )
 
     logger.info("Updated Tropo gateway fees.")
 

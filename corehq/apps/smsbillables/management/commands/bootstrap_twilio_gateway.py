@@ -95,18 +95,28 @@ def bootstrap_twilio_gateway(orm):
                     weighted_price += other_rate_twilio * subscriptions
             if country_code is not None:
                 weighted_price = weighted_price / total_subscriptions
-                SmsGatewayFee.create_new(TwilioBackend.get_api_id(), OUTGOING, weighted_price,
-                                         country_code=country_code, currency=currency_class.objects.get(code="USD"),
-                                         fee_class=sms_gateway_fee_class, criteria_class=sms_gateway_fee_criteria_class)
+                SmsGatewayFee.create_new(
+                    TwilioBackend.get_api_id(),
+                    OUTGOING,
+                    weighted_price,
+                    country_code=country_code,
+                    currency=currency_class.objects.get(code="USD"),
+                    fee_class=sms_gateway_fee_class,
+                    criteria_class=sms_gateway_fee_criteria_class,
+                )
         else:
             logger.info("%s not in mach_data" % iso)
 
     # https://www.twilio.com/help/faq/sms/will-i-be-charged-if-twilio-encounters-an-error-when-sending-an-sms
-    SmsGatewayFee.create_new(TwilioBackend.get_api_id(), OUTGOING, 0.00,
-                             country_code=None,
-                             currency=currency_class.objects.get(code="USD"),
-                             fee_class=sms_gateway_fee_class,
-                             criteria_class=sms_gateway_fee_criteria_class)
+    SmsGatewayFee.create_new(
+        TwilioBackend.get_api_id(),
+        OUTGOING,
+        0.00,
+        country_code=None,
+        currency=currency_class.objects.get(code="USD"),
+        fee_class=sms_gateway_fee_class,
+        criteria_class=sms_gateway_fee_criteria_class,
+    )
 
     logger.info("Updated Twilio gateway fees.")
 
