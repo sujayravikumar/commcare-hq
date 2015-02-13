@@ -40,6 +40,37 @@ def arbitrary_fee():
     return Decimal(str(round(random.uniform(0.0, 1.0), 4)))
 
 
+def arbitrary_country_code_and_prefixes(country_codes=TEST_COUNTRY_CODES):
+    country_codes_and_prefixes = []
+    for country_code in country_codes:
+        prefixes = [""]
+        for prefix_length in range(4):
+            prefixes.append(prefixes[-1] + str(random.randint(0, 10 - 1)))
+            prefixes.append(prefixes[-2] + str(random.randint(0, 10 - 1)))
+        for prefix in prefixes:
+            country_codes_and_prefixes.append((country_code, prefix))
+    return country_codes_and_prefixes
+
+
+def arbitrary_fees_by_prefix(backend_ids, country_codes_and_prefixes):
+    fees = {}
+    for direction in DIRECTIONS:
+        fees_by_backend = {}
+        for backend in get_available_backends().values():
+            fees_by_country_code = {}
+            for country_code, prefix in country_codes_and_prefixes:
+                fees_by_prefix = fees_by_country_code.get(country_code, {})
+                if not fees_by_prefix:
+                    fees_by_country_code[country_code] = fees_by_prefix
+                fees_by_prefix[prefix] = [
+                    (backend_instance, arbitrary_fee())
+                    for backend_instance in [backend_ids[backend.get_api_id()], None]
+                ]
+            fees_by_backend[backend.get_api_id()] = fees_by_country_code
+        fees[direction] = fees_by_backend
+    return fees
+
+
 def arbitrary_phone_number(country_codes=TEST_COUNTRY_CODES):
     return str(random.choice(country_codes)) + str(random.randint(10**9, 10**10 - 1))
 
