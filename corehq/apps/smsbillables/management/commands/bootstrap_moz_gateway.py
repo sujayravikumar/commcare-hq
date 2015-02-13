@@ -1,5 +1,6 @@
 from decimal import Decimal
 import logging
+from couchdbkit import ResourceNotFound
 
 from django.core.management.base import LabelCommand
 
@@ -56,7 +57,14 @@ def bootstrap_moz_gateway(orm):
         currency=mzn,
     )
 
-    backend = HttpBackend.get('7ddf3301c093b793c6020ebf755adb6f')
+    backend_id = '7ddf3301c093b793c6020ebf755adb6f'
+    try:
+        backend = HttpBackend.get(backend_id)
+    except ResourceNotFound:
+        # for non-production environments
+        backend = HttpBackend()
+        backend._id = backend_id
+        backend.save()
     SmsGatewayFee.create_new(
         backend.get_api_id(),
         OUTGOING,
