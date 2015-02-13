@@ -66,7 +66,9 @@ class SmsGatewayFeeCriteria(models.Model):
         except ObjectDoesNotExist:
             pass
         try:
-            return all_possible_criteria.get(country_code=country_code, backend_instance=None)
+            return get_criteria_with_longest_matching_prefix(
+                list(all_possible_criteria.filter(country_code=country_code, backend_instance=None))
+            )
         except ObjectDoesNotExist:
             pass
         try:
