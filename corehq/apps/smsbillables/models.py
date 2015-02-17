@@ -122,6 +122,11 @@ class SmsGatewayFee(models.Model):
             amount=amount,
             criteria=criteria
         )
+        # print backend_api_id
+        # print direction
+        # print backend_instance
+        # print country_code
+        # print prefix
         if save:
             new_fee.save()
         return new_fee

@@ -59,17 +59,19 @@ class TestGatewayFee(TestCase):
 
     def create_prefix_gateway_fees(self):
         for direction, backend in self.prefix_fees.items():
-            for backend_api_id, country in backend.items:
-                for country_code, prfx in country.items:
-                    for prefix, (backend_instance, amount) in prfx.items():
-                        SmsGatewayFee.create_new(
-                            backend_api_id,
-                            direction,
-                            amount,
-                            country_code=country_code,
-                            prefix=prefix,
-                            backend_instance=backend_instance,
-                        )
+            for backend_api_id, country in backend.items():
+                for country_code, prfx in country.items():
+                    for prefix, backend_instance_and_amount in prfx.items():
+                        for backend_instance, amount in backend_instance_and_amount:
+                            #print backend_instance_and_amount
+                            SmsGatewayFee.create_new(
+                                backend_api_id,
+                                direction,
+                                amount,
+                                country_code=country_code,
+                                prefix=(country_code + prefix) if not prefix else "",
+                                backend_instance=backend_instance,
+                            )
 
     def test_least_specific_fees(self):
         self.create_least_specific_gateway_fees()
@@ -155,8 +157,7 @@ class TestGatewayFee(TestCase):
     def test_prefix_fees(self):
         self.create_prefix_gateway_fees()
 
-        phone_numbers = generator.arbitrary_phone_numbers_by_prefixes(self.country_code_and_prefixes)
-        for phone_number in phone_numbers:
+        for phone_number, prefix in generator.arbitrary_phone_numbers_and_prefixes(self.country_code_and_prefixes):
             messages = generator.arbitrary_messages_by_backend_and_direction(
                 self.backend_ids,
                 phone_number=phone_number,
@@ -165,13 +166,16 @@ class TestGatewayFee(TestCase):
             for msg_log in messages:
                 billable = SmsBillable.create(msg_log)
                 self.assertIsNotNone(billable)
+                # print billable.direction
+                # print phone_number
+                # print prefix
                 self.assertEqual(
                     billable.gateway_charge,
                     self.prefix_fees
                     [billable.direction]
                     [billable.gateway_fee.criteria.backend_api_id]
                     [int(phone_number[:-10])]
-                    [self.get_prefix(phone_number)]
+                    [prefix]
                     [1]
                 )
 
