@@ -159,7 +159,7 @@ def close_task(domain, subcase_guid, submitting_user_id):
 
 def get_available_backends():
     result = {}
-    for backend_class in settings.SMS_LOADED_BACKENDS:
+    for backend_class in settings.SMS_LOADED_BACKENDS[0:1]: # FIX
         klass = to_function(backend_class)
         result[klass.__name__] = klass
     return result

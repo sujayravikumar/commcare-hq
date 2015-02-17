@@ -43,23 +43,32 @@ class SmsGatewayFeeCriteria(models.Model):
         if all_possible_criteria.count() == 0:
             return None
 
+        print national_number
         national_number = str(national_number) if national_number is not None else ""
+        if national_number:
+            national_number = '0' * (10 - len(national_number)) + national_number
+        print national_number
 
         def get_criteria_with_longest_matching_prefix(criteria_list):
             if len(set(criteria.prefix for criteria in criteria_list)) != len(criteria_list):
                 # TODO - subclass Exception
                 raise Exception
             criteria_list.sort(key=(lambda criteria: len(criteria.prefix)), reverse=True)
+            print "possible prefixes:"
+            for criteria in criteria_list:
+                print criteria.prefix
             for criteria in criteria_list:
                 if national_number.startswith(criteria.prefix):
                     return criteria
             raise ObjectDoesNotExist
 
         try:
+            print 'hit first'
             return get_criteria_with_longest_matching_prefix(
                 list(all_possible_criteria.filter(country_code=country_code, backend_instance=backend_instance))
             )
         except ObjectDoesNotExist:
+            print 'first failed'
             pass
         try:
             return all_possible_criteria.get(country_code=None, backend_instance=backend_instance)
@@ -70,6 +79,7 @@ class SmsGatewayFeeCriteria(models.Model):
                 list(all_possible_criteria.filter(country_code=country_code, backend_instance=None))
             )
         except ObjectDoesNotExist:
+            print 'third failed'
             pass
         try:
             return all_possible_criteria.get(country_code=None, backend_instance=None)
@@ -123,10 +133,11 @@ class SmsGatewayFee(models.Model):
             criteria=criteria
         )
         # print backend_api_id
-        # print direction
-        # print backend_instance
-        # print country_code
-        # print prefix
+        print direction
+        print backend_instance
+        print country_code
+        print prefix
+        print '----'
         if save:
             new_fee.save()
         return new_fee

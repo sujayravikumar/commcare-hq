@@ -42,11 +42,12 @@ def arbitrary_fee():
 
 def arbitrary_country_code_and_prefixes(country_codes=TEST_COUNTRY_CODES):
     country_codes_and_prefixes = []
-    for country_code in country_codes:
+    for country_code in country_codes[0:1]: # FIX
         prefixes = [""]
-        for prefix_length in range(4):
+        for prefix_length in range(1): # FIX
+            # prefixes.append(prefixes[-1] + '0')
             prefixes.append(prefixes[-1] + str(random.randint(0, 10 - 1)))
-            prefixes.append(prefixes[-2] + str(random.randint(0, 10 - 1)))
+            # prefixes.append(prefixes[-2] + str(random.randint(0, 10 - 1))) # FIX
         for prefix in prefixes:
             country_codes_and_prefixes.append((str(country_code), prefix))
     return country_codes_and_prefixes
@@ -58,14 +59,31 @@ def arbitrary_fees_by_prefix(backend_ids, country_codes_and_prefixes):
         fees_by_backend = {}
         for backend in get_available_backends().values():
             fees_by_country_code = {}
+            for country_code, _ in country_codes_and_prefixes:
+                fees_by_country_code[country_code] = {}
             for country_code, prefix in country_codes_and_prefixes:
-                fees_by_prefix = fees_by_country_code.get(country_code, {})
-                if not fees_by_prefix:
-                    fees_by_country_code[country_code] = fees_by_prefix
-                fees_by_prefix[prefix] = [
-                    (backend_instance, arbitrary_fee())
-                    for backend_instance in [backend_ids[backend.get_api_id()], None]
-                ]
+                fees_by_prefix = {
+                    backend_instance: arbitrary_fee()
+                    for backend_instance in [backend_ids[backend.get_api_id()]]#, None] # FIX
+                }
+                fees_by_country_code[country_code][prefix] = fees_by_prefix
+
+            #     country_code: {
+            #         prefix: {
+            #             backend_instance: arbitrary_fee()
+            #             for backend_instance in [backend_ids[backend.get_api_id()], None]
+            #         }
+            #     }
+            #     for country_code, prefix in country_codes_and_prefixes
+            # }
+
+            # for country_code, prefix in country_codes_and_prefixes:
+            #     fees_by_prefix = {}
+            #     fees_by_prefix[prefix] = {
+            #         backend_instance: arbitrary_fee()
+            #         for backend_instance in [backend_ids[backend.get_api_id()], None]
+            #     }
+            #     fees_by_country_code[country_code] = fees_by_prefix
             fees_by_backend[backend.get_api_id()] = fees_by_country_code
         fees[direction] = fees_by_backend
     return fees
@@ -185,5 +203,5 @@ def arbitrary_phone_numbers_and_prefixes(country_code_and_prefixes):
         full_prefix = country_code + prefix
         yield (
             full_prefix + str(random.randint(10**(remainder_len - 1), 10**remainder_len - 1)),
-            full_prefix
+            prefix
         )

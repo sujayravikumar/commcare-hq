@@ -26,6 +26,8 @@ class TestGatewayFee(TestCase):
         self.most_specific_fees = generator.arbitrary_fees_by_all(self.backend_ids)
         self.country_code_and_prefixes = generator.arbitrary_country_code_and_prefixes()
         self.prefix_fees = generator.arbitrary_fees_by_prefix(self.backend_ids, self.country_code_and_prefixes)
+        import pprint
+        pprint.PrettyPrinter(indent=2).pprint(self.prefix_fees)
 
         self.other_currency = generator.arbitrary_currency()
 
@@ -62,14 +64,13 @@ class TestGatewayFee(TestCase):
             for backend_api_id, country in backend.items():
                 for country_code, prfx in country.items():
                     for prefix, backend_instance_and_amount in prfx.items():
-                        for backend_instance, amount in backend_instance_and_amount:
-                            #print backend_instance_and_amount
+                        for backend_instance, amount in backend_instance_and_amount.items():
                             SmsGatewayFee.create_new(
                                 backend_api_id,
                                 direction,
                                 amount,
                                 country_code=country_code,
-                                prefix=(country_code + prefix) if not prefix else "",
+                                prefix=prefix,
                                 backend_instance=backend_instance,
                             )
 
@@ -166,18 +167,20 @@ class TestGatewayFee(TestCase):
             for msg_log in messages:
                 billable = SmsBillable.create(msg_log)
                 self.assertIsNotNone(billable)
-                # print billable.direction
-                # print phone_number
-                # print prefix
-                self.assertEqual(
-                    billable.gateway_charge,
-                    self.prefix_fees
-                    [billable.direction]
-                    [billable.gateway_fee.criteria.backend_api_id]
-                    [int(phone_number[:-10])]
-                    [prefix]
-                    [1]
-                )
+                try:
+                    self.assertEqual(
+                        billable.gateway_charge,
+                        self.prefix_fees
+                        [billable.direction]
+                        [billable.gateway_fee.criteria.backend_api_id]
+                        [phone_number[:-10]]
+                        [prefix]
+                        [msg_log.backend_id]
+                    )
+                except AssertionError as e:
+                    print phone_number
+                    print prefix
+                    raise e
 
     def test_no_matching_fee(self):
         self.create_least_specific_gateway_fees()
