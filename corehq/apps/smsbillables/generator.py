@@ -46,7 +46,7 @@ def arbitrary_country_code_and_prefixes(country_codes=TEST_COUNTRY_CODES):
         prefixes = [""]
         for prefix_length in range(4):
             prefixes.append(prefixes[-1] + str(random.randint(0, 10 - 1)))
-            # prefixes.append(prefixes[-2] + str(random.randint(0, 10 - 1)))
+            prefixes.append(prefixes[-2] + str(random.randint(0, 10 - 1)))
         for prefix in prefixes:
             country_codes_and_prefixes.append((str(country_code), prefix))
     return country_codes_and_prefixes
@@ -180,10 +180,20 @@ def arbitrary_currency():
 
 
 def arbitrary_phone_numbers_and_prefixes(country_code_and_prefixes):
+    all_full_prefixes = [
+        country_code + prefix
+        for (country_code, prefix) in country_code_and_prefixes
+    ]
     for country_code, prefix in country_code_and_prefixes:
-        remainder_len = 10 - len(prefix)
         full_prefix = country_code + prefix
+        remainder_len = 10 - len(prefix)
+        national_number = prefix + str(random.randint(10**(remainder_len - 1), 10**remainder_len - 1))
+        while any([
+            national_number.startswith(other_prefix) and other_prefix.startswith(full_prefix)
+            for other_prefix in all_full_prefixes
+        ]):
+            national_number = prefix + str(random.randint(10**(remainder_len - 1), 10**remainder_len - 1))
         yield (
-            full_prefix + str(random.randint(10**(remainder_len - 1), 10**remainder_len - 1)),
+            country_code + national_number,
             prefix
         )

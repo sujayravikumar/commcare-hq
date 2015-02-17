@@ -167,19 +167,24 @@ class TestGatewayFee(TestCase):
             for msg_log in messages:
                 billable = SmsBillable.create(msg_log)
                 self.assertIsNotNone(billable)
+                right_fee = (
+                    self.prefix_fees
+                    [billable.direction]
+                    [billable.gateway_fee.criteria.backend_api_id]
+                    [phone_number[:-10]]
+                    [prefix]
+                    [msg_log.backend_id]
+                )
                 try:
                     self.assertEqual(
                         billable.gateway_charge,
-                        self.prefix_fees
-                        [billable.direction]
-                        [billable.gateway_fee.criteria.backend_api_id]
-                        [phone_number[:-10]]
-                        [prefix]
-                        [msg_log.backend_id]
+                        right_fee
                     )
                 except AssertionError as e:
                     print phone_number
                     print prefix
+                    print billable.gateway_charge
+                    print right_fee
                     raise e
 
     def test_no_matching_fee(self):
