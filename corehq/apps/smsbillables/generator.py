@@ -180,19 +180,22 @@ def arbitrary_currency():
 
 
 def arbitrary_phone_numbers_and_prefixes(country_code_and_prefixes):
-    all_full_prefixes = [
-        country_code + prefix
+    all_prefixes = [
+        prefix
         for (country_code, prefix) in country_code_and_prefixes
     ]
     for country_code, prefix in country_code_and_prefixes:
-        full_prefix = country_code + prefix
         remainder_len = 10 - len(prefix)
-        national_number = prefix + str(random.randint(10**(remainder_len - 1), 10**remainder_len - 1))
+
+        def _get_national_number():
+            return prefix + str(random.randint(10**(remainder_len - 1), 10**remainder_len - 1))
+
+        national_number = _get_national_number()
         while any([
-            national_number.startswith(other_prefix) and other_prefix.startswith(full_prefix)
-            for other_prefix in all_full_prefixes
+            national_number.startswith(another_prefix) and another_prefix.startswith(prefix)
+            for another_prefix in all_prefixes if another_prefix and another_prefix != prefix
         ]):
-            national_number = prefix + str(random.randint(10**(remainder_len - 1), 10**remainder_len - 1))
+            national_number = _get_national_number()
         yield (
             country_code + national_number,
             prefix

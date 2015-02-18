@@ -182,9 +182,10 @@ class TestGatewayFee(TestCase):
                     )
                 except AssertionError as e:
                     print phone_number
-                    print prefix
-                    print billable.gateway_charge
-                    print right_fee
+                    print "Right prefix: %s" % prefix
+                    print "Right fee: %s" % right_fee
+                    print "Got prefix: %s" % billable.gateway_fee.criteria.prefix
+                    print "Got fee: %s" % billable.gateway_charge
                     raise e
 
     def test_no_matching_fee(self):
