@@ -1150,6 +1150,8 @@ def form_designer(req, domain, app_id, module_id=None, form_id=None,
                             unique_form_id=form.unique_id)
 
     vellum_plugins = ["modeliteration"]
+    if app.commtrack_enabled:
+        vellum_plugins.append("commtrack")
     if settings.VELLUM_PRERELEASE:
         vellum_plugins.append("itemset")
     if toggles.VELLUM_TRANSACTION_QUESTION_TYPES.enabled(domain):

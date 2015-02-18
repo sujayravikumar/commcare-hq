@@ -1,11 +1,16 @@
-# from django.db import models
+from __future__ import print_function
 from datetime import date
 import json
+import logging
 from casexml.apps.case.models import CommCareCase
 from corehq.apps.fixtures.models import FixtureDataItem, FixtureDataType, FieldList, FixtureItemField
 from couchdbkit.ext.django.schema import *
 from dimagi.utils.couch.cache import cache_core
 import requests
+from toggle.models import Toggle
+
+
+logger = logging.getLogger(__name__)
 
 
 class Dhis2Settings(Document):
@@ -24,12 +29,26 @@ class Dhis2Settings(Document):
         return res[0] if len(res) > 0 else None
 
     @classmethod
+    def all_enabled(cls):
+        """
+        Yields settings of all domains for which "enabled" is true
+        """
+        toggle = Toggle.get('dhis2_domain')
+        for domain in toggle.enabled_users:
+            if domain.startswith('domain:'):
+                # If the "domain" namespace is given, strip it off
+                domain = domain.split(':')[1]
+            settings = cls.for_domain(domain)
+            if settings and settings.is_enabled():
+                yield settings
+
+    @classmethod
     def is_enabled_for_domain(cls, domain):
         settings = cls.for_domain(domain)
         return settings is not None and settings.is_enabled()
 
     def is_enabled(self):
-        return self.dhis2.enabled
+        return self.dhis2['enabled']
 
 
 class JsonApiError(Exception):
@@ -85,6 +104,10 @@ class JsonApiRequest(object):
                                (response.url, response.status_code, response.text))
 
     def get(self, path, **kwargs):
+        logger.debug('DHIS2: GET %s: \n'
+                     '    Headers: %s\n'
+                     '    kwargs: %s',
+                     self.baseurl + path, self.headers, kwargs)
         try:
             response = requests.get(self.baseurl + path, headers=self.headers, auth=self.auth, **kwargs)
         except requests.RequestException as err:
@@ -96,6 +119,11 @@ class JsonApiRequest(object):
         headers = self.headers.copy()
         headers['Content-type'] = 'application/json'
         json_data = json.dumps(data, default=json_serializer)
+        logger.debug('DHIS2: POST %s: \n'
+                     '    Headers: %s\n'
+                     '    Data: %s\n'
+                     '    kwargs: %s',
+                     self.baseurl + path, self.headers, json_data, kwargs)
         try:
             response = requests.post(self.baseurl + path, json_data, headers=headers, auth=self.auth, **kwargs)
         except requests.RequestException as err:
@@ -106,6 +134,11 @@ class JsonApiRequest(object):
         headers = self.headers.copy()
         headers['Content-type'] = 'application/json'
         json_data = json.dumps(data, default=json_serializer)
+        logger.debug('DHIS2: PUT %s: \n'
+                     '    Headers: %s\n'
+                     '    Data: %s\n'
+                     '    kwargs: %s',
+                     self.baseurl + path, self.headers, json_data, kwargs)
         try:
             response = requests.put(self.baseurl + path, json_data, headers=headers, auth=self.auth, **kwargs)
         except requests.RequestException as err:
@@ -118,17 +151,18 @@ class Dhis2Api(object):
     def __init__(self, host, username, password, top_org_unit_name=None):
         self._username = username  # Used when creating DHIS2 events from CCHQ form data
         self.top_org_unit_name = top_org_unit_name
+        self._top_org_unit = None
         self._request = JsonApiRequest(host, username, password)
-        self._tracked_entity_attributes = {  # Cached known tracked entity attribute names and IDs
-            # Prepopulate with attributes that are not tracked entity attributes. This allows us to treat all
-            # attributes the same when adding tracked entity instances, and avoid trying to look up tracked entity
-            # attribute IDs for attributes that are not tracked entity attributes.
-            'Instance': 'instance',
-            'Created': 'created',
-            'Last updated': 'lastupdated',
-            'Org unit': 'ou',
-            'Tracked entity': 'te',
-        }
+        self._tracked_entity_attributes = {}  # Cache known tracked entity attribute names and IDs
+        self._not_tracked_entity_attributes = (
+            # These fields are returned by DHIS2, but cannot be sent in a POST
+            # or PUT request as tracked entity attributes. DHIS2 will 500.
+            'Instance',
+            'Created',
+            'Last updated',
+            'Org unit',
+            'Tracked entity',
+        )
         self._data_elements = {}  # Like _tracked_entity_attributes, but for events data
 
     def _fetch_tracked_entity_attributes(self):
@@ -141,13 +175,32 @@ class Dhis2Api(object):
         for de in response['dataElements']:
             self._data_elements[de['name']] = de['id']
 
-    def add_te_inst(self, entity_data, te_name, ou_id):
+    def _data_to_attributes(self, data):
+        """
+        Convert tracked entity instance data, as returned by DHIS2, into a
+        list of attributes, as accepted by DHIS2.
+        """
+        for attr in self._not_tracked_entity_attributes:
+            data.pop(attr, None)
+        # Convert data keys to tracked entity attribute IDs
+        if any(key not in self._tracked_entity_attributes for key in data):
+            # We are going to have to fetch at least one tracked entity
+            # attribute ID. Fetch them all to avoid multiple API requests.
+            self._fetch_tracked_entity_attributes()
+        # Create a list of attributes, looking up the attribute ID of each one
+        attributes = [{
+            'attribute': self.get_te_attr_id(key),
+            'value': value
+        } for key, value in data.iteritems()]
+        return attributes
+
+    def add_te_inst(self, te_name, ou_id, instance_data):
         """
         Add a tracked entity instance
 
-        :param entity_data: A dictionary of entity attributes and values
         :param te_name: Name of the tracked entity. Add or override its ID in data.
         :param ou_id: Add or override organisation unit ID in data.
+        :param instance_data: A dictionary of entity attributes and values
         :return: New tracked entity instance ID
 
         .. Note:: If te_name is not specified, then `data` must include the
@@ -179,63 +232,58 @@ class Dhis2Api(object):
 
 
         """
-        # Convert data keys to tracked entity attribute IDs
-        if any(key not in self._tracked_entity_attributes for key in entity_data):
-            # We are going to have to fetch at least one tracked entity attribute ID. Fetch them all to avoid
-            # multiple API requests.
-            self._fetch_tracked_entity_attributes()
-        # Create a list of attributes, looking up the attribute ID of each one
-        attributes = [{
-            'attribute': self.get_te_attr_id(key),
-            'value': value
-        } for key, value in entity_data.iteritems()]
         request_data = {
             'trackedEntity': self.get_te_id(te_name),
             'orgUnit': ou_id,
-            'attributes': attributes
+            'attributes': self._data_to_attributes(instance_data)
         }
         __, response = self._request.post('trackedEntityInstances', request_data)
         return response['reference']
 
-    def update_te_inst(self, data):
+    def update_te_inst(self, instance_data):
         """
         Update a tracked entity instance with the given data
 
-        :param data: Tracked entity instance data. Must include its ID,
+        :param instance_data: Tracked entity instance data. Must include its ID,
                      organisation unit and tracked entity type
         """
-        for attr in ('id', 'orgUnit', 'trackedEntity'):
-            if attr not in data:
-                raise KeyError('Mandatory attribute "%s" missing from tracked entity instance data' % attr)
-        # Convert data keys to tracked entity attribute IDs
-        if any(key not in self._tracked_entity_attributes for key in data):
-            self._fetch_tracked_entity_attributes()
-        # Set instance data keys to attribute IDs
-        inst = {self.get_te_attr_id(k): v for k, v in data.iteritems()}
-        __, response = self._request.put('trackedEntityInstances/' + inst['id'], inst)
+        try:
+            te_inst_id = instance_data.pop('Instance')
+            ou_id = instance_data.pop('Org unit')
+        except KeyError as err:
+            raise KeyError('Mandatory attribute missing from tracked entity instance data: %s' % err)
+        request_data = {
+            'trackedEntityInstance': te_inst_id,
+            'orgUnit': ou_id,
+            'attributes': self._data_to_attributes(instance_data)
+        }
+        __, response = self._request.put('trackedEntityInstances/' + te_inst_id, request_data)
         return response
 
     def get_top_org_unit(self):
         """
         Return the top-most organisation unit.
         """
-        if self.top_org_unit_name:
-            # A top organisation unit has been specified in the settings. Use that
-            __, response = self._request.get('organisationUnits',
-                                             params={'links': 'false',
-                                                     'query': self.top_org_unit_name})
-            return response['organisationUnits'][0]
-        # Traverse up the tree of organisation units
-        __, org_units_json = self._request.get('organisationUnits', params={'links': 'false'})
-        org_unit = org_units_json['organisationUnits'][0]
-        # The List response doesn't include parent (even if you ask for it :-| ). Request org_unit details.
-        __, org_unit = self._request.get('organisationUnits/' + org_unit['id'])
-        while True:
-            if not org_unit.get('parent'):
-                # The organisation unit with no parent is the top-most organisation unit
-                break
-            __, org_unit = self._request.get('organisationUnits/' + org_unit['parent']['id'])
-        return org_unit
+        if self._top_org_unit is None:
+            if self.top_org_unit_name:
+                # A top organisation unit has been specified in the settings. Use that
+                __, response = self._request.get('organisationUnits',
+                                                 params={'links': 'false',
+                                                         'query': self.top_org_unit_name})
+                self._top_org_unit = response['organisationUnits'][0]
+            else:
+                # Traverse up the tree of organisation units
+                __, org_units_json = self._request.get('organisationUnits', params={'links': 'false'})
+                org_unit = org_units_json['organisationUnits'][0]
+                # The List response doesn't include parent (even if you ask for it :-| ). Request org_unit details.
+                __, org_unit = self._request.get('organisationUnits/' + org_unit['id'])
+                while True:
+                    if not org_unit.get('parent'):
+                        # The organisation unit with no parent is the top-most organisation unit
+                        break
+                    __, org_unit = self._request.get('organisationUnits/' + org_unit['parent']['id'])
+                self._top_org_unit = org_unit
+        return self._top_org_unit
 
     def get_resource_id(self, resource, name):
         """
@@ -293,7 +341,7 @@ class Dhis2Api(object):
                     'links': 'false',
                     'trackedEntity': te_id,
                     'ou': top_ou['id'],
-                    'ouMode': 'DESCENDANTS',
+                    # 'ouMode': 'DESCENDANTS',  # Causes SQL error in DHIS2 2.16. Fixed in 2.18
                     'attribute': attr_id
                 })
             instances = self.entities_to_dicts(response)
@@ -312,6 +360,10 @@ class Dhis2Api(object):
         top_ou = self.get_top_org_unit()
         te_id = self.get_te_id(te_name)
         attr_id = self.get_te_attr_id(attr_name)
+        if attr_id is None:
+            raise Dhis2ConfigurationError(
+                'DHIS2 tracked entity attribute name "%s" unknown on host "%s"',
+                attr_name, self._request.baseurl)
         page = 1
         while True:
             __, response = self._request.get(
@@ -322,7 +374,7 @@ class Dhis2Api(object):
                     'links': 'false',
                     'trackedEntity': te_id,
                     'ou': top_ou['id'],
-                    'ouMode': 'DESCENDANTS',
+                    # 'ouMode': 'DESCENDANTS',  # Causes SQL error in DHIS2 2.16. Fixed in 2.18
                     'attribute': attr_id + ':EQ:' + attr_value
                 })
             instances = self.entities_to_dicts(response)
@@ -348,7 +400,7 @@ class Dhis2Api(object):
                     'page': page,
                     'links': 'false',
                     'ou': top_ou['id'],
-                    'ouMode': 'DESCENDANTS',
+                    # 'ouMode': 'DESCENDANTS',  # Causes SQL error in DHIS2 2.16. Fixed in 2.18
                     'program': program_id
                 })
             instances = self.entities_to_dicts(response)
@@ -385,9 +437,12 @@ class Dhis2Api(object):
         """
         # I didn't find a way to do this with a single request. :-|
         for ou in self.gen_org_units():
-            __, details = self._request.get('organisationUnits/' + ou['id'])
-            ou['parent_id'] = details['parent']['id'] if details.get('parent') else None
+            ou['parent_id'] = self.get_org_unit_parent_id(ou['id'])
             yield ou
+
+    def get_org_unit_parent_id(self, ou_id):
+        __, details = self._request.get('organisationUnits/' + ou_id)
+        return details['parent']['id'] if details.get('parent') else None
 
     def enroll_in(self, te_inst_id, program, when=None, data=None):
         """
@@ -422,13 +477,7 @@ class Dhis2Api(object):
             "dateOfIncident": when
         }
         if data:
-            if any(key not in self._tracked_entity_attributes for key in data):
-                self._fetch_tracked_entity_attributes()
-            attributes = [{
-                'attribute': self.get_te_attr_id(key),
-                'value': value
-            } for key, value in data.iteritems()]
-            request_data['attributes'] = attributes
+            request_data['attributes'] = self._data_to_attributes(data)
         __, response = self._request.post('enrollments', request_data)
         return response
 
@@ -639,6 +688,10 @@ class Dhis2Api(object):
         return entities
 
 
+class FixtureManagerError(Exception):
+    pass
+
+
 def to_field_list(value):
     """
     Return a field value as a FieldList
@@ -650,7 +703,10 @@ def to_field_value(field_list):
     """
     Return the first field value in a FieldList
     """
-    return field_list.field_list[0].field_value
+    try:
+        return field_list.field_list[0].field_value
+    except IndexError:
+        return None
 
 
 class FixtureManager(object):
@@ -698,6 +754,10 @@ class Dhis2OrgUnit(object):
         return self._fixture_id
 
     def save(self):
+        if self.objects is None:
+            raise FixtureManagerError(
+                'FixtureManager not set. '
+                'e.g. `Dhis2OrgUnit.objects = FixtureManager(Dhis2OrgUnit, domain, ORG_UNIT_FIXTURES)`')
         data_type = FixtureDataType.by_domain_tag(self.objects.domain, self.objects.tag).one()
         if data_type is None:
             raise Dhis2ConfigurationError(
@@ -724,5 +784,5 @@ class Dhis2OrgUnit(object):
 # To use Dhis2OrgUnit with FixtureManager, create a manager instance, and use
 # it to fetch org units. You need to do it at runtime in order to create your
 # FixtureManager instance with the right domain. e.g.:
-#     org_unit_objects = FixtureManager(Dhis2OrgUnit, domain, ORG_UNIT_FIXTURES)
-#     our_org_units = {ou.id: ou for ou in org_unit_objects.all()}
+#     Dhis2OrgUnit.objects = FixtureManager(Dhis2OrgUnit, domain, ORG_UNIT_FIXTURES)
+#     our_org_units = {ou.id: ou for ou in Dhis2OrgUnit.objects.all()}

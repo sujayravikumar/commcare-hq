@@ -20,7 +20,7 @@ from casexml.apps.phone.restore import generate_restore_payload
 from lxml import etree
 
 TEST_DOMAIN = 'commtrack-test'
-TEST_LOCATION_TYPE = 'location'
+TEST_LOCATION_TYPE = 'outlet'
 TEST_USER = 'commtrack-user'
 TEST_NUMBER = '5551234'
 TEST_PASSWORD = 'secret'
@@ -97,8 +97,7 @@ def bootstrap_user(setup, username=TEST_USER, domain=TEST_DOMAIN,
         if not SupplyPointCase.get_by_location(setup.loc):
             make_supply_point(domain, setup.loc)
 
-        user.add_location(setup.loc)
-        user.save()
+        user.set_location(setup.loc)
 
     user.save_verified_number(domain, phone_number, verified=True, backend_id=backend)
     return CommCareUser.wrap(user.to_json())

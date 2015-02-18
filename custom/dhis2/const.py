@@ -1,25 +1,30 @@
 # DHIS2 API integration constants
 
-# TODO: Get rid of all of these
+# TODO: Move all of these to per-domain config
 
 ORG_UNIT_FIXTURES = 'dhis2_org_unit'
-
-# 'child_gmp': 'Child'
+# CCHQ_CASE_ID = 'CCHQ Case ID'
+CCHQ_CASE_ID = 'cchq_id'
+CASE_TYPE = 'child_gmp'
+TRACKED_ENTITY = 'Child'
 
 NUTRITION_ASSESSMENT_PROGRAM_FIELDS = {
     # CCHQ child_gmp case attribute: DHIS2 paediatric nutrition assessment program attribute
 
-    # c.f. http://dhis1.internal.commcarehq.org:8080/dhis/api/programs/yKSaDwadHTv.json
+    # c.f. http://dhis1.internal.commcarehq.org:8080/dhis/api/programs/HiHLy0f1C1q.json
     #      programTrackedEntityAttributes
+
+    # NOTE: CHDR Number must be unique. "Optional" but defaults to null and
+    #       null is not unique ... so ... not optional then.
+    'chdr_number': 'CHDR Number',
 
     'child_first_name': 'First Name',
     'child_hh_name': 'Last Name',
-    'dob': 'Date of Birth',
-    'child_gender': 'Gender',
-    'chdr_number': 'CHDR Number',  # TODO: DHIS2 says this is optional, but throws an error if it's not passed
+    # 'dob': 'Date of Birth',
+    # 'child_gender': 'Gender',
     'mother_first_name': 'Name of the Mother/Guardian',
-    'mother_phone_number': 'Mobile Number of the Mother',
-    'street_name': 'Address',
+    # 'mother_phone_number': 'Mobile Number of the Mother',
+    # 'street_name': 'Address',
 }
 
 NUTRITION_ASSESSMENT_EVENT_FIELDS = {
@@ -57,4 +62,3 @@ RISK_ASSESSMENT_EVENT_FIELDS = {
     # 'mother_first_name': 'Name of the Mother/Guardian',
     # 'gn': 'GN Division of Household',
 }
-
