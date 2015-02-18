@@ -26,8 +26,6 @@ class TestGatewayFee(TestCase):
         self.most_specific_fees = generator.arbitrary_fees_by_all(self.backend_ids)
         self.country_code_and_prefixes = generator.arbitrary_country_code_and_prefixes()
         self.prefix_fees = generator.arbitrary_fees_by_prefix(self.backend_ids, self.country_code_and_prefixes)
-        import pprint
-        pprint.PrettyPrinter(indent=2).pprint(self.prefix_fees)
 
         self.other_currency = generator.arbitrary_currency()
 
@@ -167,7 +165,8 @@ class TestGatewayFee(TestCase):
             for msg_log in messages:
                 billable = SmsBillable.create(msg_log)
                 self.assertIsNotNone(billable)
-                right_fee = (
+                self.assertEqual(
+                    billable.gateway_charge,
                     self.prefix_fees
                     [billable.direction]
                     [billable.gateway_fee.criteria.backend_api_id]
@@ -175,18 +174,6 @@ class TestGatewayFee(TestCase):
                     [prefix]
                     [msg_log.backend_id]
                 )
-                try:
-                    self.assertEqual(
-                        billable.gateway_charge,
-                        right_fee
-                    )
-                except AssertionError as e:
-                    print phone_number
-                    print "Right prefix: %s" % prefix
-                    print "Right fee: %s" % right_fee
-                    print "Got prefix: %s" % billable.gateway_fee.criteria.prefix
-                    print "Got fee: %s" % billable.gateway_charge
-                    raise e
 
     def test_no_matching_fee(self):
         self.create_least_specific_gateway_fees()
