@@ -2944,7 +2944,7 @@ def download_bulk_app_translations(request, domain, app_id):
                     for i, annotation in enumerate(detail.graph_configuration.annotations):
                         rows[module_string].append(
                             (
-                                "graph annotation {}".format(i+1),
+                                "graph annotation {}".format(i + 1),
                                 list_or_detail
                             ) + tuple(
                                 annotation.display_text.get(lang, "")

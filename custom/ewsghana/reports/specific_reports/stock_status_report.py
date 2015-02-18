@@ -4,13 +4,13 @@ from corehq.apps.locations.models import SQLLocation
 from corehq.apps.products.models import SQLProduct
 from corehq.apps.reports.datatables import DataTablesHeader, DataTablesColumn
 from corehq.apps.reports.filters.fixtures import AsyncLocationFilter
-from corehq.apps.reports.graph_models import MultiBarChart, Axis, LineChart
+from corehq.apps.reports.graph_models import Axis
 from corehq.apps.reports.filters.dates import DatespanFilter
 from custom.common import ALL_OPTION
 from custom.ewsghana.filters import ProductByProgramFilter, ViewReportFilter
 from custom.ewsghana.reports.stock_levels_report import StockLevelsReport, InventoryManagementData, \
-    FacilityInChargeUsers, FacilityUsers, FacilitySMSUsers, StockLevelsLegend, FacilityReportData
-from custom.ewsghana.reports import MultiReport, EWSData
+    FacilityInChargeUsers, FacilityUsers, FacilitySMSUsers, StockLevelsLegend, FacilityReportData, InputStock
+from custom.ewsghana.reports import MultiReport, EWSData, EWSMultiBarChart, ProductSelectionPane, EWSLineChart
 from casexml.apps.stock.models import StockTransaction
 from django.db.models import Q
 from custom.ewsghana.utils import get_supply_points, get_products, make_url, get_second_week
@@ -88,8 +88,7 @@ class ProductAvailabilityData(EWSData):
                             datalist.append([row['product_code'], calculate_percent(row['with_stock'], total)])
                     ret_data.append({'color': chart_config['label_color'][k], 'label': k, 'data': datalist})
                 return ret_data
-
-            chart = MultiBarChart('', x_axis=Axis('Products'), y_axis=Axis('', '.2%'))
+            chart = EWSMultiBarChart('', x_axis=Axis('Products'), y_axis=Axis('', '.2%'))
             chart.rotateLabels = -45
             chart.marginBottom = 120
             chart.stacked = False
@@ -219,8 +218,8 @@ class StockoutsProduct(EWSData):
     def charts(self):
         rows = self.rows
         if self.show_chart:
-            chart = LineChart("Stockout by Product", x_axis=Axis(self.chart_x_label, dateFormat='%b %Y'),
-                              y_axis=Axis(self.chart_y_label, 'd'))
+            chart = EWSLineChart("Stockout by Product", x_axis=Axis(self.chart_x_label, dateFormat='%b %Y'),
+                                 y_axis=Axis(self.chart_y_label, 'd'))
             chart.x_axis_uses_dates = True
             for key, value in rows.iteritems():
                 chart.add_dataset(key, value)
@@ -279,6 +278,7 @@ class StockStatus(MultiReport):
     fields = [AsyncLocationFilter, ProductByProgramFilter, DatespanFilter, ViewReportFilter]
     split = False
     exportable = True
+    is_exportable = True
 
     @property
     def report_config(self):
@@ -295,13 +295,58 @@ class StockStatus(MultiReport):
         )
 
     @property
-    def export_table(self):
-        if not self.is_reporting_type():
-            return super(StockStatus, self).export_table
-        r = self.report_context['reports'][0]['report_table']
-        return [self._export_table(r['title'], r['headers'], r['rows'])]
+    def data_providers(self):
+        config = self.report_config
+        report_type = self.request.GET.get('report_type', None)
 
-    def _export_table(self, export_sheet_name, headers, formatted_rows, total_row=None):
+        if self.is_reporting_type():
+            self.split = True
+            return [
+                FacilityReportData(config),
+                StockLevelsLegend(config),
+                InputStock(config),
+                FacilitySMSUsers(config),
+                FacilityUsers(config),
+                FacilityInChargeUsers(config),
+                InventoryManagementData(config)
+            ]
+        self.split = False
+        if report_type == 'stockouts':
+            return [
+                ProductSelectionPane(config=config),
+                StockoutsProduct(config=config),
+                StockoutTable(config=config)
+            ]
+        elif report_type == 'asi':
+            return [
+                ProductSelectionPane(config=config),
+                ProductAvailabilityData(config=config),
+                MonthOfStockProduct(config=config),
+                StockoutsProduct(config=config),
+                StockoutTable(config=config)
+            ]
+        else:
+            return [
+                ProductSelectionPane(config=config),
+                ProductAvailabilityData(config=config),
+                MonthOfStockProduct(config=config)
+            ]
+
+    @property
+    def export_table(self):
+        if self.is_reporting_type():
+            return super(StockStatus, self).export_table
+
+        report_type = self.request.GET.get('report_type', None)
+        if report_type == 'stockouts' or not report_type:
+            r = self.report_context['reports'][1]['report_table']
+            return [self._export(r['title'], r['headers'], r['rows'])]
+        else:
+            reports = [self.report_context['reports'][1]['report_table'],
+                       self.report_context['reports'][3]['report_table']]
+            return [self._export(r['title'], r['headers'], r['rows']) for r in reports]
+
+    def _export(self, export_sheet_name, headers, formatted_rows, total_row=None):
         def _unformat_row(row):
             return [col.get("sort_key", col) if isinstance(col, dict) else col for col in row]
 
@@ -319,38 +364,3 @@ class StockStatus(MultiReport):
             table.append(_unformat_row(total_row))
 
         return [export_sheet_name, table]
-
-    @property
-    def data_providers(self):
-        config = self.report_config
-        report_type = self.request.GET.get('report_type', None)
-
-        if self.is_reporting_type():
-            self.split = True
-            return [
-                FacilityReportData(config),
-                StockLevelsLegend(config),
-                FacilitySMSUsers(config),
-                FacilityUsers(config),
-                FacilityInChargeUsers(config),
-                InventoryManagementData(config)
-            ]
-        self.split = False
-        if report_type == 'stockouts':
-            return [
-                StockoutsProduct(config=config),
-                StockoutTable(config=config)
-            ]
-        elif report_type == 'asi':
-            return [
-                ProductAvailabilityData(config=config),
-                MonthOfStockProduct(config=config),
-                StockoutsProduct(config=config),
-                StockoutTable(config=config)
-            ]
-        else:
-            return [
-                ProductAvailabilityData(config=config),
-                MonthOfStockProduct(config=config)
-            ]
-

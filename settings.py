@@ -466,6 +466,7 @@ BILLING_EMAIL = 'billing-comm@dimagi.com'
 INVOICING_CONTACT_EMAIL = 'accounts@dimagi.com'
 MASTER_LIST_EMAIL = 'master-list@dimagi.com'
 EULA_CHANGE_EMAIL = 'eula-notifications@dimagi.com'
+CONTACT_EMAIL = 'info@dimagi.com'
 BOOKKEEPER_CONTACT_EMAILS = []
 EMAIL_SUBJECT_PREFIX = '[commcarehq] '
 
@@ -885,6 +886,9 @@ MAILCHIMP_MASS_EMAIL_ID = ''
 
 SQL_REPORTING_DATABASE_URL = None
 
+# number of days since last access after which a saved export is considered unused
+SAVED_EXPORT_ACCESS_CUTOFF = 35
+
 # override for production
 DEFAULT_PROTOCOL = 'http'
 
@@ -1216,8 +1220,6 @@ PILLOWTOPS = {
         'custom.tdh.models.TDHNewbornTreatmentFluffPillow',
         'custom.tdh.models.TDHChildClassificationFluffPillow',
         'custom.tdh.models.TDHChildTreatmentFluffPillow',
-        'custom.up_nrhm.models.UpNRHMLocationHierarchyFluffPillow',
-        'custom.up_nrhm.models.ASHAFacilitatorsFluffPillow'
     ],
     'mvp': [
         'corehq.apps.indicators.pillows.FormIndicatorPillow',
@@ -1231,7 +1233,8 @@ PILLOWTOPS = {
 
 
 CUSTOM_DATA_SOURCES = [
-    os.path.join('custom', 'up_nrhm', 'data_sources', 'location_hierarchy.json')
+    os.path.join('custom', 'up_nrhm', 'data_sources', 'location_hierarchy.json'),
+    os.path.join('custom', 'up_nrhm', 'data_sources', 'asha_facilitators.json'),
 ]
 
 
