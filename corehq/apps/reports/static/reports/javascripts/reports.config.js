@@ -58,7 +58,11 @@ var HQReport = function (options) {
 
                 if (self.isEmailable) {
                     self.emailReportViewModel = new EmailReportViewModel(self);
-                    ko.applyBindings(self.emailReportViewModel, $(self.emailReportModal).get(0));
+                    // Why would I need to do this?
+                    //var el = $(self.emailReportModal).get(0);
+                    //if (el) {
+                        ko.applyBindings(self.emailReportViewModel, $(self.emailReportModal).get(0));
+                    //}
                 }
 
                 $(self.printReportButton).click(function (e) {

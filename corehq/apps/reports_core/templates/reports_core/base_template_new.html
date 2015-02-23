@@ -9,7 +9,9 @@
 {% block js %}{{ block.super }}
     {% include "imports/datatables.html" %}
     <script src="{% static 'reports/javascripts/config.dataTables.bootstrap.js' %}"></script>
+    <script src="{% static 'hqwebapp/js/lib/jquery-ui-datepicker/jquery-ui-1.8.17.custom.datepicker.min.js' %}"></script>
     <script src="{% static 'style/lib/knockout_plugins/knockout_mapping.ko.min.js' %}"></script>
+    <script src="{% static 'hqwebapp/js-custom/hq.legacy.js' %}"></script>
     <script src="{% static 'style/ko/knockout_bindings.ko.js' %}"></script>
     <script src="{% static 'hqwebapp/js/lib/nvd3/lib/d3.v3.js' %}"></script>
     <script src="{% static 'hqwebapp/js/lib/nvd3/nv.d3.v1.1.10b.min.js' %}"></script>
@@ -17,6 +19,7 @@
     <script type="text/javascript" src="{% static 'reports/javascripts/bootstrap-daterangepicker/daterangepicker.min.js' %}"></script>
     <script type="text/javascript" src="{% static 'reports/javascripts/daterangepicker.js' %}"></script>
     <script src="{% static 'reports_core/js/charts.js' %}"></script>
+    <script src="{% static 'reports/javascripts/reports.config.js' %}"></script>
     <script src="{% static 'hqwebapp/js/lib/select2/select2.js' %}"></script>
 {% endblock %}
 
@@ -144,6 +147,7 @@
     </form>
 
     <div class="report-actions">
+        {# TODO: Some of these buttons are cary over and dont do anything / reference the right things #}
         {% if report.show_filters %}
             <a href="#reportFilters" class="btn" id="toggle-report-filters"
                 data-toggle="collapse" data-open-text="{% trans "Show Filter Options" %}"
