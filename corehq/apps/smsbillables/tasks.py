@@ -2,10 +2,14 @@ import json
 import urllib2
 from celery.schedules import crontab
 from celery.task import periodic_task
+from datetime import date
 from django.conf import settings
 from celery.utils.log import get_task_logger
 
 from corehq.apps.accounting.models import Currency
+from corehq.apps.smsbillables.models import SmsBillable
+
+from dimagi.utils.django.email import send_HTML_email
 
 
 logger = get_task_logger("accounting")
@@ -28,3 +32,26 @@ def update_exchange_rates(app_id=settings.OPEN_EXCHANGE_RATES_ID):
             })
     except Exception as e:
         logger.error(e.message)
+
+@periodic_task(run_every=crontab(hour=13, minute=0, day_of_month='1'))
+def send_billables_missing_gateway_fee(
+        date_from=None,
+        date_to=None,
+        emails=settings.BOOKKEEPER_CONTACT_EMAILS,
+):
+    date_from = date_from or date.today()
+    date_to = date_to or date.today()
+
+    billables_missing_gateway_fee = SmsBillable.objects.filter(
+        gateway_fee=None,
+        date_sent__gte=date_from,
+        date_send__lte=date_to,
+    )
+
+    subject = "SMSs with no matching gateway fee - %s" % date.today().strftime("%B %Y")
+
+    for email in emails:
+        send_HTML_email(
+            subject,
+            email,
+        )
