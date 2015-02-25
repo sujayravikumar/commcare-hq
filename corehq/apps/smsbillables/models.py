@@ -247,7 +247,7 @@ class SmsBillable(models.Model):
             if conversion_rate != 0:
                 billable.gateway_fee_conversion_rate = conversion_rate
             else:
-                smsbillables_logging.error("Gateway fee conversion rate for currency %s is 0",
+                smsbillables_logging.error("[SMS-BILLING] Gateway fee conversion rate for currency %s is 0",
                                            billable.gateway_fee.currency.code)
 
         # Fetch usage_fee todo
@@ -257,7 +257,7 @@ class SmsBillable(models.Model):
         )
 
         if billable.usage_fee is None:
-            smsbillables_logging.error("Did not find usage fee for direction %s and domain %s"
+            smsbillables_logging.error("[SMS-BILLING] Did not find usage fee for direction %s and domain %s"
                                        % (direction, domain))
 
         if api_response is not None:
