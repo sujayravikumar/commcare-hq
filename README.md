@@ -51,6 +51,8 @@ individual project sites when necessary.
   - `brew install homebrew/versions/elasticsearch090` works well on mac
 + redis >= 2.2.12 ([installation notes](https://gist.github.com/mwhite/c0381c5236855993572c))
 + [Jython][jython] 2.5.2 (optional, only needed for CloudCare)
++ (For development) Development libraries for XML, XSLT, PostgreSQL client and Python:
+  - `$ sudo apt-get install libxml2-dev libxslt1-dev libpq-dev python-dev` on Debian / Ubuntu
 + For additional requirements necessary only if you want to modify the default
   JavaScript or CSS styling, see [CommCare HQ Style](https://github.com/dimagi/hqstyle-src).
 
