@@ -9,7 +9,8 @@
 $(function() {
     $("#saved-reports").reportConfigList({
         items: {{ configs|JSON }},
-        saveUrl: '{% url "add_report_config" domain %}'
+        saveUrl: '{% url "add_report_config" domain %}',
+        userId: '{{ couch_user.get_id }}'
     });
     $("button.send-stopper").click(function () {
         $(this).text("{% trans 'Saving' %}").prepend('<i class="icon-refresh icon-spin"></i> ').addClass('btn disabled').attr('disabled', 'disabled');
@@ -55,6 +56,11 @@ $(function() {
                             data-bind="click: $root.setConfigBeingEdited">
                             {% trans "Edit" %}
                         </button>
+                        <button class="btn"
+                            data-bind="visible: isOwner, click: $root.setConfigBeingShared">
+                            {% trans "Share" %}
+                        </button>
+
                         <button class="btn btn-danger"
                             data-bind="click: $root.deleteConfig">
                             {% trans "Delete" %}
@@ -65,6 +71,7 @@ $(function() {
             </tbody>
         </table>
         {% include "reports/partials/save_reports_modal.html" %}
+        {% include "reports/partials/share_reports_modal.html" %}
     </div>
 
     {% if report.show %}

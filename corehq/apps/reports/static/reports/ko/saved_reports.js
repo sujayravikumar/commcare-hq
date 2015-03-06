@@ -1,7 +1,9 @@
-var ReportConfig = function (data) {
+var ReportConfig = function (data, userId) {
     var self = ko.mapping.fromJS(data, {
         'copy': ['filters']
     });
+
+    self.isOwner = data.owner_id === userId;
 
     self.error = ko.observable(false);
 
@@ -100,12 +102,14 @@ var ReportConfigsViewModel = function (options) {
     self.initialLoad = true;
 
     self.reportConfigs = ko.observableArray(ko.utils.arrayMap(options.items, function (item) {
-        return new ReportConfig(item);
+        return new ReportConfig(item, options.userId);
     }));
 
     self.configBeingViewed = ko.observable();
 
     self.configBeingEdited = ko.observable();
+
+    self.configBeingShared = ko.observable();
 
     self.filterHeadingName = ko.computed(function () {
         var config = self.configBeingViewed(),
@@ -215,6 +219,17 @@ var ReportConfigsViewModel = function (options) {
             maxDate: '0',
             numberOfMonths: 2
         });
+    };
+
+    self.setConfigBeingShared = function (config) {
+        self.configBeingShared({
+            reportConfig: config,
+            modalTitle: "Share Saved Report: " + config.name()
+        });
+    };
+
+    self.unsetConfigBeingShared = function () {
+        self.configBeingShared(undefined);
     };
 
     self.unsetConfigBeingEdited = function () {

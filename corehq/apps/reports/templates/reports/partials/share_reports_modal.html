@@ -1,0 +1,27 @@
+{% load i18n %}
+<div id="report-config-share-modal" class="hide fade" data-bind="modal: configBeingShared">
+    <div data-bind="with: configBeingShared">
+        <div class="modal-header">
+            <a class="close" data-bind="click: $root.unsetConfigBeingShared">×</a>
+            <h3 data-bind="text: modalTitle"></h3>
+        </div>
+        <div class="alert alert-error" data-bind="visible: error">
+            {% trans "Some required fields are missing. Please complete them before saving." %}
+        </div>
+        <form class="form-horizontal" data-bind="with: reportConfig">
+            <div class="modal-body">
+
+            </div>
+            <div class="modal-footer">
+                <div class="btn-toolbar">
+                    <div class="btn-group">
+                        <a href="#" class="btn" data-bind="click: $root.unsetConfigBeingShared">Cancel</a>
+                    </div>
+                    <div class="btn-group" onclick="ga_track_event('Scheduled Reports', 'Share report', '-');">
+                        <span data-bind="saveButton2: $root.modalSaveButton.state, saveOptions: $root.modalSaveButton.saveOptions"></span>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
