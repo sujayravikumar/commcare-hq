@@ -151,7 +151,7 @@ def saved_reports(request, domain, template="reports/reports_home.html"):
             or request.couch_user.get_viewable_reports()):
         raise Http404
 
-    configs = ReportConfig.by_domain_and_owner(domain, user._id)
+    configs = ReportConfig.by_domain_and_owner(domain, user)
 
     def _is_valid(rn):
         # the _id check is for weird bugs we've seen in the wild that look like
@@ -475,7 +475,7 @@ def touch_saved_reports_views(user, domain):
     homepage.
 
     """
-    ReportConfig.by_domain_and_owner(domain, user._id, limit=1, stale=False)
+    ReportConfig.by_domain_and_owner(domain, user, limit=1)
     ReportNotification.by_domain_and_owner(domain, user._id, limit=1, stale=False)
 
 
@@ -490,7 +490,7 @@ def add_config(request, domain=None):
     if 'name' not in POST or not POST['name']:
         return HttpResponseBadRequest()
 
-    user_configs = ReportConfig.by_domain_and_owner(domain, user_id)
+    user_configs = ReportConfig.by_domain_and_owner(domain, request.couch_user)
     if not POST.get('_id') and POST['name'] in [c.name for c in user_configs]:
         return HttpResponseBadRequest()
 
@@ -663,7 +663,7 @@ def edit_scheduled_report(request, domain, scheduled_report_id=None,
 
     user_id = request.couch_user._id
 
-    configs = ReportConfig.by_domain_and_owner(domain, user_id)
+    configs = ReportConfig.by_domain_and_owner(domain, request.couch_user)
     config_choices = [(c._id, c.full_name) for c in configs if c.report and c.report.emailable]
 
     if not config_choices:

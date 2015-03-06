@@ -353,7 +353,7 @@ class ReportsTab(UITab):
         saved_report_header = dropdown_dict(_('My Saved Reports'), is_header=True)
         saved_reports_list = list(ReportConfig.by_domain_and_owner(
                                   self.domain,
-                                  self.couch_user._id))
+                                  self.couch_user))
 
         MAX_DISPLAYABLE_SAVED_REPORTS = 5
         first_five_items = [

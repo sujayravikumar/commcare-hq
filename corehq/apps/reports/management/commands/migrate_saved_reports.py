@@ -48,7 +48,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         db = ReportConfig.get_db()
         results = db.view('reportconfig/configs_by_domain',
-            startkey=["name"], endkey=["name", {}],
+            startkey=["owner"], endkey=["owner", {}],
             reduce=False,
             include_docs=False,
         ).all()

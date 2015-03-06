@@ -165,6 +165,16 @@ class TempCommCareUser(CommCareUser):
 DATE_RANGE_CHOICES = ['last7', 'last30', 'lastn', 'lastmonth', 'since', 'range']
 
 
+class SharingPermission(DocumentSchema):
+    target = StringProperty()
+    permissions = StringProperty()
+
+
+class SharingSettings(DocumentSchema):
+    shared_with = SchemaListProperty(SharingPermission)
+    excluded_users = StringListProperty()
+
+
 class ReportConfig(CachedCouchDocumentMixin, Document):
     _extra_json_properties = ['url', 'report_name', 'date_description']
 
@@ -179,6 +189,8 @@ class ReportConfig(CachedCouchDocumentMixin, Document):
     name = StringProperty()
     description = StringProperty()
     owner_id = StringProperty()
+
+    sharing = SchemaProperty(SharingSettings)
 
     filters = DictProperty()
 
@@ -201,21 +213,44 @@ class ReportConfig(CachedCouchDocumentMixin, Document):
         return super(ReportConfig, self).delete(*args, **kwargs)
 
     @classmethod
-    def by_domain_and_owner(cls, domain, owner_id, report_slug=None,
-                            stale=True, **kwargs):
-        if stale:
-            #kwargs['stale'] = settings.COUCH_STALE_QUERY
-            pass
-
+    def by_domain_and_owner(cls, domain, user, report_slug=None, reduce=False, **kwargs):
+        user_role = user.get_role(domain, include_teams=False).get_qualified_id()
+        keys = [
+            ["owned", domain, user._id],
+            ["shared", domain, user._id],
+            ["shared", domain, user_role],
+        ]
         if report_slug is not None:
-            key = ["name slug", domain, owner_id, report_slug]
-        else:
-            key = ["name", domain, owner_id]
+            keys = [key + [report_slug] for key in keys]
+
+        def get_result(key, reduce=False):
+            if not reduce:
+                kwargs['include_docs'] = True
+            return cache_core.cached_view(
+                db,
+                "reportconfig/configs_by_domain",
+                reduce=False,
+                startkey=key,
+                endkey=key + [{}],
+                wrapper=cls.wrap,
+                **kwargs
+            )
 
         db = cls.get_db()
-        result = cache_core.cached_view(db, "reportconfig/configs_by_domain", reduce=False,
-                                     include_docs=True, startkey=key, endkey=key + [{}], wrapper=cls.wrap, **kwargs)
-        return result
+        if not reduce:
+            results = {}
+            for key in keys:
+                result = get_result(key, reduce)
+                if result:
+                    results.update({result._id: result for result in get_result(key, reduce)})
+
+            return results.values()
+        else:
+            result_ids = set()
+            for key in keys:
+                result_ids |= {result['id'] for result in get_result(key, reduce)}
+
+            return len(result_ids)
 
     @classmethod
     def default(self):

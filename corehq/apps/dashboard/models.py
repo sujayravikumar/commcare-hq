@@ -266,20 +266,16 @@ class ReportsPaginatedContext(BasePaginatedTileContextProcessor):
     """
     @property
     def total(self):
-        key = ["name", self.request.domain, self.request.couch_user._id]
-        results = ReportConfig.get_db().view(
-            'reportconfig/configs_by_domain',
-            include_docs=False,
-            startkey=key,
-            endkey=key+[{}],
-            reduce=True,
-        ).all()
-        return results[0]['value'] if results else 0
+        return ReportConfig.by_domain_and_owner(
+            self.request.domain,
+            self.request.couch_user,
+            reduce=True
+        )
 
     @property
     def paginated_items(self):
         reports = ReportConfig.by_domain_and_owner(
-            self.request.domain, self.request.couch_user._id,
+            self.request.domain, self.request.couch_user,
             limit=self.limit, skip=self.skip
         )
         for report in reports:
