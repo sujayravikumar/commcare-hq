@@ -242,6 +242,8 @@ class CreateNewReportForm(forms.Form):
 
         self.domain = domain
         self.fields['report_source'].bootstrap(self.domain)
+        report_source_fields = self.fields['report_source'].get_fields()
+        self.fields.update(report_source_fields)
         self.helper = FormHelper()
         self.helper.form_class = "form-horizontal"
         self.helper.form_id = "report-builder-form"
@@ -249,7 +251,7 @@ class CreateNewReportForm(forms.Form):
             crispy.Fieldset(
                 _('Create New Report'),
                 'report_type',
-                crispy.MultiWidgetField('report_source'),
+                *report_source_fields.keys()
             ),
             FormActions(
                 crispy.ButtonHolder(

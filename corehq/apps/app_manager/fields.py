@@ -1,3 +1,4 @@
+from django.utils.datastructures import SortedDict
 import collections
 from django import forms
 from django.utils.translation import ugettext as _
@@ -54,11 +55,14 @@ class ApplicationDataSourceField(forms.MultiValueField):
             source_choices.append(("case", _("Case")))
         if enable_forms:
             source_choices.append(("form", _("Form")))
-        application = forms.ChoiceField()
-        source_type = forms.ChoiceField(choices=source_choices)
-        source = forms.ChoiceField()
-        super(ApplicationDataSourceField, self).__init__(fields=(application, source_type, source),
-                                                         *args, **kwargs)
+
+        self.application_field = forms.ChoiceField(label=_('Application'))
+        self.source_type_field = forms.ChoiceField(label=_('Source Type'), choices=source_choices)
+        self.source_field = forms.ChoiceField(label=_('Source'))
+        super(ApplicationDataSourceField, self).__init__(
+            fields=(self.application_field, self.source_type_field, self.source_field),
+            *args, **kwargs
+        )
 
     def compress(self, data_list):
         return ApplicationDataSource(*data_list)
@@ -82,6 +86,7 @@ class ApplicationDataSourceField(forms.MultiValueField):
         # it's super weird/annoying that you have to manually sync these
         for i, widget in enumerate(self.widget.widgets):
             widget.choices = self.fields[i].choices
+            self.fields[i].widget = widget
 
         # NOTE: This corresponds to a view-model that must be initialized in your template.
         # See the doc string of this class for more information.
@@ -94,6 +99,12 @@ class ApplicationDataSourceField(forms.MultiValueField):
             optionsValue: function(item){return item.value}
         '''}
 
+    def get_fields(self):
+        fields = SortedDict()
+        fields['application'] = self.application_field
+        fields['source_type'] = self.source_type_field
+        fields['source'] = self.source_field
+        return fields
 
 def get_app_sources(domain):
     apps = get_apps_in_domain(domain, full=True, include_remote=False)
