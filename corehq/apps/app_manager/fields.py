@@ -2,14 +2,34 @@ import collections
 from django import forms
 from django.utils.translation import ugettext as _
 from corehq.apps.app_manager.models import get_apps_in_domain
+from dimagi.utils.html import format_html
 
 
 ApplicationDataSource = collections.namedtuple('ApplicationDataSource', ['application', 'source_type', 'source'])
 
 
+class LabeledWidgetMixIn(object):
+
+    def render(self, name, value, attrs=None, *args, **kwargs):
+        rendered = super(LabeledWidgetMixIn, self).render(name, value, attrs, *args, **kwargs)
+        if 'label' in self.attrs:
+            label = self.attrs['label']
+        else:
+            label = name
+        return format_html(
+            '<label class="control-label">{label}</label><div class="controls">{widget}</div>',
+            label=label,
+            widget=rendered
+        )
+
+
+class LabeledSelect(LabeledWidgetMixIn, forms.Select):
+    pass
+
+
 class ApplicationDataSourceWidget(forms.MultiWidget):
     def __init__(self, attrs=None):
-        widgets = [forms.Select(), forms.Select(), forms.Select()]
+        widgets = [LabeledSelect(), LabeledSelect(), LabeledSelect()]
         super(ApplicationDataSourceWidget, self).__init__(widgets, attrs)
 
     def decompress(self, value):
@@ -54,9 +74,9 @@ class ApplicationDataSourceField(forms.MultiValueField):
             source_choices.append(("case", _("Case")))
         if enable_forms:
             source_choices.append(("form", _("Form")))
-        application = forms.ChoiceField()
-        source_type = forms.ChoiceField(choices=source_choices)
-        source = forms.ChoiceField()
+        application = forms.ChoiceField(label=_('Application'))
+        source_type = forms.ChoiceField(label=_('Source Type'), choices=source_choices)
+        source = forms.ChoiceField(label=_('Source'))
         super(ApplicationDataSourceField, self).__init__(fields=(application, source_type, source),
                                                          *args, **kwargs)
 
@@ -81,18 +101,19 @@ class ApplicationDataSourceField(forms.MultiValueField):
 
         # it's super weird/annoying that you have to manually sync these
         for i, widget in enumerate(self.widget.widgets):
+            widget.attrs = {'label': self.fields[i].label}
             widget.choices = self.fields[i].choices
 
         # NOTE: This corresponds to a view-model that must be initialized in your template.
         # See the doc string of this class for more information.
         app_widget, source_type_widget, source_widget = self.widget.widgets
-        app_widget.attrs = {'data-bind': 'value: application'}
-        source_type_widget.attrs = {'data-bind': 'value: sourceType'}
-        source_widget.attrs = {'data-bind': '''
+        app_widget.attrs.update({'data-bind': 'value: application'})
+        source_type_widget.attrs.update({'data-bind': 'value: sourceType'})
+        source_widget.attrs.update({'data-bind': '''
             options: sourcesMap[application()][sourceType()],
             optionsText: function(item){return item.text},
             optionsValue: function(item){return item.value}
-        '''}
+        '''})
 
 
 def get_app_sources(domain):
