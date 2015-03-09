@@ -29,7 +29,6 @@ class SavedReportConfigForm(forms.Form):
         required=False,
         widget=forms.HiddenInput(),
     )
-    filters = forms.MultiValueDict()
 
     def __init__(self, domain, user_id, *args, **kwargs):
         self.domain = domain
