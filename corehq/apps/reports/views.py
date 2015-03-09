@@ -544,7 +544,6 @@ class AddSavedReportConfigView(View):
         )
 
     @property
-    @memoized
     def user_id(self):
         return self.request.couch_user._id
 
