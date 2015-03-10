@@ -9,6 +9,7 @@ from corehq.apps.userreports.reports.factory import ReportFactory
 from corehq.util.couch import get_document_or_404
 from dimagi.utils.couch.pagination import DatatablesParams
 from dimagi.utils.decorators.memoized import memoized
+from django.utils.translation import ugettext_noop as _
 
 from dimagi.utils.web import json_request
 from no_exceptions.exceptions import Http403
@@ -17,6 +18,7 @@ from corehq.apps.reports.datatables import DataTablesHeader
 
 
 class ConfigurableReport(JSONResponseMixin, TemplateView):
+    name = _("Project Report")
     template_name = 'userreports/configurable_report.html'
     slug = "configurable"
     prefix = slug
