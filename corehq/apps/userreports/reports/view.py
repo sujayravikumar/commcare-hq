@@ -20,7 +20,7 @@ class ConfigurableReport(JSONResponseMixin, TemplateView):
     template_name = 'userreports/configurable_report.html'
     slug = "configurable"
     prefix = slug
-    is_emailable = True
+    emailable = True
 
     @property
     @memoized
@@ -143,3 +143,11 @@ class ConfigurableReport(JSONResponseMixin, TemplateView):
     @property
     def sub_slug(self):
         return self.report_config_id
+
+    @classmethod
+    def get_report(cls, domain, slug):
+        return cls
+
+    @property
+    def report_type(self):
+        return self.type
