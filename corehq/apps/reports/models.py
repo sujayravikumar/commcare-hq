@@ -421,8 +421,6 @@ class ReportConfig(CachedCouchDocumentMixin, Document):
                 **self.view_kwargs)
             else:
                 file_obj = None
-            if type(self._dispatcher) == ConfigurableReport:
-                return response.content, file_obj
             return json.loads(response.content)['report'], file_obj
         except PermissionDenied:
             return _(

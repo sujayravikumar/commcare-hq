@@ -1,4 +1,6 @@
+import json
 from django.core.urlresolvers import reverse
+from django.http import HttpResponse
 from django.views.generic.base import TemplateView
 from braces.views import JSONResponseMixin
 from corehq.apps.reports.dispatcher import cls_to_view_login_and_domain
@@ -74,7 +76,12 @@ class ConfigurableReport(JSONResponseMixin, TemplateView):
         user = request.couch_user
         if self.has_permissions(self.domain, user):
             if request.is_ajax() or request.GET.get('format', None) == 'json':
-                return self.get_ajax(request, **kwargs)
+                json_response = self.get_ajax(request, **kwargs)
+                if kwargs.get('render_as') == 'email':
+                    return HttpResponse(json.dumps({
+                        'report': json.loads(json_response.content),
+                    }), content_type='application/json')
+                return json_response
             self.content_type = None
             return super(ConfigurableReport, self).dispatch(request, self.domain, **kwargs)
         else:
