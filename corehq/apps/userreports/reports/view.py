@@ -67,15 +67,16 @@ class ConfigurableReport(JSONResponseMixin, TemplateView):
         return self.spec.ui_filters
 
     @cls_to_view_login_and_domain
-    def dispatch(self, request, domain, report_config_id, **kwargs):
-        self.domain = domain
+    def dispatch(self, request, report_config_id, **kwargs):
+        self.request = request
+        self.domain = request.domain
         self.report_config_id = report_config_id
         user = request.couch_user
-        if self.has_permissions(domain, user):
+        if self.has_permissions(self.domain, user):
             if request.is_ajax() or request.GET.get('format', None) == 'json':
-                return self.get_ajax(request, domain, **kwargs)
+                return self.get_ajax(request, **kwargs)
             self.content_type = None
-            return super(ConfigurableReport, self).dispatch(request, domain, **kwargs)
+            return super(ConfigurableReport, self).dispatch(request, self.domain, **kwargs)
         else:
             raise Http403()
 
