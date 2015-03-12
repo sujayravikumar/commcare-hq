@@ -165,4 +165,15 @@ class ConfigurableReport(JSONResponseMixin, TemplateView):
 
     @property
     def email_response(self):
-        raise NotImplementedError
+        try:
+            data = self.data_source
+            data.set_filter_values(self.filter_values)
+        except UserReportsError as e:
+            return self.render_json_response({
+                'error': e.message,
+            })
+
+        rows = list(data.get_data())
+        return HttpResponse(json.dumps({
+            'report': json.dumps(rows),
+        }))
