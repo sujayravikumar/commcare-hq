@@ -1,4 +1,6 @@
 import json
+import os
+import tempfile
 from django.core.urlresolvers import reverse
 from django.http import HttpResponse
 from django.views.generic.base import TemplateView
@@ -9,6 +11,8 @@ from corehq.apps.userreports.exceptions import UserReportsError
 from corehq.apps.userreports.models import ReportConfiguration
 from corehq.apps.userreports.reports.factory import ReportFactory
 from corehq.util.couch import get_document_or_404
+from couchexport.export import export_from_tables
+from couchexport.models import Format
 from dimagi.utils.couch.pagination import DatatablesParams
 from dimagi.utils.decorators.memoized import memoized
 from django.utils.translation import ugettext_noop as _
@@ -164,7 +168,7 @@ class ConfigurableReport(JSONResponseMixin, TemplateView):
         return reverse(self.slug, args=[self.domain, self.report_config_id])
 
     @property
-    def email_response(self):
+    def export_table(self):
         try:
             data = self.data_source
             data.set_filter_values(self.filter_values)
@@ -173,7 +177,22 @@ class ConfigurableReport(JSONResponseMixin, TemplateView):
                 'error': e.message,
             })
 
-        rows = list(data.get_data())
-        return HttpResponse(json.dumps({
-            'report': json.dumps(rows),
-        }))
+        raw_rows = list(data.get_data())
+        headers = raw_rows[0].keys()  # TODO implement
+        rows = [[raw_row[row_key] for row_key in raw_row.keys()] for raw_row in raw_rows]
+        return [
+            [
+                self.title,
+                [headers] + rows
+            ]
+        ]
+
+    @property
+    def email_response(self):
+        fd, path = tempfile.mkstemp()
+        with os.fdopen(fd, 'wb') as temp:
+            export_from_tables(self.export_table, temp, Format.HTML)
+        with open(path) as f:
+            return HttpResponse(json.dumps({
+                'report': f.read(),
+            }))
