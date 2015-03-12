@@ -326,7 +326,11 @@ class ReportConfig(CachedCouchDocumentMixin, Document):
     def url(self):
         try:
             from django.core.urlresolvers import reverse
+            from corehq.apps.userreports.reports.view import ConfigurableReport
 
+            if type(self._dispatcher) == ConfigurableReport:
+                # TODO pass filters in query_string
+                return reverse(ConfigurableReport.slug, args=[self.domain, self.subreport_slug])
             return reverse(self._dispatcher.name(), kwargs=self.view_kwargs) \
                     + '?' + self.query_string
         except Exception:
