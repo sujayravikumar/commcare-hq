@@ -95,7 +95,7 @@ class ConfigurableReport(JSONResponseMixin, TemplateView):
             'domain': self.domain,
             'report': self,
             'filter_context': self.filter_context,
-            'url': reverse(self.slug, args=[self.domain, self.report_config_id]),
+            'url': self.url,
             'headers': self.headers
         }
         context.update(self.saved_report_context_data)
@@ -161,3 +161,7 @@ class ConfigurableReport(JSONResponseMixin, TemplateView):
     @property
     def report_type(self):
         return self.type
+
+    @property
+    def url(self):
+        return reverse(self.slug, args=[self.domain, self.report_config_id])
