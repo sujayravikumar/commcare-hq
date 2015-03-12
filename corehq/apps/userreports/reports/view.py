@@ -75,13 +75,10 @@ class ConfigurableReport(JSONResponseMixin, TemplateView):
         self.report_config_id = report_config_id
         user = request.couch_user
         if self.has_permissions(self.domain, user):
+            if kwargs.get('render_as') == 'email':
+                return self.email_response
             if request.is_ajax() or request.GET.get('format', None) == 'json':
-                json_response = self.get_ajax(request, **kwargs)
-                if kwargs.get('render_as') == 'email':
-                    return HttpResponse(json.dumps({
-                        'report': json.loads(json_response.content),
-                    }), content_type='application/json')
-                return json_response
+                return self.get_ajax(request, **kwargs)
             self.content_type = None
             return super(ConfigurableReport, self).dispatch(request, self.domain, **kwargs)
         else:
@@ -165,3 +162,7 @@ class ConfigurableReport(JSONResponseMixin, TemplateView):
     @property
     def url(self):
         return reverse(self.slug, args=[self.domain, self.report_config_id])
+
+    @property
+    def email_response(self):
+        raise NotImplementedError
