@@ -1,4 +1,6 @@
+from collections import namedtuple
 from datetime import datetime, timedelta
+from functools import total_ordering
 import logging
 from django.core.urlresolvers import reverse
 from django.http import Http404
@@ -16,7 +18,7 @@ from corehq.apps.reports.display import xmlns_to_name
 from couchdbkit.ext.django.schema import *
 from corehq.apps.reports.exportfilters import form_matches_users, is_commconnect_form, default_form_filter, \
     default_case_filter
-from corehq.apps.users.models import WebUser, CommCareUser, CouchUser
+from corehq.apps.users.models import WebUser, CommCareUser, CouchUser, UserRole
 from corehq.feature_previews import CALLCENTER
 from corehq.util.view_utils import absolute_reverse
 from couchexport.models import SavedExportSchema, GroupExportConfiguration, FakeSavedExportSchema
@@ -165,9 +167,27 @@ class TempCommCareUser(CommCareUser):
 DATE_RANGE_CHOICES = ['last7', 'last30', 'lastn', 'lastmonth', 'since', 'range']
 
 
-class SharingPermission(DocumentSchema):
-    target = StringProperty()
-    permissions = StringProperty()
+@total_ordering
+class ValueOrder(object):
+    def __eq__(self, other):
+        return self.value == other.value
+
+    def __lt__(self, other):
+        return self.value < other.value
+
+
+@total_ordering
+class SharingPermission(ValueOrder, namedtuple('SharingPermission', 'slug label value')):
+    pass
+
+
+ALL_SHARING_PERMISSIONS = [
+    SharingPermission(slug='read', label='Read Only', value=1),
+    SharingPermission(slug='edit', label='Edit', value=2),
+    SharingPermission(slug='manage', label='Manage Sharing', value=3),
+]
+
+SHARING_PERMISSIONS_BY_SLUG = {p.slug: p for p in ALL_SHARING_PERMISSIONS}
 
 
 class SharingSettings(DocumentSchema):
@@ -178,6 +198,18 @@ class SharingSettings(DocumentSchema):
     """
     shared_with = StringDictProperty()
     excluded_users = SetProperty(unicode)
+
+
+def get_sharing_target(user_or_role):
+    if isinstance(user_or_role, CouchUser):
+        target = user_or_role.get_id
+    elif isinstance(user_or_role, UserRole):
+        target = user_or_role.get_qualified_id()
+    elif isinstance(user_or_role, basestring):
+        target = user_or_role
+    else:
+        raise TypeError('Unexpected type: {}'.format(user_or_role))
+    return target
 
 
 class ReportConfig(CachedCouchDocumentMixin, Document):
@@ -203,6 +235,49 @@ class ReportConfig(CachedCouchDocumentMixin, Document):
     days = IntegerProperty(default=None)
     start_date = DateProperty(default=None)
     end_date = DateProperty(default=None)
+
+    def share_with(self, user_or_role, permission):
+        target = get_sharing_target(user_or_role)
+
+        if isinstance(permission, SharingPermission):
+            permission = permission.slug
+        else:
+            assert permission in SHARING_PERMISSIONS_BY_SLUG, 'unknown permission {}'.format(permission)
+
+        self.sharing.shared_with[target] = permission
+        try:
+            self.sharing.excluded_users.remove(target)
+        except KeyError:
+            pass
+
+    def unshare_with(self, user_or_role):
+        target = get_sharing_target(user_or_role)
+        try:
+            del self.sharing.shared_with[target]
+        except KeyError:
+            pass
+
+        if isinstance(user_or_role, CouchUser):
+            role = user_or_role.get_role(self.domain, include_teams=False).get_qualified_id()
+            if role in self.sharing.shared_with:
+                self.sharing.excluded_users.add(user_or_role.get_id)
+
+    def excludes_user(self, user_id):
+        return self.sharing.excluded_users and user_id in self.sharing.excluded_users
+
+    def get_permission_for_user(self, user):
+        user_id = user.get_id
+        user_role = user.get_role(self.domain, include_teams=False).get_qualified_id()
+        permission_slugs = [
+            self.sharing.shared_with[target]
+            for target in [user_id, user_role]
+            if target in self.sharing.shared_with and not self.excludes_user(user_id)
+        ]
+        permissions = [
+            SHARING_PERMISSIONS_BY_SLUG[slug]
+            for slug in permission_slugs
+        ]
+        return max(permissions) if permissions else None
 
     def delete(self, *args, **kwargs):
         notifications = self.view('reportconfig/notifications_by_config',
@@ -251,7 +326,7 @@ class ReportConfig(CachedCouchDocumentMixin, Document):
                     results.update({
                         result._id: result
                         for result in get_result(key, reduce)
-                        if not (result.sharing.excluded_users and user_id in result.sharing.excluded_users)
+                        if not result.excludes_user(user_id)
                     })
 
             return results.values()
