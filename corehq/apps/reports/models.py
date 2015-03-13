@@ -171,8 +171,13 @@ class SharingPermission(DocumentSchema):
 
 
 class SharingSettings(DocumentSchema):
-    shared_with = SchemaListProperty(SharingPermission)
-    excluded_users = StringListProperty()
+    """
+    shared_with:    dict mapping user ID or user role to permission slug
+    excluded_users: list of users who may be included by role but who should
+                    still not have access.
+    """
+    shared_with = StringDictProperty()
+    excluded_users = SetProperty(unicode)
 
 
 class ReportConfig(CachedCouchDocumentMixin, Document):
@@ -215,9 +220,10 @@ class ReportConfig(CachedCouchDocumentMixin, Document):
     @classmethod
     def by_domain_and_owner(cls, domain, user, report_slug=None, reduce=False, **kwargs):
         user_role = user.get_role(domain, include_teams=False).get_qualified_id()
+        user_id = user._id
         keys = [
-            ["owned", domain, user._id],
-            ["shared", domain, user._id],
+            ["owned", domain, user_id],
+            ["shared", domain, user_id],
             ["shared", domain, user_role],
         ]
         if report_slug is not None:
@@ -242,7 +248,11 @@ class ReportConfig(CachedCouchDocumentMixin, Document):
             for key in keys:
                 result = get_result(key, reduce)
                 if result:
-                    results.update({result._id: result for result in get_result(key, reduce)})
+                    results.update({
+                        result._id: result
+                        for result in get_result(key, reduce)
+                        if not (result.sharing.excluded_users and user_id in result.sharing.excluded_users)
+                    })
 
             return results.values()
         else:
@@ -250,6 +260,7 @@ class ReportConfig(CachedCouchDocumentMixin, Document):
             for key in keys:
                 result_ids |= {result['id'] for result in get_result(key, reduce)}
 
+            result_ids -= {result['id'] for result in get_result(["excluded", domain, user_id], True)}
             return len(result_ids)
 
     @classmethod

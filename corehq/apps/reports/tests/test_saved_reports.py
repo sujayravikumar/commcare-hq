@@ -1,6 +1,6 @@
 from django.test import TestCase
 from corehq.apps.accounting import generator
-from corehq.apps.reports.models import ReportConfig, SharingPermission, SharingSettings
+from corehq.apps.reports.models import ReportConfig, SharingSettings
 from corehq.apps.users.models import UserRole, Permissions
 
 
@@ -21,15 +21,13 @@ class SavedReportTest(TestCase):
         cls.user.set_role(cls.domain, cls.custom_role.get_qualified_id())
         cls.user.save()
 
-        def create_config(owner, shared_with):
+        def create_config(owner, shared_with, exclude=None):
             ReportConfig(
                 domain=cls.domain,
                 owner_id=owner,
                 sharing=SharingSettings(
-                    shared_with=[
-                        SharingPermission(target=target, permission='read')
-                        for target in shared_with
-                    ]
+                    shared_with={target: 'read' for target in shared_with},
+                    excluded_users=exclude,
                 )
             ).save()
 
@@ -41,6 +39,9 @@ class SavedReportTest(TestCase):
 
         # shared with user via role
         create_config('user2', shared_with=[cls.custom_role.get_qualified_id()])
+
+        # shared with user via role but user is excluded
+        create_config('user2', shared_with=[cls.custom_role.get_qualified_id()], exclude={cls.user._id})
 
         # not accessible to user
         create_config('user2', shared_with=['third_user', 'user_role:other_role'])
