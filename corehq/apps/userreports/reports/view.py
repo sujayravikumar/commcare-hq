@@ -28,6 +28,7 @@ class ConfigurableReport(JSONResponseMixin, TemplateView):
     slug = "configurable"
     prefix = slug
     emailable = True
+    is_emailable = True
 
     @property
     @memoized

@@ -150,66 +150,7 @@
     </div>
 
     {% if report.is_emailable %}
-    <div id="email-report-modal" class="modal hide fade">
-        <div>
-            <div class="modal-header">
-                <a class="close" data-dismiss="modal" data-bind="click: resetModal">×</a>
-                <h3>
-                    {% trans "Email report:" %}
-                    {{ datespan.startdate|date:"Y-m-d" }}
-                    {% if datespan.startdate %}
-                        {% trans "to" %}
-                    {% endif %}
-                    {{ datespan.enddate|date:"Y-m-d" }}
-                </h3>
-            </div>
-            <form class="form-horizontal">
-                <div class="modal-body">
-                    <div class="control-group">
-                        <label class="control-label" for="email-report-subject">{% trans "Subject" %}</label>
-                        <div class="controls">
-                            <input type="text"
-                                   id="email-report-subject"
-                                   name="subject"
-                                   data-bind="value: subject"/>
-                        </div>
-                    </div>
-                    <div class="control-group">
-                        <div class="controls">
-                            <label class="checkbox"><input type="checkbox" data-bind="checked: send_to_owner" />{% trans "Send to me" %}</label>
-                        </div>
-                    </div>
-                    <div class="control-group">
-                        <label class="control-label"
-                               for="email-report-recipient_emails">{% trans "Additional Recipients" %}</label>
-                        <div class="controls">
-                            <textarea rows="3"
-                                      id="email-report-recipient_emails"
-                                      name="recipient_emails"
-                                      data-bind="value: recipient_emails"></textarea>
-                        </div>
-                    </div>
-                    <div class="control-group">
-                        <label class="control-label" for="email-report-notes">{% trans "Report notes" %}</label>
-                        <div class="controls">
-                            <textarea rows="3" id="email-report-notes" name="notes" data-bind="value: notes"></textarea>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <div class="pull-left">
-                    <div class="email-status text-success hide">{% trans 'Email successfully sent!' %}</div>
-                    <div class="email-status text-error hide">{% trans 'Error sending email.' %}</div></div>
-                    <div class="btn-toolbar pull-right">
-                        <a href="#" class="btn cancel-button" data-dismiss="modal" data-bind="click: resetModal">{% trans "Close" %}</a>
-                        <button class="btn btn-success send-button" type="button"
-                               data-loading-text="{% trans 'Sending...' %}"
-                               data-bind="click: sendEmail">{% trans 'Send Email' %}</button>
-                    </div>
-                </div>
-            </form>
-        </div>
-    </div>
+        {% include 'reports/standard/partials/email_report_modal.html' %}
     {% endif %}
 
     {% if report.special_notice %}

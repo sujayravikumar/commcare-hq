@@ -168,6 +168,11 @@
         {% endif %}
     </div>
 </div>
+
+{% if report.is_emailable %}
+    {% include 'reports/standard/partials/email_report_modal.html' %}
+{% endif %}
+
 {% block reportcharts %}
 <section id="chart-container" style="display: none;">
 </section>
