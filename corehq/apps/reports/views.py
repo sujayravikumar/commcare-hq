@@ -34,7 +34,7 @@ from django.views.decorators.http import require_GET
 from django.views.generic import View
 import pytz
 from casexml.apps.stock.models import StockTransaction
-from corehq import toggles, Domain
+from corehq import toggles, Domain, ConfigurableReport
 from casexml.apps.case.cleanup import rebuild_case, close_case
 from corehq.apps.products.models import SQLProduct
 from corehq.apps.data_interfaces.dispatcher import DataInterfaceDispatcher
@@ -559,9 +559,13 @@ class AddSavedReportConfigView(View):
         return self.request.couch_user._id
 
 
+def email_subreport(request, domain, report_slug, subreport_slug, report_type=ConfigurableReport.prefix):
+    return email_report(request, domain, report_slug, subreport_slug, report_type=report_type)
+
+
 @login_and_domain_required
 @datespan_default
-def email_report(request, domain, report_slug, report_type=ProjectReportDispatcher.prefix):
+def email_report(request, domain, report_slug, *args, **kwargs):
     from dimagi.utils.django.email import send_HTML_email
     from forms import EmailReportForm
     user_id = request.couch_user._id
@@ -574,20 +578,23 @@ def email_report(request, domain, report_slug, report_type=ProjectReportDispatch
     # see ReportConfig.query_string()
     object.__setattr__(config, '_id', 'dummy')
     config.name = _("Emailed report")
-    config.report_type = report_type
+    config.report_type = kwargs.get('report_type', ProjectReportDispatcher.prefix)
 
     config.report_slug = report_slug
+    if len(args):
+        config.subreport_slug = args[0]
     config.owner_id = user_id
     config.domain = domain
 
-    config.date_range = 'range'
-    config.start_date = request.datespan.computed_startdate.date()
-    config.end_date = request.datespan.computed_enddate.date()
+    if config.report_type != ConfigurableReport.prefix:
+        config.date_range = 'range'
+        config.start_date = request.datespan.computed_startdate.date()
+        config.end_date = request.datespan.computed_enddate.date()
 
     GET = dict(request.GET.iterlists())
-    exclude = ['startdate', 'enddate', 'subject', 'send_to_owner', 'notes', 'recipient_emails']
+    exclude = ['startdate', 'enddate', 'subject', 'send_to_owner', 'notes', 'recipient_emails', 'config_id']
     filters = {}
-    for field in GET:
+    for field in GET: # TODO - need to populate GET with relevant filters - see saving config as an example
         if not field in exclude:
             filters[field] = GET.get(field)
 

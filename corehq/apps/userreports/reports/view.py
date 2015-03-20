@@ -54,6 +54,7 @@ class ConfigurableReport(JSONResponseMixin, TemplateView):
     @property
     @memoized
     def filter_values(self):
+        print self.request_dict
         return {
             filter.css_id: filter.get_value(self.request_dict)
             for filter in self.filters
@@ -180,10 +181,22 @@ class ConfigurableReport(JSONResponseMixin, TemplateView):
 
     @property
     @memoized
+    def url_root(self):
+        # path = self.request.META.get('PATH_INFO', "")
+        try:
+            return self.url[0:self.url.index(self.slug)]
+        except ValueError:
+            return None
+            root = None
+        return root
+
+    @property
+    @memoized
     def export_table(self):
         try:
             data = self.data_source
-            data.set_filter_values(self.filter_values)
+            print self.filter_values
+            # data.set_filter_values(self.filter_values)
         except UserReportsError as e:
             return self.render_json_response({
                 'error': e.message,
