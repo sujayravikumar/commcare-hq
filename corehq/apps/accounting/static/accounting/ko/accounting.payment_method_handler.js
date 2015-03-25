@@ -226,7 +226,6 @@ var ChargedCostItem = function (initData) {
     self.reset =  function (response) {
         self.customPaymentAmount(self.balance());
         self.paymentAmountType('full');
-        self.paginatedList.refreshList(self.paginatedItem);
     };
 
     self.isValid = ko.computed(function () {
@@ -254,10 +253,27 @@ var Invoice = function (initData) {
     self.invoiceNumber = ko.computed(function () {
         return self.paginatedItem.itemData().invoice_number;
     });
+
+    self.reset = function (response) {
+        ChargedCostItem.prototype.reset.call(self);
+        self.paginatedList.refreshList(self.paginatedItem);
+    };
 };
 
 Invoice.protoptye = Object.create( ChargedCostItem.prototype );
 Invoice.prototype.constructor = Invoice;
+
+var TotalCostItem = function (initData) {
+    'use strict';
+    ChargedCostItem.call(this, initData);
+    var self = this;
+
+    self.balance(initData.totalBalance);
+    self.customPaymentAmount(self.balance());
+};
+
+TotalCostItem.protoptye = Object.create( ChargedCostItem.prototype );
+TotalCostItem.prototype.constructor = TotalCostItem;
 
 var CreditCostItem = function (initData) {
    'use strict';

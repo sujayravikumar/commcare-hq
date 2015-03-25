@@ -6,7 +6,7 @@ from django.utils.translation import ugettext as _
 from corehq import Domain
 from corehq.apps.accounting.models import (
     PaymentRecord, CreditLine, SoftwareProductType,
-)
+    Invoice)
 from corehq.apps.accounting.user_text import get_feature_name
 from corehq.apps.accounting.utils import fmt_dollar_amount
 from dimagi.utils.decorators.memoized import memoized
@@ -220,6 +220,63 @@ class InvoiceStripePaymentHandler(BaseStripePaymentHandler):
             'invoice_num': self.invoice.invoice_number,
         })
         return context
+
+
+class BulkStripePaymentHandler(BaseStripePaymentHandler):
+    receipt_email_template = 'TODO'
+    receipt_email_template_plaintext = 'TODO'
+
+    def __init__(self, payment_method, domain):
+        super(BulkStripePaymentHandler, self).__init__(payment_method)
+        self.domain = domain
+
+    @property
+    def cost_item_name(self):
+        return _('Bulk Payment for project space %s' % self.domain)
+
+    def create_charge(self, amount, card=None, customer=None):
+        return stripe.Charge.create(
+            card=card,
+            customer=customer,
+            amount=self.get_amount_in_cents(amount),
+            currency=settings.DEFAULT_CURRENCY,
+            description=self.cost_item_name,
+        )
+
+    @property
+    def invoices(self):
+        return Invoice.objects.filter(
+            subscription__subscriber__domain=self.domain,
+            is_hidden=False,
+        ).all()
+
+    def get_charge_amount(self, request):
+        if request.POST['paymentAmount'] == 'full':
+            return sum(invoice.balance for invoice in self.invoices)
+        return Decimal(request.POST['customPaymentAmount'])
+
+    def update_credits(self, payment_record):
+        amount = payment_record.amount
+        for invoice in self.invoices:
+            deduct_amount = min(amount, invoice.balance)
+            amount -= deduct_amount
+            if deduct_amount > 0:
+                # try to understand, and then refactor
+                CreditLine.add_credit(
+                    deduct_amount, account=invoice.subscription.account,
+                    payment_record=payment_record,
+                )
+                CreditLine.add_credit(
+                    -deduct_amount,
+                    account=invoice.subscription.account,
+                    invoice=invoice,
+                )
+                invoice.update_balance()
+                invoice.save()
+        assert amount == 0 # else do something with the remainder
+
+    def get_email_context(self):
+        return {}
 
 
 class CreditStripePaymentHandler(BaseStripePaymentHandler):
