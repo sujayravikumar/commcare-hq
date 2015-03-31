@@ -69,6 +69,7 @@ from django.core.urlresolvers import reverse, RegexURLResolver, Resolver404
 from django.shortcuts import render
 from corehq.apps.translations import system_text_sources
 from corehq.apps.translations.models import Translation
+from corehq.util.soft_assert import soft_assert
 from corehq.util.view_utils import set_file_download
 from dimagi.utils.django.cached_object import CachedObject
 from django.utils.http import urlencode
@@ -1127,6 +1128,10 @@ def view_module(request, domain, app_id, module_id):
 @require_GET
 @require_deploy_apps
 def view_app(request, domain, app_id=None):
+    soft_assert(to=['droberts@dimagi.com']).call(
+        domain == 'droberts',
+        'domain should only ever be droberts (just being silly)'
+    )
     # redirect old m=&f= urls
     module_id = request.GET.get('m', None)
     form_id = request.GET.get('f', None)
