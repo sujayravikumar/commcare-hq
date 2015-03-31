@@ -1,5 +1,6 @@
 import logging
 from optparse import make_option
+from django.core.mail import mail_admins
 from django.core.management.base import BaseCommand, LabelCommand
 from casexml.apps.case.cleanup import rebuild_case
 from couchlog.models import ExceptionRecord
@@ -61,6 +62,12 @@ class Command(BaseCommand):
             if not quiet:
                 print 'Fetching new batch'
             total, records = get_records_to_process('CASE XFORM MISMATCH', batch)
+            if total == 0:
+                if quiet:
+                    mail_admins("CASE XFORM MISMATCH: done!", "No more cases to process")
+                else:
+                    print "No more cases to process"
+                return
             for record in records:
                 case_id = record['case_id']
                 try:
