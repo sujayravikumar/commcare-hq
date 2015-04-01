@@ -15,6 +15,9 @@ from corehq.apps.domain.views import DomainViewMixin, LoginAndDomainMixin, \
     DefaultProjectSettingsView
 from corehq.apps.hqwebapp.views import BasePageView
 from corehq.apps.users.views import DefaultProjectUserSettingsView
+from corehq.util.timezones.conversions import \
+    get_timezone_data_migration_complete
+from corehq.util.view_utils import get_request
 from django_prbac.utils import has_privilege
 
 
@@ -81,6 +84,8 @@ class DomainDashboardView(JSONResponseMixin, BaseDashboardView):
                 'slug': d.slug,
                 'ng_directive': d.ng_directive,
             } for d in self.tile_configs],
+            'threadlocal_request': get_request(),
+            'threadlocal_tz_status': get_timezone_data_migration_complete()
         }
 
     def make_tile(self, slug, in_data):

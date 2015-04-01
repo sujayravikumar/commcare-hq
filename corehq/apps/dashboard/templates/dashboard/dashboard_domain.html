@@ -3,7 +3,8 @@
 {% load djangular_tags %}
 
 
-{% block js %}{{ block.super }}
+{% block js %}
+{{ block.super }}
 <script type="text/javascript"
         src="{% new_static 'dashboard/js/hq_dashboard.ng.js' %}"></script>
 {% endblock %}
@@ -30,6 +31,11 @@
     });
 }(window.angular));
 </script>
+<!--
+Domain: {{ threadlocal_request.domain }}
+Username: {{ threadlocal_request.couch_user.username }}
+Timezone Data Migration Complete: {{ threadlocal_tz_status }}
+-->
 {% endblock %}
 
 {% block dashboard-content %}
