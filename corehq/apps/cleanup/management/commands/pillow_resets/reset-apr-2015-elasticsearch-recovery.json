@@ -1,0 +1,17 @@
+{
+    "seq": "30792848-g1AAAAHreJzLYWBg4MhgTmFQTElKzi9KdUhJMtZLycxNTM80MDDWS87JL01JzCvRy0styQEqZUpkSJL___9_VhKD9ao1JOhLUgCSSfZQrZzLSNHqANIaD9Fqte4vKVoTQFrroVpvPCVBax4LkGRoAFJA3fOB2i1nvCBZ-wKI9v0gP8usIln7AYj2-yDHF3KRrP0BRDvY75UHsgD4-KJv",
+    "pillow_names": [
+        "corehq.pillows.case.CasePillow",
+        "corehq.pillows.xform.XFormPillow",
+        "corehq.pillows.domain.DomainPillow",
+        "corehq.pillows.user.UserPillow",
+        "corehq.pillows.application.AppPillow",
+        "corehq.pillows.group.GroupPillow",
+        "corehq.pillows.sms.SMSPillow",
+        "corehq.pillows.user.GroupToUserPillow",
+        "corehq.pillows.user.UnknownUsersPillow",
+        "corehq.pillows.log.PhoneLogPillow",
+        "corehq.pillows.reportcase.ReportCasePillow",
+        "corehq.pillows.reportxform.ReportXFormPillow"
+    ]
+}
