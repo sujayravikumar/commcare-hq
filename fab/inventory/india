@@ -13,6 +13,9 @@
 [_indiacloud5]
 10.10.1.25
 
+[_indiacloud6]
+10.10.1.26
+
 
 [couchdb]
 # no children, cloudant
@@ -55,3 +58,6 @@ _indiacloud5
 
 [shared_dir_host:children]
 _indiacloud3
+
+[ansiblecontrol:children]
+_indiacloud6
