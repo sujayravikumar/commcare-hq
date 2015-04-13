@@ -12,9 +12,9 @@ from casexml.apps.case.models import CommCareCase
 from casexml.apps.case.tests.util import delete_all_cases, delete_all_xforms
 from casexml.apps.case.xml import V2
 from casexml.apps.phone.models import SyncLog
-from corehq.util.dates import datetime_to_iso_string
 import couchforms
 from couchforms.models import XFormInstance, XFormDeprecated
+from dimagi.utils.parsing import json_format_datetime
 
 
 TEST_CASE_ID = "EOL9FIAKIQWOFXFOH0QAMWU64"
@@ -46,10 +46,10 @@ class BaseCaseMultimediaTest(TestCase):
     def _formatXForm(self, doc_id, raw_xml, attachment_block):
         final_xml = raw_xml % ({
             "attachments": attachment_block,
-            "time_start": datetime_to_iso_string(datetime.utcnow()
-                                                 - timedelta(minutes=4)),
-            "time_end": datetime_to_iso_string(datetime.utcnow()),
-            "date_modified": datetime_to_iso_string(datetime.utcnow()),
+            "time_start": json_format_datetime(datetime.utcnow()
+                                               - timedelta(minutes=4)),
+            "time_end": json_format_datetime(datetime.utcnow()),
+            "date_modified": json_format_datetime(datetime.utcnow()),
             "doc_id": doc_id
         })
         return final_xml

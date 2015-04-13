@@ -14,7 +14,7 @@ import hashlib
 from casexml.apps.case.models import CommCareCase
 from casexml.apps.case.xml import V2, LEGAL_VERSIONS
 from corehq.apps.receiverwrapper.exceptions import DuplicateFormatException, IgnoreDocument
-from corehq.util.dates import iso_string_to_datetime, datetime_to_iso_string
+from corehq.util.dates import iso_string_to_datetime
 
 from couchforms.models import XFormInstance
 from dimagi.utils.decorators.memoized import memoized
@@ -386,7 +386,7 @@ class RepeatRecord(Document, LockableMixIn):
             if not value:
                 continue
             try:
-                data[attr] = datetime_to_iso_string(
+                data[attr] = json_format_datetime(
                     iso_string_to_datetime(value))
             except ValueError:
                 pass

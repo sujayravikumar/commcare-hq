@@ -1,5 +1,5 @@
 from dimagi.ext.couchdbkit import *
-from corehq.util.dates import datetime_to_iso_string
+from dimagi.utils.parsing import json_format_datetime
 
 
 class HqDeploy(Document):
@@ -25,8 +25,8 @@ class HqDeploy(Document):
     def get_list(cls, environment, startdate, enddate, limit=50):
         return HqDeploy.view(
             'hqadmin/deploy_history',
-            startkey=[environment, datetime_to_iso_string(startdate)],
-            endkey=[environment, datetime_to_iso_string(enddate)],
+            startkey=[environment, json_format_datetime(startdate)],
+            endkey=[environment, json_format_datetime(enddate)],
             reduce=False,
             limit=limit,
             include_docs=False

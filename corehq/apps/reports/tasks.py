@@ -5,7 +5,6 @@ import uuid
 from celery.schedules import crontab
 from celery.task import periodic_task
 from corehq.apps.reports.scheduled import get_scheduled_reports
-from corehq.util.dates import datetime_to_iso_string
 from corehq.util.view_utils import absolute_reverse
 from couchexport.files import Temp
 from couchexport.groupexports import export_for_group, rebuild_export
@@ -36,6 +35,7 @@ from corehq.elastic import get_es, ES_URLS, stream_es_query
 from corehq.pillows.mappings.app_mapping import APP_INDEX
 from corehq.pillows.mappings.domain_mapping import DOMAIN_INDEX
 from corehq.apps.users.models import WebUser
+from dimagi.utils.parsing import json_format_datetime
 import settings
 
 
@@ -172,7 +172,7 @@ def update_calculated_properties():
             "cp_last_form": CALC_FNS["last_form_submission"](dom, False),
             "cp_is_active": CALC_FNS["active"](dom),
             "cp_has_app": CALC_FNS["has_app"](dom),
-            "cp_last_updated": datetime_to_iso_string(datetime.utcnow()),
+            "cp_last_updated": json_format_datetime(datetime.utcnow()),
             "cp_n_in_sms": int(CALC_FNS["sms"](dom, "I")),
             "cp_n_out_sms": int(CALC_FNS["sms"](dom, "O")),
             "cp_n_sms_ever": int(CALC_FNS["sms_in_last"](dom)),
@@ -188,8 +188,8 @@ def update_calculated_properties():
 
 def is_app_active(app_id, domain):
     now = datetime.utcnow()
-    then = datetime_to_iso_string(now - timedelta(days=30))
-    now = datetime_to_iso_string(now)
+    then = json_format_datetime(now - timedelta(days=30))
+    now = json_format_datetime(now)
 
     key = ['submission app', domain, app_id]
     row = get_db().view("reports_forms/all_forms", startkey=key+[then], endkey=key+[now]).all()

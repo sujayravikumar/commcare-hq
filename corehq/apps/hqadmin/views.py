@@ -36,7 +36,6 @@ from casexml.apps.case.models import CommCareCase
 from corehq.apps.callcenter.indicator_sets import CallCenterIndicators
 from couchdbkit import ResourceNotFound
 from corehq.apps.hqcase.utils import get_case_by_domain_hq_user_id
-from corehq.util.dates import datetime_to_iso_string
 from couchforms.const import DEVICE_LOG_XMLNS
 from couchforms.models import XFormInstance
 from pillowtop import get_all_pillows_json, get_pillow_by_name
@@ -471,7 +470,7 @@ def noneulized_users(request, template="hqadmin/noneulized_users.html"):
         "eula_report/noneulized_users",
         reduce=False,
         include_docs=True,
-        startkey=["WebUser", datetime_to_iso_string(days_ago)],
+        startkey=["WebUser", json_format_datetime(days_ago)],
         endkey=["WebUser", {}]
     ).all()
 
