@@ -10,7 +10,7 @@ from dimagi.ext.couchdbkit import (
     StringListProperty,
 )
 from dimagi.ext.couchdbkit import StringProperty, DictProperty, ListProperty, IntegerProperty
-from jsonobject import JsonObject
+from dimagi.ext.jsonobject import JsonObject
 from corehq.apps.cachehq.mixins import CachedCouchDocumentMixin
 from corehq.apps.userreports.exceptions import BadSpecError
 from corehq.apps.userreports.expressions.factory import ExpressionFactory
