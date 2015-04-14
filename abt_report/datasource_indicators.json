@@ -4,7 +4,7 @@
     "datatype": "string", 
     "type": "expression", 
     "is_primary_key": false, 
-    "column_id": "country", 
+    "transform": {}, 
     "is_nullable": true, 
     "expression": {
       "value_expression": {
@@ -23,14 +23,15 @@
           "@case_id"
         ]
       }
-    }
+    }, 
+    "column_id": "country"
   }, 
   {
     "display_name": "district", 
     "datatype": "string", 
     "type": "expression", 
     "is_primary_key": false, 
-    "column_id": "district", 
+    "transform": {}, 
     "is_nullable": true, 
     "expression": {
       "value_expression": {
@@ -49,14 +50,15 @@
           "@case_id"
         ]
       }
-    }
+    }, 
+    "column_id": "district"
   }, 
   {
     "display_name": "worker_code", 
     "datatype": "string", 
     "type": "expression", 
     "is_primary_key": false, 
-    "column_id": "worker_code", 
+    "transform": {}, 
     "is_nullable": true, 
     "expression": {
       "value_expression": {
@@ -75,7 +77,8 @@
           "@case_id"
         ]
       }
-    }
+    }, 
+    "column_id": "worker_code"
   }, 
   {
     "display_name": "commune_code", 
@@ -195,19 +198,6 @@
     "property_name": null
   }, 
   {
-    "display_name": "Spray_Progress", 
-    "property_path": [
-      "form", 
-      "Spray_Progress"
-    ], 
-    "datatype": "string", 
-    "is_primary_key": false, 
-    "column_id": "spray_progress", 
-    "is_nullable": true, 
-    "type": "raw", 
-    "property_name": null
-  }, 
-  {
     "display_name": "username", 
     "property_path": [
       "form", 
@@ -282,7 +272,7 @@
     "datatype": "integer", 
     "type": "expression", 
     "is_primary_key": false, 
-    "column_id": "target_number", 
+    "transform": {}, 
     "is_nullable": true, 
     "expression": {
       "test": {
@@ -377,6 +367,7 @@
           }
         }
       }
-    }
+    }, 
+    "column_id": "target_number"
   }
 ]
