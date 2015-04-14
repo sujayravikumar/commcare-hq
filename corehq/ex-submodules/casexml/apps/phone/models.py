@@ -10,9 +10,6 @@ from casexml.apps.case.sharedmodels import CommCareCaseIndex, IndexHoldingMixIn
 from casexml.apps.phone.checksum import Checksum, CaseStateHash
 import logging
 
-# override a few values with our own
-from dimagi.ext.couchdbkit import DateTimeProperty, SafeSaveDocument
-
 
 class User(object):
     """ 

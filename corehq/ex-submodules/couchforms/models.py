@@ -12,17 +12,7 @@ from lxml import etree
 
 from django.utils.datastructures import SortedDict
 from couchdbkit.exceptions import PreconditionFailed, BadValueError
-from dimagi.ext.couchdbkit import (
-    StringProperty,
-    DictProperty,
-    SchemaListProperty,
-    BooleanProperty
-)
-from dimagi.ext.couchdbkit import (
-    DateTimeProperty,
-    DocumentSchema,
-    SafeSaveDocument
-)
+from dimagi.ext.couchdbkit import *
 from couchdbkit import ResourceNotFound
 from lxml.etree import XMLSyntaxError
 from couchforms.jsonobject_extensions import GeoPointProperty

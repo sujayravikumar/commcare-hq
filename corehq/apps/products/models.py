@@ -4,8 +4,8 @@ from dimagi.ext.couchdbkit import (
     DecimalProperty,
     DictProperty,
     BooleanProperty,
+    DateTimeProperty,
 )
-from dimagi.ext.couchdbkit import DateTimeProperty
 from datetime import datetime
 from decimal import Decimal
 from django.db import models

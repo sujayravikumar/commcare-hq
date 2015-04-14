@@ -39,12 +39,6 @@ from dimagi.utils.couch import (
     LooselyEqualDocumentSchema,
 )
 
-from dimagi.ext.couchdbkit import (
-    DateTimeProperty,
-    Document,
-    SafeSaveDocument,
-)
-
 
 """
 Couch models for commcare cases.  
