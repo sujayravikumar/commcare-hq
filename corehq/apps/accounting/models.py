@@ -12,6 +12,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.template.loader import render_to_string
 from django.utils.translation import ugettext_lazy as _
+from corehq.const import USER_DATE_FORMAT
 from corehq.util.view_utils import absolute_reverse
 from dimagi.utils.web import get_site_domain
 
@@ -818,8 +819,8 @@ class Subscription(models.Model):
                 "[%(date_start)s - %(date_end)s]" % {
                     'plan_version': self.plan_version,
                     'subscriber': self.subscriber,
-                    'date_start': self.date_start.strftime("%d %B %Y"),
-                    'date_end': (self.date_end.strftime("%d %B %Y")
+                    'date_start': self.date_start.strftime(USER_DATE_FORMAT),
+                    'date_end': (self.date_end.strftime(USER_DATE_FORMAT)
                                  if self.date_end is not None else "--"),
                 })
 
@@ -1138,7 +1139,7 @@ class Subscription(models.Model):
         if num_days_left == 1:
             ending_on = _("tomorrow!")
         else:
-            ending_on = _("on %s." % self.date_end.strftime("%B %d, %Y"))
+            ending_on = _("on %s." % self.date_end.strftime(USER_DATE_FORMAT))
 
         user_desc = self.plan_version.user_facing_description
         plan_name = user_desc['name']
@@ -1444,6 +1445,10 @@ class Invoice(models.Model):
             )
         return contact_emails
 
+    @property
+    def is_paid(self):
+        return bool(self.date_paid)
+
 
 class SubscriptionAdjustment(models.Model):
     """
@@ -1512,9 +1517,7 @@ class BillingRecord(models.Model):
         invoice_pdf.generate_pdf(record.invoice)
         record.pdf_data_id = invoice_pdf._id
         record._pdf = invoice_pdf
-        if record.invoice.subscription.do_not_invoice:
-            record.skipped_email = True
-            invoice.is_hidden = True
+        record.skipped_email = invoice.is_hidden
         record.save()
         return record
 
@@ -1528,7 +1531,7 @@ class BillingRecord(models.Model):
         ).count() > MAX_INVOICE_COMMUNICATIONS
 
     def send_email(self, contact_emails=None):
-        if self.invoice.subscription.do_not_invoice:
+        if self.skipped_email:
             return
         pdf_attachment = {
             'title': self.pdf.get_filename(self.invoice),
@@ -1555,12 +1558,13 @@ class BillingRecord(models.Model):
             'domain_url': absolute_reverse(DefaultProjectSettingsView.urlname,
                                            args=[domain]),
             'statement_number': self.invoice.invoice_number,
-            'payment_status': (_("Paid") if self.invoice.date_paid is not None
+            'payment_status': (_("Paid") if self.invoice.is_paid
                                else _("Payment Required")),
             'amount_due': fmt_dollar_amount(self.invoice.balance),
             'statements_url': absolute_reverse(
                 DomainBillingStatementsView.urlname, args=[domain]),
             'invoicing_contact_email': settings.INVOICING_CONTACT_EMAIL,
+            'accounts_email': settings.ACCOUNTS_EMAIL,
         }
 
         contact_emails = contact_emails or self.invoice.email_recipients
@@ -1657,7 +1661,7 @@ class InvoicePdf(SafeSaveDocument):
         pdf_data.close()
 
         self.invoice_id = str(invoice.id)
-        self.date_created = datetime.datetime.now()
+        self.date_created = datetime.datetime.utcnow()
         self.save()
 
     def get_filename(self, invoice):
@@ -1829,7 +1833,7 @@ class CreditLine(models.Model):
     def add_credit(cls, amount, account=None, subscription=None,
                    product_type=None, feature_type=None, payment_record=None,
                    invoice=None, line_item=None, related_credit=None,
-                   note=None, reason=None, web_user=None):
+                   note=None, reason=None, web_user=None, permit_inactive=False):
         if account is None and subscription is None:
             raise CreditLineError(
                 "You must specify either a subscription "
@@ -1847,7 +1851,7 @@ class CreditLine(models.Model):
                 product_type__exact=product_type,
                 feature_type__exact=feature_type,
             )
-            if not credit_line.is_active and not invoice:
+            if not permit_inactive and not credit_line.is_active and not invoice:
                 raise CreditLineError(
                     "Could not add credit to CreditLine %s because it is "
                     "inactive." % credit_line.__str__()

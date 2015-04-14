@@ -4,7 +4,7 @@ from optparse import make_option
 import sys
 
 from django.core.management.base import NoArgsCommand
-import simplejson
+import json
 from corehq.util.couch_helpers import paginate_view
 from pillowtop.couchdb import CachedCouchDB
 
@@ -108,7 +108,7 @@ class PtopReindexer(NoArgsCommand):
         if hasattr(self, '_seq_prefix'):
             datestring = self._seq_prefix
         else:
-            datestring = datetime.now().strftime("%Y-%m-%d-%H%M")
+            datestring = datetime.utcnow().strftime("%Y-%m-%d-%H%M")
             self._seq_prefix = datestring
         return datestring
 
@@ -174,7 +174,7 @@ class PtopReindexer(NoArgsCommand):
             dump_filename, datetime.utcnow().isoformat()))
         with open(dump_filename, 'w') as fout:
             for row in self.full_couch_view_iter():
-                fout.write('{}\n'.format(simplejson.dumps(row)))
+                fout.write('{}\n'.format(json.dumps(row)))
         self.log("View and sequence written to disk: %s" % datetime.utcnow().isoformat())
 
     def _load_seq_from_disk(self):
@@ -185,7 +185,7 @@ class PtopReindexer(NoArgsCommand):
     def view_data_file_iter(self):
         with open(self.get_dump_filename(), 'r') as fin:
             for line in fin:
-                yield simplejson.loads(line)
+                yield json.loads(line)
 
     def _bootstrap(self, options):
         self.resume = options['resume']
@@ -324,9 +324,9 @@ class PtopReindexer(NoArgsCommand):
             except Exception as ex:
                 retries += 1
                 retry_time = (datetime.utcnow() - bulk_start).seconds + retries * RETRY_TIME_DELAY_FACTOR
-                self.log("\t%s: Exception sending slice %d:%d, %s, retrying in %s seconds" % (datetime.now().isoformat(), start, end, ex, retry_time))
+                self.log("\t%s: Exception sending slice %d:%d, %s, retrying in %s seconds" % (datetime.utcnow().isoformat(), start, end, ex, retry_time))
                 time.sleep(retry_time)
-                self.log("\t%s: Retrying again %d:%d..." % (datetime.now().isoformat(), start, end))
+                self.log("\t%s: Retrying again %d:%d..." % (datetime.utcnow().isoformat(), start, end))
                 # reset timestamp when looping again
                 bulk_start = datetime.utcnow()
 

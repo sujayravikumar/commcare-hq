@@ -1,8 +1,10 @@
-var PaymentMethodHandler = function (errorMessages) {
+var PaymentMethodHandler = function (errorMessages, submitBtnText, form_id) {
     'use strict';
     var self = this;
 
-    self.errorMessages = errorMessages;
+    self.errorMessages = errorMessages || {};
+    self.submitBtnText = submitBtnText;
+    self.form_id = form_id;
 
     self.costItem = ko.observable();
     self.hasCostItem = ko.computed(function () {
@@ -71,6 +73,7 @@ var PaymentMethodHandler = function (errorMessages) {
     self.reset = function () {
         self.paymentIsComplete(false);
         self.serverErrorMsg('');
+        self.newCard(new StripeCard());
     };
 
     self.processPayment = function () {
@@ -80,11 +83,10 @@ var PaymentMethodHandler = function (errorMessages) {
     };
 
     self.submitForm = function () {
-        $('#payment-form').ajaxSubmit({
+        $('#' + self.form_id).ajaxSubmit({
             success: function (response) {
                 if (response.success) {
                     self.costItem().reset(response);
-                    self.newCard(new StripeCard());
                     if (response.wasSaved) {
                         var stripe_card = new StripeCard();
                         stripe_card.loadSavedData(response.card);
@@ -106,7 +108,7 @@ var PaymentMethodHandler = function (errorMessages) {
     self.removeSavedCard = function () {
         self.isRemovingCard(true);
         self.showConfirmRemoveCard(false);
-        $('#payment-form').ajaxSubmit({
+        $('#' + self.form_id).ajaxSubmit({
             data: {
                 removeCard: true
             },
@@ -161,21 +163,13 @@ var BaseCostItem = function (initData) {
 
 };
 
-var Invoice = function (initData) {
+var ChargedCostItem = function (initData) {
     'use strict';
     BaseCostItem.call(this, initData);
     var self = this;
-    self.paginatedItem = initData.paginatedItem;
-    self.paginatedList = initData.paginatedList;
-    self.id = ko.computed(function () {
-        return self.paginatedItem.itemData().id;
-    });
-    self.balance = ko.computed(function () {
-        return self.paginatedItem.itemData().balance;
-    });
-    self.invoiceNumber = ko.computed(function () {
-        return self.paginatedItem.itemData().invoice_number;
-    });
+
+    self.balance = ko.observable();
+
     self.customPaymentAmount = ko.observable(self.balance());
     self.paymentAmountType = ko.observable('full');
 
@@ -229,19 +223,57 @@ var Invoice = function (initData) {
         self.paymentAmountType('partial');
     };
 
-    self.reset =  function (response) {
-        self.customPaymentAmount(self.balance());
-        self.paymentAmountType('full');
-        self.paginatedList.refreshList(self.paginatedItem);
-    };
-
     self.isValid = ko.computed(function () {
         return self.isLeftoverAmountEnough() && self.isAmountWithinRange();
     });
 };
 
-Invoice.prototype = Object.create( BaseCostItem.prototype );
+ChargedCostItem.prototype = Object.create( BaseCostItem.prototype );
+ChargedCostItem.prototype.constructor = ChargedCostItem;
+
+
+var Invoice = function (initData) {
+    'use strict';
+    ChargedCostItem.call(this, initData);
+    var self = this;
+
+    self.paginatedItem = initData.paginatedItem;
+    self.paginatedList = initData.paginatedList;
+    self.balance(self.paginatedItem.itemData().balance);
+    self.customPaymentAmount(self.balance());
+
+    self.id = ko.computed(function () {
+        return self.paginatedItem.itemData().id;
+    });
+    self.invoiceNumber = ko.computed(function () {
+        return self.paginatedItem.itemData().invoice_number;
+    });
+
+    self.reset = function (response) {
+        self.paginatedList.refreshList(self.paginatedItem);
+    };
+};
+
+Invoice.protoptye = Object.create( ChargedCostItem.prototype );
 Invoice.prototype.constructor = Invoice;
+
+var TotalCostItem = function (initData) {
+    'use strict';
+    ChargedCostItem.call(this, initData);
+    var self = this;
+
+    self.balance(initData.totalBalance);
+    self.customPaymentAmount(self.balance());
+
+    self.id = null; // TODO remove once cost-item-template does not need this
+
+    self.reset =  function (response) {
+        paginatedListModel.refreshList();
+    };
+};
+
+TotalCostItem.protoptye = Object.create( ChargedCostItem.prototype );
+TotalCostItem.prototype.constructor = TotalCostItem;
 
 var CreditCostItem = function (initData) {
    'use strict';

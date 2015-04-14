@@ -1303,6 +1303,7 @@ class CouchUser(Document, DjangoUserMixin, IsMemberOfMixin, UnicodeMixIn, EulaMi
     def is_current_web_user(self, request):
         return self.user_id == request.couch_user.user_id
 
+    # gets hit for can_view_reports, etc.
     def __getattr__(self, item):
         if item.startswith('can_'):
             perm = item[len('can_'):]
@@ -1352,7 +1353,7 @@ class LocationUserMixin(DocumentSchema):
 
             # we only add the new one because we don't know
             # if we can actually remove the old..
-            self.add_location(location)
+            self.add_location_delegate(location)
         else:
             self.create_location_delegates([location])
 
@@ -1363,6 +1364,16 @@ class LocationUserMixin(DocumentSchema):
 
         self.location_id = location._id
 
+        self.save()
+
+    def unset_location(self):
+        """
+        Unset the location and remove all associated user data and cases
+        """
+        self.user_data.pop('commtrack-supply-point', None)
+        self.user_data.pop('commcare_primary_case_sharing_id', None)
+        self.location_id = None
+        self.clear_locations()
         self.save()
 
     @property
@@ -1429,10 +1440,13 @@ class LocationUserMixin(DocumentSchema):
                 "There was no linked supply point for the location."
             )
 
-    def add_location(self, location, create_sp_if_missing=False):
+    def add_location_delegate(self, location):
         """
         Add a single location to the delgate case access.
+
+        This will dynamically create a supply point if the supply point isn't found.
         """
+        # todo: the dynamic supply point creation is bad and should be removed.
         from corehq.apps.commtrack.models import SupplyPointCase
 
         sp = SupplyPointCase.get_or_create_by_location(location)
@@ -1453,7 +1467,7 @@ class LocationUserMixin(DocumentSchema):
             self._id
         )
 
-    def remove_location(self, location):
+    def remove_location_delegate(self, location):
         """
         Remove a single location from the case delagate access.
         """
@@ -1474,13 +1488,14 @@ class LocationUserMixin(DocumentSchema):
 
                 self.submit_location_block(caseblock)
 
-    def clear_locations(self):
+    def clear_location_delgates(self):
         """
         Wipe all case delagate access.
         """
+        from casexml.apps.case.cleanup import safe_hard_delete
         mapping = self.get_location_map_case()
         if mapping:
-            mapping.delete()
+            safe_hard_delete(mapping)
 
     def create_location_delegates(self, locations):
         """
@@ -1499,7 +1514,7 @@ class LocationUserMixin(DocumentSchema):
                 # as we can't compare the location objects themself
                 return
 
-        self.clear_locations()
+        self.clear_location_delgates()
 
         if not locations:
             return
@@ -1557,7 +1572,6 @@ class CommCareUser(CouchUser, SingleMembershipMixin, CommCareMobileContactMixin,
             self.domain_membership = DomainMembership(domain=data.get('domain', ""))
             if role_id:
                 self.domain_membership.role_id = role_id
-#            self.save() # will uncomment when I figure out what's happening with sheels commcareuser
 
         return self
 
@@ -1824,7 +1838,7 @@ class CommCareUser(CouchUser, SingleMembershipMixin, CommCareMobileContactMixin,
                     for loc in sql_loc.get_descendants()
                 ]
             else:
-                return [self.location.sql_location.case_sharing_group_object(self)._id]
+                return [self.location.sql_location.case_sharing_group_object(self._id)._id]
 
         else:
             return []
@@ -2112,7 +2126,7 @@ class WebUser(CouchUser, MultiMembershipMixin, OrgMembershipMixin, CommCareMobil
         return self.email or self.username
 
     def get_time_zone(self):
-        from corehq.apps.reports import util as report_utils
+        from corehq.util.timezones.utils import get_timezone_for_user
 
         if hasattr(self, 'current_domain'):
             domain = self.current_domain
@@ -2121,7 +2135,7 @@ class WebUser(CouchUser, MultiMembershipMixin, OrgMembershipMixin, CommCareMobil
         else:
             return None
 
-        timezone = report_utils.get_timezone(self.user_id, domain)
+        timezone = get_timezone_for_user(self.user_id, domain)
         return timezone.zone
 
     def get_language_code(self):

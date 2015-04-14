@@ -156,7 +156,7 @@ OFFLINE_CLOUDCARE = StaticToggle(
 
 CASE_REBUILD = StaticToggle(
     'case_rebuild',
-    'Show UI-based case rebuild option',
+    'Show UI-based case and form rebuild options (primarily for support team)',
 )
 
 IS_DEVELOPER = StaticToggle(
@@ -221,13 +221,6 @@ DOUBLE_MANAGEMENT = StaticToggle(
     [NAMESPACE_USER, NAMESPACE_DOMAIN]
 )
 
-BATCHED_RESTORE = PredicatablyRandomToggle(
-    'batched_restore',
-    'Batch OTA restore response generation',
-    [NAMESPACE_DOMAIN, NAMESPACE_USER],
-    0.5
-)
-
 SPLIT_MULTISELECT_EXPORT = StaticToggle(
     'split_multiselect_export',
     'Split multiselect columns in custom exports',
@@ -282,22 +275,10 @@ ALLOW_CASE_ATTACHMENTS_VIEW = StaticToggle(
     [NAMESPACE_DOMAIN, NAMESPACE_USER]
 )
 
-CASEDETAILS_IN_CLOUDCARE_FORMS = StaticToggle(
-    'case_details_in_cloudcare_forms',
-    'Display details of the selected case on top in CloudCare if a form uses Case Management',
-    [NAMESPACE_DOMAIN, NAMESPACE_USER]
-)
-
 LOCATION_TYPE_STOCK_RATES = StaticToggle(
     'location_type_stock_rates',
     "Specify stock rates per location type.",
     [NAMESPACE_DOMAIN]
-)
-
-APP_SUMMARY = StaticToggle(
-    'app_summary',
-    'Form and Case summary of an application',
-    [NAMESPACE_DOMAIN, NAMESPACE_USER]
 )
 
 BULK_ARCHIVE_FORMS = StaticToggle(
@@ -326,6 +307,7 @@ PRIME_RESTORE = StaticToggle(
 FORM_LINK_WORKFLOW = StaticToggle(
     'form_link_workflow',
     'Form linking workflow available on forms',
+    [NAMESPACE_DOMAIN],
 )
 
 # not referenced in code directly but passed through to vellum
@@ -356,7 +338,40 @@ CUSTOM_PROPERTIES = StaticToggle(
     [NAMESPACE_DOMAIN]
 )
 
+FILE_RESTORE = StaticToggle(
+    'file_restore',
+    'Use files to do phone restore',
+    [NAMESPACE_DOMAIN, NAMESPACE_USER],
+)
+
+GLOBAL_SMS_RATES = StaticToggle(
+    'global_sms_rates',
+    'Global SMS Rates page',
+    [NAMESPACE_USER]
+)
+
 BULK_SMS_VERIFICATION = StaticToggle(
     'bulk_sms_verification',
     'Allow initiating the SMS phone verification workflow for all users in a group.',
+    [NAMESPACE_USER, NAMESPACE_DOMAIN],
+)
+
+BULK_PAYMENTS = StaticToggle(
+    'bulk_payments',
+    'Enable payment of invoices by bulk credit payments and invoice generation for wire tranfers',
+)
+
+MODULE_FILTER = StaticToggle(
+    'module_filter',
+    'Enable module filtering',
+    [NAMESPACE_DOMAIN],
+)
+
+USE_NEW_TIMEZONE_BEHAVIOR = StaticToggle(
+    'use_new_timezone_behavior',
+    ("Enable properly dealing with timezones in phone timestamps "
+     "during submission and in reports. "
+     "(Please do not set manually, "
+     "because it has to be accompanied by a migration.)"),
+    [NAMESPACE_DOMAIN],
 )

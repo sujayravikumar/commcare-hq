@@ -153,13 +153,28 @@ class VerifiedNumber(Document):
         return v if (include_pending or (v and v.verified)) else None
 
     @classmethod
-    def by_domain(cls, domain):
+    def by_domain(cls, domain, ids_only=False):
         result = cls.view("sms/verified_number_by_domain",
                           startkey=[domain],
                           endkey=[domain, {}],
-                          include_docs=True,
+                          include_docs=(not ids_only),
                           reduce=False).all()
-        return result
+        if ids_only:
+            return [row['id'] for row in result]
+        else:
+            return result
+
+    @classmethod
+    def count_by_domain(cls, domain):
+        result = cls.view("sms/verified_number_by_domain",
+            startkey=[domain],
+            endkey=[domain, {}],
+            include_docs=False,
+            reduce=True).all()
+        if result:
+            return result[0]['value']
+        return 0
+
 
 def add_plus(phone_number):
     return ('+' + phone_number) if not phone_number.startswith('+') else phone_number
@@ -183,6 +198,8 @@ class MobileBackend(Document):
     base_doc = "MobileBackend"
     domain = StringProperty()               # This is the domain that the backend belongs to, or None for global backends
     name = StringProperty()                 # The name to use when setting this backend for a contact
+    display_name = StringProperty()         # Simple name to display to users - e.g. Twilio
+    incoming_api_id = StringProperty()      # Some Gateways have different API ids for IN/OUT
     authorized_domains = ListProperty(StringProperty)  # A list of additional domains that are allowed to use this backend
     is_global = BooleanProperty(default=True)  # If True, this backend can be used for any domain
     description = StringProperty()          # (optional) A description of this backend
@@ -487,20 +504,22 @@ class SMSBackend(MobileBackend):
 
     @classmethod
     def get_wrapped(cls, backend_id):
-        from corehq.apps.sms.util import get_available_backends
-        backend_classes = get_available_backends()
         try:
             backend = SMSBackend.get(backend_id)
         except ResourceNotFound:
             raise UnrecognizedBackendException("Backend %s not found" %
                 backend_id)
-        doc_type = backend.doc_type
+        return backend.wrap_correctly()
+
+    def wrap_correctly(self):
+        from corehq.apps.sms.util import get_available_backends
+        backend_classes = get_available_backends()
+        doc_type = self.doc_type
         if doc_type in backend_classes:
-            backend = backend_classes[doc_type].wrap(backend.to_json())
-            return backend
+            return backend_classes[doc_type].wrap(self.to_json())
         else:
             raise UnrecognizedBackendException("Backend %s has an "
-                "unrecognized doc type." % backend_id)
+                "unrecognized doc type." % self._id)
 
 
 class BackendMapping(Document):

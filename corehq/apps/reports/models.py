@@ -20,7 +20,7 @@ from corehq.apps.reports.exportfilters import form_matches_users, is_commconnect
 from corehq.apps.users.models import WebUser, CommCareUser, CouchUser
 from corehq.feature_previews import CALLCENTER
 from corehq.util.view_utils import absolute_reverse
-from couchexport.models import SavedExportSchema, GroupExportConfiguration, FakeSavedExportSchema
+from couchexport.models import SavedExportSchema, GroupExportConfiguration, FakeSavedExportSchema, SplitColumn
 from couchexport.transforms import couch_to_excel_datetime, identity
 from couchexport.util import SerializableFunction
 import couchforms
@@ -421,18 +421,33 @@ class ReportConfig(CachedCouchDocumentMixin, Document):
 
         try:
             if self.is_configurable_report:
-                response = self._dispatcher.dispatch(request, self.subreport_slug, render_as='email',
-                    **self.view_kwargs)
+                response = self._dispatcher.dispatch(
+                    request,
+                    self.subreport_slug,
+                    render_as='email',
+                    **self.view_kwargs
+                )
             else:
-                response = self._dispatcher.dispatch(request, render_as='email',
-                    **self.view_kwargs)
+                response = self._dispatcher.dispatch(
+                    request,
+                    render_as='email',
+                    permissions_check=self._dispatcher.permissions_check,
+                    **self.view_kwargs
+                )
             if attach_excel is True:
                 if self.is_configurable_report:
-                    file_obj = self._dispatcher.dispatch(request, self.subreport_slug, render_as='excel',
-                        **self.view_kwargs)
+                    file_obj = self._dispatcher.dispatch(
+                        request, self.subreport_slug,
+                        render_as='excel',
+                        **self.view_kwargs
+                    )
                 else:
-                    file_obj = self._dispatcher.dispatch(request, render_as='excel',
-                        **self.view_kwargs)
+                    file_obj = self._dispatcher.dispatch(
+                        request,
+                        render_as='excel',
+                        permissions_check=self._dispatcher.permissions_check,
+                        **self.view_kwargs
+                    )
             else:
                 file_obj = None
             return json.loads(response.content)['report'], file_obj
@@ -640,10 +655,17 @@ class FormExportSchema(HQExportSchema):
     doc_type = 'SavedExportSchema'
     app_id = StringProperty()
     include_errors = BooleanProperty(default=False)
+    split_multiselects = BooleanProperty(default=False)
 
     def update_schema(self):
         super(FormExportSchema, self).update_schema()
-        self.update_question_schema()
+        if self.split_multiselects:
+            self.update_question_schema()
+            for column in [column for table in self.tables for column in table.columns]:
+                if isinstance(column, SplitColumn):
+                    question = self.question_schema.question_schema.get(column.index)
+                    column.options = question.options
+                    column.ignore_extras = True
 
     def update_question_schema(self):
         schema = self.question_schema

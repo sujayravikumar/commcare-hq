@@ -30,7 +30,7 @@ class Group(UndoableDocument):
     metadata = DictProperty()
 
     def save(self, *args, **kwargs):
-        self.last_modified = datetime.now()
+        self.last_modified = datetime.utcnow()
         return super(Group, self).save(*args, **kwargs)
 
     def add_user(self, couch_user_id, save=True):
@@ -181,10 +181,7 @@ class Group(UndoableDocument):
             groups.extend([
                 location.case_sharing_group_object() for location in
                 SQLLocation.objects.filter(domain=domain)
-                # location_type_object is sometimes None
-                # fixes http://manage.dimagi.com/default.asp?158564
-                if getattr(location.couch_location().location_type_object,
-                           'shares_cases', None)
+                if location.couch_location.location_type_object.shares_cases
             ])
             return groups
         else:

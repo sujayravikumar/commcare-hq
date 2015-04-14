@@ -30,12 +30,15 @@ from corehq.apps.accounting.models import (
 )
 from corehq.apps.hqwebapp.async_handler import AsyncHandlerMixin
 from corehq.apps.hqwebapp.utils import get_bulk_upload_form
+from corehq.apps.locations.models import Location
 from corehq.apps.users.util import (
     can_add_extra_mobile_workers,
     smart_query_string,
 )
 from corehq.apps.custom_data_fields import CustomDataEditor
+from corehq.const import USER_DATE_FORMAT
 from corehq.elastic import es_query, ES_URLS, ADD_TO_ES_FILTER
+from corehq.util.couch import get_document_or_404
 
 from couchexport.models import Format
 from corehq.apps.users.forms import (CommCareAccountForm, UpdateCommCareUserInfoForm, CommtrackUserForm,
@@ -419,7 +422,7 @@ class AsyncListCommCareUsersView(ListCommCareUsersView):
                 'edit_url': reverse(EditCommCareUserView.urlname, args=[self.domain, user.user_id]),
                 'username': user.raw_username,
                 'full_name': user.full_name,
-                'joined_on': user.date_joined.strftime("%d %b %Y"),
+                'joined_on': user.date_joined.strftime(USER_DATE_FORMAT),
                 'phone_numbers': user.phone_numbers,
                 'form_count': '--',
                 'case_count': '--',
@@ -654,6 +657,9 @@ class CreateCommCareUserView(BaseManageCommCareUserView):
             password = self.new_commcare_user_form.cleaned_data['password']
             phone_number = self.new_commcare_user_form.cleaned_data['phone_number']
 
+            if 'location_id' in request.GET:
+                loc = get_document_or_404(Location, self.domain, request.GET.get('location_id'))
+
             couch_user = CommCareUser.create(
                 self.domain,
                 username,
@@ -662,6 +668,10 @@ class CreateCommCareUserView(BaseManageCommCareUserView):
                 device_id="Generated from HQ",
                 user_data=self.custom_data.get_data_to_save(),
             )
+
+            if 'location_id' in request.GET:
+                couch_user.set_location(loc)
+
             return HttpResponseRedirect(reverse(EditCommCareUserView.urlname,
                                                 args=[self.domain, couch_user.userID]))
         return self.get(request, *args, **kwargs)

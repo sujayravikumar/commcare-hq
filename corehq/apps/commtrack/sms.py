@@ -477,10 +477,10 @@ def convert_transactions_to_blocks(E, transactions):
     balances, transfers = process_transactions(E, transactions)
 
     stock_blocks = []
-    if balances:
-        stock_blocks.append(balances)
     if transfers:
         stock_blocks.append(transfers)
+    if balances:
+        stock_blocks.append(balances)
 
     return stock_blocks
 
@@ -536,7 +536,7 @@ def requisition_case_xml(data, stock_blocks):
         update={'requisition_status': status},
     ).as_xml())
 
-    timestamp = data['transactions'][0].timestamp or datetime.now()
+    timestamp = data['transactions'][0].timestamp or datetime.utcnow()
     device_id = get_device_id(data)
 
     return """

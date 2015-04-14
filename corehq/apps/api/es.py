@@ -1,5 +1,5 @@
 import logging
-import simplejson
+import json
 import six
 import copy
 import datetime
@@ -7,6 +7,12 @@ import datetime
 from django.http import HttpResponse
 from django.utils.decorators import method_decorator, classonlymethod
 from django.views.generic import View
+from corehq.pillows.mappings.case_mapping import CASE_INDEX
+from corehq.pillows.mappings.reportcase_mapping import REPORT_CASE_INDEX
+from corehq.pillows.mappings.reportxform_mapping import REPORT_XFORM_INDEX
+from corehq.pillows.mappings.user_mapping import USER_INDEX
+from corehq.pillows.mappings.xform_mapping import XFORM_INDEX
+from dimagi.utils.parsing import ISO_DATE_FORMAT
 
 from no_exceptions.exceptions import Http400
 from dimagi.utils.logging import notify_exception
@@ -21,11 +27,14 @@ from no_exceptions.exceptions import Http400
 
 DEFAULT_SIZE = 10
 
+
 class ESUserError(Http400):
     pass
 
+
 class DateTimeError(ValueError):
     pass
+
 
 class ESView(View):
     """
@@ -105,7 +114,7 @@ class ESView(View):
         Returns the raw query json back, or None if there's an error
         """
 
-        logging.info("ESlog: [%s.%s] ESquery: %s" % (self.__class__.__name__, self.domain, simplejson.dumps(es_query)))
+        logging.info("ESlog: [%s.%s] ESquery: %s" % (self.__class__.__name__, self.domain, json.dumps(es_query)))
         if 'fields' in es_query or 'script_fields' in es_query:
             #nasty hack to add domain field to query that does specific fields.
             #do nothing if there's no field query because we get everything
@@ -186,7 +195,7 @@ class ESView(View):
         size = request.GET.get('size', DEFAULT_SIZE)
         start = request.GET.get('start', 0)
         query_results = self.run_query(self.base_query(start=start, size=size))
-        query_output = simplejson.dumps(query_results, indent=self.indent)
+        query_output = json.dumps(query_results, indent=self.indent)
         response = HttpResponse(query_output, content_type="application/json")
         return response
 
@@ -196,15 +205,15 @@ class ESView(View):
         """
         try:
             raw_post = request.body
-            raw_query = simplejson.loads(raw_post)
+            raw_query = json.loads(raw_post)
         except Exception, ex:
             content_response = dict(message="Error parsing query request", exception=ex.message)
-            response = HttpResponse(status=406, content=simplejson.dumps(content_response))
+            response = HttpResponse(status=406, content=json.dumps(content_response))
             return response
 
         #ensure that the domain is filtered in implementation
         query_results = self.run_query(raw_query)
-        query_output = simplejson.dumps(query_results, indent=self.indent)
+        query_output = json.dumps(query_results, indent=self.indent)
         response = HttpResponse(query_output, content_type="application/json")
         return response
 
@@ -214,15 +223,15 @@ class CaseES(ESView):
     Expressive CaseES interface. Yes, this is redundant with pieces of the v0_1.py CaseAPI - todo to merge these applications
     Which this should be the final say on ES access for Casedocs
     """
-    index = "hqcases"
+    index = CASE_INDEX
 
 
 class ReportCaseES(ESView):
-    index = 'report_cases'
+    index = REPORT_CASE_INDEX
 
 
 class XFormES(ESView):
-    index = "xforms"
+    index = XFORM_INDEX
 
     def base_query(self, terms=None, doc_type='xforminstance', fields=None, start=0, size=DEFAULT_SIZE):
         """
@@ -275,8 +284,7 @@ class UserES(ESView):
     """
     self.run_query accepts a structured elasticsearch query
     """
-
-    index = "hqusers"
+    index = USER_INDEX
 
     def validate_query(self, query):
         if 'password' in query['fields']:
@@ -289,7 +297,7 @@ class UserES(ESView):
         """
 
         logging.info("ESlog: [%s.%s] ESquery: %s" % (
-            self.__class__.__name__, self.domain, simplejson.dumps(es_query)))
+            self.__class__.__name__, self.domain, json.dumps(es_query)))
 
         self.validate_query(es_query)
 
@@ -372,10 +380,8 @@ def get_report_script_field(field_path, is_known=False):
     return ret
 
 
-
 class ReportXFormES(XFormES):
-    index = 'report_xforms'
-
+    index = REPORT_XFORM_INDEX
 
     def base_query(self, terms=None, doc_type='xforminstance', fields=None, start=0, size=DEFAULT_SIZE):
         """
@@ -429,7 +435,8 @@ class ReportXFormES(XFormES):
 
     @classmethod
     def by_case_id_query(cls, domain, case_id, terms=None, doc_type='xforminstance',
-                         date_field=None, startdate=None, enddate=None, date_format='%Y-%m-%d'):
+                         date_field=None, startdate=None, enddate=None,
+                         date_format=ISO_DATE_FORMAT):
         """
         Run a case_id query on both case properties (supporting old and new) for xforms.
 
@@ -604,7 +611,7 @@ class ESQuerySet(object):
 
 def validate_date(date):
     try:
-        datetime.datetime.strptime(date, '%Y-%m-%d')
+        datetime.datetime.strptime(date, ISO_DATE_FORMAT)
     except ValueError:
         try:
             datetime.datetime.strptime(date, '%Y-%m-%dT%H:%M:%S')
@@ -635,7 +642,7 @@ def es_search(request, domain, reserved_query_params=None):
     # NOTE: The fields actually analyzed into ES indices differ somewhat from the raw
     # XML / JSON.
     if '_search' in request.GET:
-        additions = simplejson.loads(request.GET['_search'])
+        additions = json.loads(request.GET['_search'])
 
         if 'filter' in additions:
             payload['filter']['and'].append(additions['filter'])

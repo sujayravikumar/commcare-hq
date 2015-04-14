@@ -11,6 +11,7 @@ from corehq.apps.fixtures.models import FixtureDataType
 from corehq.apps.orgs.models import Organization
 from corehq.apps.reminders.models import METHOD_SMS_SURVEY, METHOD_IVR_SURVEY
 from corehq.apps.users.models import CommCareUser, UserRole
+from corehq.const import USER_DATE_FORMAT
 from couchexport.models import SavedExportSchema
 from dimagi.utils.couch.database import iter_docs
 from dimagi.utils.decorators.memoized import memoized
@@ -283,7 +284,7 @@ class DomainDowngradeStatusHandler(BaseModifySubscriptionHandler):
                 ungettext(
                     "You have %(num_fix)s Lookup Table set up. Selecting this "
                     "plan will delete this Lookup Table.",
-                    "You have $(num_fix)s Lookup Tables set up. Selecting "
+                    "You have %(num_fix)s Lookup Tables set up. Selecting "
                     "this plan will delete these Lookup Tables.",
                     num_fixtures
                 ) % {'num_fix': num_fixtures}
@@ -467,6 +468,6 @@ class DomainDowngradeStatusHandler(BaseModifySubscriptionHandler):
                 "Changing this plan will CANCEL that %(plan_name)s "
                 "subscription."
             ) % {
-                'date_start': next_subscription.date_start.strftime("%d %B %Y"),
+                'date_start': next_subscription.date_start.strftime(USER_DATE_FORMAT),
                 'plan_name': plan_desc['name'],
             })

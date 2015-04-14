@@ -6,6 +6,7 @@ import logging
 import numpy
 import pytz
 from corehq.apps.indicators.models import DynamicIndicatorDefinition, CombinedCouchViewIndicatorDefinition
+from corehq.const import USER_MONTH_FORMAT
 from dimagi.utils.decorators.memoized import memoized
 from mvp.models import MVP
 from mvp.reports import MVPIndicatorReport
@@ -138,7 +139,7 @@ class VerbalAutopsyReport(MVPIndicatorReport):
                 ]
             },
             {
-                'category_title': "Medial Neonate",
+                'category_title': "Medical Neonate",
                 'category_slug': 'va_neonates',
                 'indicator_slugs': [
                     "va_neonates_birth_asphyxia",
@@ -152,7 +153,7 @@ class VerbalAutopsyReport(MVPIndicatorReport):
                 ]
             },
             {
-                'category_title': "Medial Child(1-59)",
+                'category_title': "Medical Child(1-59)",
                 'category_slug': 'va_child',
                 'indicator_slugs': [
                     "va_child_accident",
@@ -286,7 +287,7 @@ class VerbalAutopsyReport(MVPIndicatorReport):
         )
         if self.is_debug:
             for result in retrospective:
-                result['date'] = result['date'].strftime("%B %Y")
+                result['date'] = result['date'].strftime(USER_MONTH_FORMAT)
             return retrospective
         if isinstance(indicator, CombinedCouchViewIndicatorDefinition):
             table = self.get_indicator_table(retrospective)

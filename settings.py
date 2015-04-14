@@ -124,6 +124,7 @@ MIDDLEWARE_CLASSES = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'corehq.middleware.OpenRosaMiddleware',
+    'corehq.util.global_request.middleware.GlobalRequestMiddleware',
     'corehq.apps.users.middleware.UsersMiddleware',
     'corehq.apps.domain.middleware.CCHQPRBACMiddleware',
     'casexml.apps.phone.middleware.SyncTokenMiddleware',
@@ -199,8 +200,6 @@ HQ_APPS = (
     'django_digest',
     'rosetta',
     'auditcare',
-    'djangocouch',
-    'djangocouchuser',
     'hqscripts',
     'casexml.apps.case',
     'casexml.apps.phone',
@@ -496,6 +495,8 @@ FIXTURE_GENERATORS = {
     ]
 }
 
+RESTORE_PAYLOAD_DIR = None  # Defaults to tempfile.gettempdir()
+
 GET_URL_BASE = 'dimagi.utils.web.get_url_base'
 
 SMS_GATEWAY_URL = "http://localhost:8001/"
@@ -556,6 +557,7 @@ COUCHLOG_DISPLAY_COLS = ["id", "archived?", "date", "exception type", "message",
                          "domain", "user", "url", "actions", "report"]
 COUCHLOG_RECORD_WRAPPER = "corehq.apps.hqcouchlog.wrapper"
 COUCHLOG_DATABASE_NAME = "commcarehq-couchlog"
+COUCHLOG_AUTH_DECORATOR = 'corehq.apps.domain.decorators.require_superuser_or_developer'
 
 # couchlog/case search
 LUCENE_ENABLED = False
@@ -675,6 +677,7 @@ ANALYTICS_IDS = {
     'GOOGLE_ANALYTICS_ID': '',
     'PINGDOM_ID': '',
     'ANALYTICS_ID_PUBLIC_COMMCARE': '',
+    'SEGMENT_ANALYTICS_KEY': '',
 }
 
 OPEN_EXCHANGE_RATES_ID = ''
@@ -868,7 +871,8 @@ INVOICE_FROM_ADDRESS = {}
 BANK_ADDRESS = {}
 BANK_NAME = ''
 BANK_ACCOUNT_NUMBER = ''
-BANK_ROUTING_NUMBER = ''
+BANK_ROUTING_NUMBER_ACH = ''
+BANK_ROUTING_NUMBER_WIRE = ''
 BANK_SWIFT_CODE = ''
 
 STRIPE_PUBLIC_KEY = ''
@@ -1046,7 +1050,6 @@ COUCHDB_APPS = [
     ('cvsu', 'fluff-cvsu'),
     ('mc', 'fluff-mc'),
     ('m4change', 'm4change'),
-    ('wvindia2', 'wvindia2'),
     ('export', 'meta'),
     'tdhtesting'
 ]
@@ -1215,6 +1218,7 @@ PILLOWTOPS = {
         'custom.tdh.models.TDHNewbornTreatmentFluffPillow',
         'custom.tdh.models.TDHChildClassificationFluffPillow',
         'custom.tdh.models.TDHChildTreatmentFluffPillow',
+        'custom.succeed.models.UCLAPatientFluffPillow'
     ],
     'mvp_indicators': [
         'mvp_docs.pillows.MVPFormIndicatorPillow',
@@ -1226,6 +1230,7 @@ PILLOWTOPS = {
 CUSTOM_DATA_SOURCES = [
     os.path.join('custom', 'up_nrhm', 'data_sources', 'location_hierarchy.json'),
     os.path.join('custom', 'up_nrhm', 'data_sources', 'asha_facilitators.json'),
+    os.path.join('custom', 'succeed', 'data_sources', 'submissions.json'),
 ]
 
 
@@ -1312,6 +1317,10 @@ DOMAIN_MODULE_MAP = {
     'mvp-ruhiira': 'mvp',
     'mvp-mwandama': 'mvp',
     'mvp-sada': 'mvp',
+    'mvp-tiby': 'mvp',
+    'mvp-mbola': 'mvp',
+    'mvp-koraro': 'mvp',
+    'mvp-pampaida': 'mvp',
     'opm': 'custom.opm',
     'psi-unicef': 'psi',
     'project': 'custom.apps.care_benin',
@@ -1326,9 +1335,8 @@ DOMAIN_MODULE_MAP = {
     'succeed': 'custom.succeed',
     'ilsgateway-test-1': 'custom.ilsgateway',
     'ilsgateway-test-2': 'custom.ilsgateway',
-    'ews-ghana-test': 'custom.ewsghana',
     'ewsghana-test-1': 'custom.ewsghana',
-    'stock-status-test-1': 'custom.ewsghana',
+    'ewsghana-test-2': 'custom.ewsghana',
     'test-pathfinder': 'custom.m4change',
     'wvindia2': 'custom.world_vision',
     'pathways-india-mis': 'custom.care_pathways',
@@ -1339,18 +1347,16 @@ DOMAIN_MODULE_MAP = {
 
 CASEXML_FORCE_DOMAIN_CHECK = True
 
-# arbitrarily split up tests into three chunks
+# arbitrarily split up tests into two chunks
 # that have approximately equal run times,
-# The two groups shown here, plus a third group consisting of everything else
+# the group shown here, plus a second group consisting of everything else
 TRAVIS_TEST_GROUPS = (
     (
         'accounting', 'adm', 'announcements', 'api', 'app_manager', 'appstore',
         'auditcare', 'bihar', 'builds', 'cachehq', 'callcenter', 'care_benin',
-    ),
-    (
         'care_sa', 'case', 'cleanup', 'cloudcare', 'commtrack', 'consumption',
         'couchapps', 'couchlog', 'crud', 'cvsu', 'dca', 'django_digest',
-        'djangocouch', 'djangocouchuser', 'domain', 'domainsync', 'export',
+        'domain', 'domainsync', 'export',
         'facilities', 'fixtures', 'fluff_filter', 'formplayer',
         'formtranslate', 'fri', 'grapevine', 'groups', 'gsid', 'hope',
         'hqadmin', 'hqcase', 'hqcouchlog', 'hqmedia',
@@ -1372,3 +1378,5 @@ COMPRESS_OFFLINE_CONTEXT = {
     'less_debug': LESS_DEBUG,
     'less_watch': LESS_WATCH,
 }
+
+COMPRESS_CSS_HASHING_METHOD = 'content'

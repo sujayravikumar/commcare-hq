@@ -31,6 +31,11 @@ class TestFileMixin(object):
             return f.read()
 
     @classmethod
+    def write_xml(cls, name, xml):
+        with open(cls.get_path(name, 'xml'), 'w') as f:
+            return f.write(xml)
+
+    @classmethod
     def get_json(cls, name):
         return json.loads(cls.get_file(name, 'json'))
 
@@ -52,7 +57,7 @@ class TestFileMixin(object):
         if normalize:
             expected = parse_normalize(expected)
             actual = parse_normalize(actual)
-        _check_shared(expected, actual, LXMLOutputChecker(), "html")
+        _check_shared(expected, actual, LXMLOutputChecker(), "xml")
 
     def assertHtmlEqual(self, expected, actual, normalize=True):
         if normalize:

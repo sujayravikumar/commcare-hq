@@ -1,20 +1,21 @@
-from django.http import HttpResponse, HttpResponseRedirect, Http404, HttpResponseNotFound
+import json
+import copy
+
+from django.contrib import messages
+from django.core.urlresolvers import reverse
+from django.http import HttpResponseRedirect, Http404
 from django.utils.decorators import method_decorator
 from django.utils.translation import ugettext as _, ugettext_noop
+
+from dimagi.utils.decorators.memoized import memoized
+from dimagi.utils.web import json_response
+
 from corehq.apps.domain.decorators import (
     domain_admin_required,
     login_and_domain_required,
 )
-from corehq.apps.domain.models import Domain
 from corehq.apps.domain.views import BaseDomainView
-from corehq.apps.locations.models import Location
-from dimagi.utils.decorators.memoized import memoized
-from django.core.urlresolvers import reverse
-from django.contrib import messages
-import json
-from couchdbkit import ResourceNotFound
-import itertools
-import copy
+from corehq.apps.locations.models import SQLLocation, LocationType
 
 from .forms import ConsumptionForm, StockLevelsForm, CommTrackSettingsForm
 from .models import CommtrackActionConfig, StockRestoreConfig
@@ -120,6 +121,9 @@ class CommTrackSettingsView(BaseCommTrackManageView):
 
             self.commtrack_settings.save()
 
+            for loc_type in LocationType.objects.filter(domain=self.domain).all():
+                # This will update stock levels based on commtrack config
+                loc_type.save()
 
             if (previous_config.use_auto_consumption != self.commtrack_settings.use_auto_consumption
                 or previous_config.consumption_config.to_json() != self.commtrack_settings.consumption_config.to_json()
@@ -165,42 +169,26 @@ class DefaultConsumptionView(BaseCommTrackManageView):
 @login_and_domain_required
 def api_query_supply_point(request, domain):
     id = request.GET.get('id')
-    query = request.GET.get('name', '')
-    
+    query = request.GET.get('name', '').lower()
+
     def loc_to_payload(loc):
-        return {'id': loc._id, 'name': loc.name}
+        return {'id': loc.location_id, 'name': loc.display_name}
 
     if id:
         try:
-            loc = Location.get(id)
-            return HttpResponse(json.dumps(loc_to_payload(loc)), 'text/json')
-
-        except ResourceNotFound:
-            return HttpResponseNotFound(json.dumps({'message': 'no location with id %s found' % id}, 'text/json'))
-
+            loc = SQLLocation.objects.get(location_id=id)
+        except SQLLocation.DoesNotExist:
+            return json_response(
+                {'message': 'no location with id %s found' % id},
+                status_code=404,
+            )
+        else:
+            return json_response(loc_to_payload(loc))
     else:
-        LIMIT = 100
-        loc_types = [loc_type.name for loc_type in Domain.get_by_name(domain).location_types]
-
-        def get_locs(type):
-            # TODO use ES instead?
-            q = query.lower()
-            startkey = [domain, type, q]
-            endkey = [domain, type, q + 'zzzzzz']
-            return [loc for loc in Location.view(
-                'locations/by_name',
-                startkey=startkey,
-                endkey=endkey,
-                limit=LIMIT,
-                reduce=False,
-                include_docs=True,
-            ) if not loc.is_archived]
-
-        locs = sorted(
-            itertools.chain(*(get_locs(loc_type) for loc_type in loc_types)),
-            key=lambda e: e.name
-        )[:LIMIT]
-        return HttpResponse(json.dumps(map(loc_to_payload, locs)), 'text/json')
+        locs = SQLLocation.objects.filter(domain=domain)
+        if query:
+            locs = locs.filter(name__icontains=query)
+        return json_response(map(loc_to_payload, locs[:10]))
 
 
 class SMSSettingsView(BaseCommTrackManageView):
@@ -270,29 +258,36 @@ class StockLevelsView(BaseCommTrackManageView):
     template_name = 'commtrack/manage/stock_levels.html'
 
     def get_existing_stock_levels(self):
-        """
-        Returns a list of dicts of this form:
-        {
-            'loc_type': 'district,
-            'emergency_level': 0.5,
-            'understock_threshold': 1.5,
-            'overstock_threshold': 3,
-        }
-        """
+        loc_types = LocationType.objects.by_domain(self.domain)
         return [{
             'loc_type': loc_type.name,
-            'emergency_level': 0.5,
-            'understock_threshold': 1.5,
-            'overstock_threshold': 3,
-        } for loc_type in self.domain_object.location_types]
+            'emergency_level': loc_type.emergency_level,
+            'understock_threshold': loc_type.understock_threshold,
+            'overstock_threshold': loc_type.overstock_threshold,
+        } for loc_type in loc_types]
 
     def save_stock_levels(self, levels):
         """
-        Accepts a dict of the form returned by get_existing_stock_levels
+        Accepts a list of dicts of the form returned by
+        get_existing_stock_levels and writes to the appropriate LocationType
         """
-        for d in levels:
-            print d.values()
-            print "saved levels for {}".format(d['loc_type'])
+        levels = {level['loc_type']: level for level in levels}
+        for loc_type in LocationType.objects.filter(domain=self.domain).all():
+            if loc_type.name not in levels:
+                continue
+
+            stock_levels = levels[loc_type.name]
+            changed = False
+            for threshold in [
+                'emergency_level',
+                'understock_threshold',
+                'overstock_threshold'
+            ]:
+                if getattr(loc_type, threshold) != stock_levels[threshold]:
+                    setattr(loc_type, threshold, stock_levels[threshold])
+                    changed = True
+            if changed:
+                loc_type.save()
 
     @property
     def page_context(self):

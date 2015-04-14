@@ -13,10 +13,11 @@ from custom.common import ALL_OPTION
 from custom.ilsgateway.filters import MonthAndQuarterFilter
 from custom.ilsgateway.models import SupplyPointStatusTypes, OrganizationSummary
 from corehq.apps.reports.graph_models import PieChart
-from dimagi.utils.dates import DateSpan, DEFAULT_DATE_FORMAT
+from dimagi.utils.dates import DateSpan
 from dimagi.utils.decorators.memoized import memoized
 from custom.ilsgateway.tanzania.reports.utils import make_url
 from django.utils import html
+from dimagi.utils.parsing import ISO_DATE_FORMAT
 
 
 class ILSData(object):
@@ -119,7 +120,7 @@ class ILSMixin(object):
 class ILSDateSpan(DateSpan):
 
     @classmethod
-    def from_month_or_quarter(cls, month_or_quarter=None, year=None, format=DEFAULT_DATE_FORMAT,
+    def from_month_or_quarter(cls, month_or_quarter=None, year=None, format=ISO_DATE_FORMAT,
                               inclusive=True, timezone=pytz.utc):
         """
         Generate a DateSpan object given a numerical month and year.
@@ -171,14 +172,14 @@ class MonthQuarterYearMixin(object):
         if 'month' in self.request_params:
             return int(self.request_params['month'])
         else:
-            return datetime.now().month
+            return datetime.utcnow().month
 
     @property
     def year(self):
         if 'year' in self.request_params:
             return int(self.request_params['year'])
         else:
-            return datetime.now().year
+            return datetime.utcnow().year
 
 
 class MultiReport(SqlTabularReport, ILSMixin, CustomProjectReport,
@@ -239,14 +240,19 @@ class MultiReport(SqlTabularReport, ILSMixin, CustomProjectReport,
                         .values_list('product_id', flat=True)
                     prd_part_url = '&filter_by_product=%s' % ALL_OPTION
                 else:
-                    products = [SQLProduct.objects.get(pk=product, is_archived=False).order_by('code').product_id
-                                for product in products_list]
+                    products = SQLProduct.objects.filter(
+                        pk__in=products_list,
+                        is_archived=False
+                    ).order_by('code').values_list('product_id', flat=True)
+
                     prd_part_url = "".join(["&filter_by_product=%s" % product for product in products_list])
 
             else:
-                products = SQLProduct.objects.filter(domain=self.domain, is_archived=False)\
-                    .values_list('product_id', flat=True)\
-                    .order_by('code')
+                products = SQLProduct.objects.filter(
+                    domain=self.domain,
+                    is_archived=False
+                ).order_by('code').values_list('product_id', flat=True)
+
                 prd_part_url = "&filter_by_product="
             config.update(dict(products=products, program=program, prd_part_url=prd_part_url))
 
@@ -340,7 +346,7 @@ class DetailsReport(MultiReport):
 
     @property
     def with_tabs(self):
-        return self.location and self.location.location_type == 'FACILITY'
+        return self.location and self.location.location_type.name.upper() == 'FACILITY'
 
     @property
     def report_context(self):

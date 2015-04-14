@@ -10,7 +10,11 @@ class AlertsHandler(KeywordHandler):
         verified_contact = self.verified_contact
         user = verified_contact.owner
         domain = Domain.get_by_name(verified_contact.domain)
-        text = self.msg.text
+        splitted_text = self.msg.text.split()
+        if splitted_text[0].lower() == 'soh':
+            text = ' '.join(self.msg.text.split()[1:])
+        else:
+            text = self.msg.text
 
         if not domain.commtrack_enabled:
             return False
@@ -25,9 +29,7 @@ class AlertsHandler(KeywordHandler):
                 raise
             send_sms_to_verified_number(verified_contact, 'problem with stock report: %s' % str(e))
             return True
+        process(domain.name, data)
         transactions = data['transactions']
-
-        if not stock_alerts(transactions, user) and user.location:
-            process(domain.name, data)
-            report_completion_check(self.user)
+        stock_alerts(transactions, user)
         return True

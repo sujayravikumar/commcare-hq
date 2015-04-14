@@ -29,8 +29,8 @@ class DeploymentsReport(GenericTabularReport, ProjectReport, ProjectReportParame
    
     @classmethod
     def show_in_navigation(cls, domain=None, project=None, user=None):
-        # for commtrack/connect projects - only show if the user can view apps
-        if project.commtrack_enabled or project.commconnect_enabled:
+        # for commtrack projects - only show if the user can view apps
+        if project.commtrack_enabled:
             return user and (user.is_superuser or user.has_permission(domain, 'edit_apps'))
         return super(DeploymentsReport, cls).show_in_navigation(domain, project, user)
 
@@ -65,6 +65,8 @@ def _build_html(version, version_source):
 class ApplicationStatusReport(DeploymentsReport):
     name = ugettext_noop("Application Status")
     slug = "app_status"
+    emailable = True
+    exportable = True
     fields = ['corehq.apps.reports.filters.users.UserTypeFilter',
               'corehq.apps.reports.filters.select.GroupFilter',
               'corehq.apps.reports.filters.select.SelectApplicationFilter']

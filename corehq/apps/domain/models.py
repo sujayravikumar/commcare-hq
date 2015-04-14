@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
 from itertools import imap
-import hashlib
 import json
 import logging
 import uuid
@@ -13,24 +12,24 @@ from couchdbkit.ext.django.schema import (
     DocumentSchema, SchemaProperty, DictProperty,
     StringListProperty, SchemaListProperty, TimeProperty, DecimalProperty
 )
-from django.core.cache import cache
 from django.core.urlresolvers import reverse
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
 from corehq.apps.appstore.models import SnapshotMixin
+from corehq.util.quickcache import skippable_quickcache
 from dimagi.utils.couch.cache import cache_core
-from dimagi.utils.couch.database import iter_docs
+from dimagi.utils.couch.database import (
+    iter_docs, get_db, get_safe_write_kwargs, apply_update, iter_bulk_delete
+)
 from dimagi.utils.decorators.memoized import memoized
+from dimagi.utils.django.email import send_HTML_email
 from dimagi.utils.html import format_html
 from dimagi.utils.logging import notify_exception
-from dimagi.utils.couch.database import get_db, get_safe_write_kwargs, apply_update, iter_bulk_delete
-from dimagi.utils.django.email import send_HTML_email
 from dimagi.utils.web import get_url_base
 from itertools import chain
 from langcodes import langs as all_langs
 from collections import defaultdict
 from django.utils.importlib import import_module
-from corehq.apps.locations.schema import LocationType
 from corehq import toggles
 
 from .exceptions import InactiveTransferDomainException
@@ -217,7 +216,6 @@ class Domain(Document, SnapshotMixin):
     is_shared = BooleanProperty(default=False)
     commtrack_enabled = BooleanProperty(default=False)
     locations_enabled = BooleanProperty(default=False)
-    location_types = SchemaListProperty(LocationType)
     call_center_config = SchemaProperty(CallCenterProperties)
     has_careplan = BooleanProperty(default=False)
     restrict_superusers = BooleanProperty(default=False)
@@ -350,6 +348,11 @@ class Domain(Document, SnapshotMixin):
         if 'cloudcare_releases' not in data:
             data['cloudcare_releases'] = 'nostars'  # legacy default setting
 
+        # Don't actually remove location_types yet.  We can migrate fully and
+        # remove this after everything's hunky-dory in production.  2015-03-06
+        if 'location_types' in data:
+            data['obsolete_location_types'] = data.pop('location_types')
+
         self = super(Domain, cls).wrap(data)
         if self.deployment is None:
             self.deployment = Deployment()
@@ -358,6 +361,11 @@ class Domain(Document, SnapshotMixin):
         if should_save:
             self.save()
         return self
+
+    def get_default_timezone(self):
+        """return a timezone object from self.default_timezone"""
+        import pytz
+        return pytz.timezone(self.default_timezone)
 
     @staticmethod
     def active_for_user(user, is_active=True):
@@ -490,7 +498,7 @@ class Domain(Document, SnapshotMixin):
             include_docs=False,
             limit=1).all()
         if len(res) > 0: # if there have been any submissions in the past 30 days
-            return (datetime.now() <=
+            return (datetime.utcnow() <=
                     datetime.strptime(res[0]['key'][2], "%Y-%m-%dT%H:%M:%SZ")
                     + timedelta(days=30))
         else:
@@ -508,6 +516,7 @@ class Domain(Document, SnapshotMixin):
         return self.name
 
     @classmethod
+    @skippable_quickcache(['name'], skip_arg='strict', timeout=30*60)
     def get_by_name(cls, name, strict=False):
         if not name:
             # get_by_name should never be called with name as None (or '', etc)
@@ -525,37 +534,21 @@ class Domain(Document, SnapshotMixin):
                     notify_exception(None, '%r is not a valid domain name' % name)
                     return None
 
-        cache_key = _domain_cache_key(name)
-        if not strict:
-            MISSING = object()
-            res = cache.get(cache_key, MISSING)
-            if res != MISSING:
-                return res
+        def _get_by_name(stale=False):
+            extra_args = {'stale': settings.COUCH_STALE_QUERY} if stale else {}
+            result = cls.view("domain/domains", key=name, reduce=False, include_docs=True, **extra_args).first()
+            if not isinstance(result, Domain):
+                # A stale view may return a result with no doc if the doc has just been deleted.
+                # In this case couchdbkit just returns the raw view result as a dict
+                return None
+            else:
+                return result
 
-        domain = cls._get_by_name(name, strict)
-        # 30 mins, so any unforeseen invalidation bugs aren't too bad.
-        cache.set(cache_key, domain, 30*60)
-        return domain
-
-    @classmethod
-    def _get_by_name(cls, name, strict=False):
-        extra_args = {'stale': settings.COUCH_STALE_QUERY} if not strict else {}
-
-        db = cls.get_db()
-        res = cache_core.cached_view(db, "domain/domains", key=name, reduce=False,
-                                     include_docs=True, wrapper=cls.wrap, force_invalidate=strict,
-                                     **extra_args)
-
-        if len(res) > 0:
-            result = res[0]
-        else:
-            result = None
-
-        if result is None and not strict:
+        domain = _get_by_name(stale=(not strict))
+        if domain is None and not strict:
             # on the off chance this is a brand new domain, try with strict
-            return cls.get_by_name(name, strict=True)
-
-        return result
+            domain = _get_by_name(stale=False)
+        return domain
 
     @classmethod
     def get_by_organization(cls, organization):
@@ -613,7 +606,7 @@ class Domain(Document, SnapshotMixin):
         if not include_docs:
             return domains
         else:
-            return imap(cls, iter_docs(cls.get_db(), [d['id'] for d in domains]))
+            return imap(cls.wrap, iter_docs(cls.get_db(), [d['id'] for d in domains]))
 
     @classmethod
     def get_all_names(cls):
@@ -624,7 +617,7 @@ class Domain(Document, SnapshotMixin):
 
     def save(self, **params):
         super(Domain, self).save(**params)
-        cache.delete(_domain_cache_key(self.name))
+        Domain.get_by_name.clear(Domain, self.name)  # clear the domain cache
 
         from corehq.apps.domain.signals import commcare_domain_post_save
         results = commcare_domain_post_save.send_robust(sender='domain', domain=self)
@@ -755,6 +748,9 @@ class Domain(Document, SnapshotMixin):
         if doc_type in ('Application', 'RemoteApp'):
             new_doc = import_app(id, new_domain_name)
             new_doc.copy_history.append(id)
+            # when copying from app-docs that don't have
+            # unique_id attribute on Modules
+            new_doc.ensure_module_unique_ids(should_save=False)
         else:
             cls = str_to_cls[doc_type]
 
@@ -795,7 +791,7 @@ class Domain(Document, SnapshotMixin):
             if copy is None:
                 return None
             copy.is_snapshot = True
-            copy.snapshot_time = datetime.now()
+            copy.snapshot_time = datetime.utcnow()
             del copy.deployment
             copy.save()
             return copy
@@ -896,6 +892,9 @@ class Domain(Document, SnapshotMixin):
     def get_license_display(self):
         return LICENSES.get(self.license)
 
+    def get_license_url(self):
+        return LICENSE_LINKS.get(self.license)
+
     def copies(self):
         return Domain.view('domain/copied_from_snapshot', key=self._id, include_docs=True)
 
@@ -912,6 +911,7 @@ class Domain(Document, SnapshotMixin):
         )]
         iter_bulk_delete(db, related_doc_ids, chunksize=500)
         super(Domain, self).delete()
+        Domain.get_by_name.clear(Domain, self.name)  # clear the domain cache
 
     def all_media(self, from_apps=None): #todo add documentation or refactor
         from corehq.apps.hqmedia.models import CommCareMultimedia
@@ -1034,6 +1034,11 @@ class Domain(Document, SnapshotMixin):
         return self.published_by.human_friendly_name if self.published_by else ""
 
     @property
+    def location_types(self):
+        from corehq.apps.locations.models import LocationType
+        return LocationType.objects.filter(domain=self.name).all()
+
+    @property
     def supports_multiple_locations_per_user(self):
         """
         This method is a wrapper around the toggle that
@@ -1049,7 +1054,7 @@ class DomainCounter(Document):
     domain = StringProperty()
     name = StringProperty()
     count = IntegerProperty()
-    
+
     @classmethod
     def get_or_create(cls, domain, name):
         #TODO: Need to make this atomic
@@ -1065,7 +1070,7 @@ class DomainCounter(Document):
             )
             counter.save()
         return counter
-    
+
     @classmethod
     def increment(cls, domain, name, amount=1):
         num_tries = 0
@@ -1148,7 +1153,7 @@ class TransferDomainRequest(models.Model):
     @requires_active_transfer
     def send_transfer_request(self):
         self.transfer_guid = uuid.uuid4().hex
-        self.request_time = datetime.now()
+        self.request_time = datetime.utcnow()
         self.save()
 
         self.email_to_request()
@@ -1196,7 +1201,7 @@ class TransferDomainRequest(models.Model):
     @requires_active_transfer
     def transfer_domain(self, *args, **kwargs):
 
-        self.confirm_time = datetime.now()
+        self.confirm_time = datetime.utcnow()
         if 'ip' in kwargs:
             self.confirm_ip = kwargs['ip']
 
@@ -1228,7 +1233,3 @@ class TransferDomainRequest(models.Model):
             'deactivate_url': self.deactivate_url(),
             'activate_url': self.activate_url(),
         }
-
-
-def _domain_cache_key(name):
-    return hashlib.md5(u'cchq:domain:{name}'.format(name=name).encode('utf-8')).hexdigest()

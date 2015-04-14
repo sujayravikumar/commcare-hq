@@ -6,7 +6,6 @@ from datetime import datetime
 import hashlib
 from couchdbkit.exceptions import ResourceConflict
 from couchdbkit.ext.django.schema import *
-from couchdbkit.schema import LazyDict
 from corehq.apps.app_manager.exceptions import XFormException
 from dimagi.utils.couch.resource_conflict import retry_resource
 from django.contrib import messages
@@ -485,7 +484,7 @@ class ApplicationMediaReference(object):
     def _get_name(self, raw_name, lang=None):
         if not raw_name:
             return ""
-        if not isinstance(raw_name, dict) or not isinstance(raw_name, LazyDict):
+        if not isinstance(raw_name, dict):
             return raw_name
         if lang is None:
             lang = self.app_lang
@@ -506,6 +505,9 @@ class HQMediaMixin(Document):
 
     # keys are the paths to each file in the final application media zip
     multimedia_map = SchemaDictProperty(HQMediaMapItem)
+
+    # paths to custom logos
+    logo_refs = DictProperty()
 
     @property
     @memoized
@@ -627,14 +629,19 @@ class HQMediaMixin(Document):
             'is_menu_media': is_menu_media,
         }
 
-    def remove_unused_mappings(self, additional_permitted_paths=()):
+    @property
+    @memoized
+    def logo_paths(self):
+        return set(value['path'] for value in self.logo_refs.values())
+
+    def remove_unused_mappings(self):
         """
             This checks to see if the paths specified in the multimedia map still exist in the Application.
             If not, then that item is removed from the multimedia map.
         """
         map_changed = False
         paths = self.multimedia_map.keys() if self.multimedia_map else []
-        permitted_paths = self.all_media_paths | set(additional_permitted_paths)
+        permitted_paths = self.all_media_paths | self.logo_paths
         for path in paths:
             if path not in permitted_paths:
                 map_changed = True

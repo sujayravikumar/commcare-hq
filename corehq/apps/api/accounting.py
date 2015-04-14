@@ -3,13 +3,13 @@ from corehq.apps.accounting.models import Feature, FeatureRate, SoftwarePlanVers
     BillingAccountAdmin, BillingAccount, BillingContactInfo, Currency, PaymentRecord, SoftwareProductRate, \
     SoftwareProduct, SoftwarePlan, DefaultProductPlan, CreditAdjustment, Subscription, CreditLine, Subscriber, \
     SubscriptionAdjustment, BillingRecord, Invoice
-from corehq.apps.api.resources.v0_1 import CustomResourceMeta, SuperuserAuthentication
+from corehq.apps.api.resources.v0_1 import CustomResourceMeta, AdminAuthentication
 from tastypie import fields
 from django_prbac.models import Role
 
 
 class AccountingResourceMeta(CustomResourceMeta):
-    authentication = SuperuserAuthentication()
+    authentication = AdminAuthentication()
     list_allowed_methods = ['get']
     include_resource_uri = False
 
@@ -212,6 +212,7 @@ class SubscriptionAndAdjustmentResource(ModelResource):
 
     subscription = fields.ToOneField(SubscriptionResource, 'subscription', full=True, null=True)
     related_subscription = fields.ToOneField(SubscriptionResource, 'related_subscription', full=True, null=True)
+    invoice = fields.ToOneField(InvoiceResource, 'invoice', full=True, null=True)
 
     class Meta(AccountingResourceMeta):
         queryset = SubscriptionAdjustment.objects.all()

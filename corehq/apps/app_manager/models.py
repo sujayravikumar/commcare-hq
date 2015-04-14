@@ -17,6 +17,7 @@ from urllib2 import urlopen
 from urlparse import urljoin
 
 from couchdbkit import ResourceConflict, MultipleResultsFound
+import itertools
 from lxml import etree
 from django.core.cache import cache
 from django.utils.encoding import force_unicode
@@ -31,8 +32,10 @@ from django.template.loader import render_to_string
 from restkit.errors import ResourceError
 from couchdbkit.resource import ResourceNotFound
 from corehq import toggles, privileges
+from corehq.const import USER_DATE_FORMAT, USER_TIME_FORMAT
 from corehq.apps.app_manager.feature_support import CommCareFeatureSupportMixin
 from corehq.util.quickcache import quickcache
+from corehq.util.timezones.conversions import ServerTime
 from django_prbac.exceptions import PermissionDenied
 from corehq.apps.accounting.utils import domain_has_privilege
 
@@ -53,7 +56,6 @@ from corehq.util import view_utils
 from corehq.apps.appstore.models import SnapshotMixin
 from corehq.apps.builds.models import BuildSpec, CommCareBuildConfig, BuildRecord
 from corehq.apps.hqmedia.models import HQMediaMixin
-from corehq.apps.reports.templatetags.timezone_tags import utc_to_timezone
 from corehq.apps.translations.models import TranslationMixin
 from corehq.apps.users.models import CouchUser
 from corehq.apps.users.util import cc_user_domain
@@ -72,6 +74,7 @@ from .exceptions import (
     IncompatibleFormTypeException,
     LocationXpathValidationError,
     ModuleNotFoundException,
+    ModuleIdMissingException,
     RearrangeError,
     VersioningError,
     XFormException,
@@ -317,7 +320,7 @@ class FormActions(DocumentSchema):
         return names
 
 
-class AdvancedAction(DocumentSchema):
+class AdvancedAction(IndexedSchema):
     case_type = StringProperty()
     case_tag = StringProperty()
     case_properties = DictProperty()
@@ -325,6 +328,8 @@ class AdvancedAction(DocumentSchema):
     parent_reference_id = StringProperty(default='parent')
 
     close_condition = SchemaProperty(FormActionCondition)
+
+    __eq__ = DocumentSchema.__eq__
 
     def get_paths(self):
         for path in self.case_properties.values():
@@ -335,10 +340,6 @@ class AdvancedAction(DocumentSchema):
 
     def get_property_names(self):
         return set(self.case_properties.keys())
-
-    @property
-    def case_session_var(self):
-        return 'case_id_{0}'.format(self.case_tag)
 
     @property
     def is_subcase(self):
@@ -366,7 +367,7 @@ class AutoSelectCase(DocumentSchema):
 class LoadUpdateAction(AdvancedAction):
     """
     details_module:     Use the case list configuration from this module to show the cases.
-    preload:            Value from the case to load into the form.
+    preload:            Value from the case to load into the form. Keys are question paths, values are case properties.
     auto_select:        Configuration for auto-selecting the case
     show_product_stock: If True list the product stock using the module's Product List configuration.
     product_program:    Only show products for this CommTrack program.
@@ -381,13 +382,17 @@ class LoadUpdateAction(AdvancedAction):
         for path in super(LoadUpdateAction, self).get_paths():
             yield path
 
-        for path in self.preload.values():
+        for path in self.preload.keys():
             yield path
 
     def get_property_names(self):
         names = super(LoadUpdateAction, self).get_property_names()
-        names.update(self.preload.keys())
+        names.update(self.preload.values())
         return names
+
+    @property
+    def case_session_var(self):
+        return 'case_id_{0}'.format(self.case_tag)
 
 
 class AdvancedOpenCaseAction(AdvancedAction):
@@ -405,13 +410,20 @@ class AdvancedOpenCaseAction(AdvancedAction):
         if self.open_condition.type == 'if':
             yield self.open_condition.question
 
+    @property
+    def case_session_var(self):
+        return 'case_id_new_{}_{}'.format(self.case_type, self.id)
+
 
 class AdvancedFormActions(DocumentSchema):
     load_update_cases = SchemaListProperty(LoadUpdateAction)
     open_cases = SchemaListProperty(AdvancedOpenCaseAction)
 
+    get_load_update_actions = IndexedSchema.Getter('load_update_cases')
+    get_open_actions = IndexedSchema.Getter('open_cases')
+
     def get_all_actions(self):
-        return self.load_update_cases + self.open_cases
+        return itertools.chain(self.get_load_update_actions(), self.get_open_actions())
 
     def get_subcase_actions(self):
         return (a for a in self.get_all_actions() if a.parent_tag)
@@ -485,8 +497,8 @@ class AdvancedFormActions(DocumentSchema):
                 if type == 'load' and action.auto_select and action.auto_select.mode:
                     meta['by_auto_select_mode'][action.auto_select.mode].append(action)
 
-        add_actions('load', self.load_update_cases)
-        add_actions('open', self.open_cases)
+        add_actions('load', self.get_load_update_actions())
+        add_actions('open', self.get_open_actions())
 
         return meta
 
@@ -560,7 +572,7 @@ class FormLink(DocumentSchema):
     form_id:    id of next form to open
     """
     xpath = StringProperty()
-    form_id = StringProperty()
+    form_id = FormIdProperty('modules[*].forms[*].form_links[*].form_id')
 
 
 class FormSchedule(DocumentSchema):
@@ -727,6 +739,9 @@ class FormBase(DocumentSchema):
             error = {'type': 'validation error', 'validation_message': msg}
             error.update(meta)
             errors.append(error)
+
+        if self.post_form_workflow == WORKFLOW_FORM and not self.form_links:
+            errors.append(dict(type="no form links", **meta))
 
         errors.extend(self.extended_build_validation(meta, xml_valid, validate_module))
 
@@ -983,6 +998,17 @@ class Form(IndexedFormBase, NavMenuItemMediaMixin):
     def all_other_forms_require_a_case(self):
         m = self.get_module()
         return all([form.requires == 'case' for form in m.get_forms() if form.id != self.id])
+
+    def session_var_for_action(self, action_type, subcase_index=None):
+        module_case_type = self.get_module().case_type
+        if action_type == 'open_case':
+            return 'case_id_new_{}_0'.format(module_case_type)
+        if action_type == 'subcase':
+            opens_case = 'open_case' in self.active_actions()
+            subcase_type = self.actions.subcases[subcase_index].case_type
+            if opens_case:
+                subcase_index += 1
+            return 'case_id_new_{}_{}'.format(subcase_type, subcase_index)
 
     def _get_active_actions(self, types):
         actions = {}
@@ -1474,6 +1500,12 @@ class ModuleBase(IndexedSchema, NavMenuItemMediaMixin):
         except IndexError:
             raise FormNotFoundException()
 
+    def get_child_modules(self):
+        return [
+            module for module in self.get_app().get_modules()
+            if module.unique_id != self.unique_id and getattr(module, 'root_module_id', None) == self.unique_id
+        ]
+
     def requires_case_details(self):
         return False
 
@@ -1512,7 +1544,11 @@ class ModuleBase(IndexedSchema, NavMenuItemMediaMixin):
             if column.format in ('enum', 'enum-image'):
                 for item in column.enum:
                     key = item.key
-                    if not re.match('^([\w_-]*)$', key):
+                    # key cannot contain certain characters because it is used
+                    # to generate an xpath variable name within suite.xml
+                    # todo: I think the space here will break xpath generation
+                    # todo: which relies on 'k{key}' being a valid xpath token
+                    if not re.match('^([\w_ -]*)$', key):
                         yield {
                             'type': 'invalid id key',
                             'key': key,
@@ -1537,11 +1573,6 @@ class ModuleBase(IndexedSchema, NavMenuItemMediaMixin):
 
     def validate_for_build(self):
         errors = []
-        if not self.forms:
-            errors.append({
-                'type': 'no forms',
-                'module': self.get_module_info(),
-            })
         if self.requires_case_details():
             errors.extend(self.get_case_errors(
                 needs_case_type=True,
@@ -1701,6 +1732,11 @@ class Module(ModuleBase):
 
     def validate_for_build(self):
         errors = super(Module, self).validate_for_build()
+        if not self.forms and not self.case_list.show:
+            errors.append({
+                'type': 'no forms or case list',
+                'module': self.get_module_info(),
+            })
         for sort_element in self.detail_sort_elements:
             try:
                 validate_detail_screen_field(sort_element.field)
@@ -1819,6 +1855,18 @@ class AdvancedForm(IndexedFormBase, NavMenuItemMediaMixin):
     actions = SchemaProperty(AdvancedFormActions)
     schedule = SchemaProperty(FormSchedule, default=None)
 
+    @classmethod
+    def wrap(cls, data):
+        # lazy migration to swap keys with values in action preload dict.
+        # http://manage.dimagi.com/default.asp?162213
+        load_actions = data.get('actions', {}).get('load_update_cases', [])
+        for action in load_actions:
+            preload = action['preload']
+            if preload and preload.values()[0].startswith('/'):
+                action['preload'] = {v: k for k, v in preload.items()}
+
+        return super(AdvancedForm, cls).wrap(data)
+
     def add_stuff_to_xform(self, xform):
         super(AdvancedForm, self).add_stuff_to_xform(xform)
         xform.add_case_and_meta_advanced(self)
@@ -1841,7 +1889,7 @@ class AdvancedForm(IndexedFormBase, NavMenuItemMediaMixin):
 
     def get_registration_actions(self, case_type=None):
         return [
-            action for action in self.actions.open_cases
+            action for action in self.actions.get_open_actions()
             if not action.is_subcase and (not case_type or action.case_type == case_type)
         ]
 
@@ -1984,7 +2032,7 @@ class AdvancedForm(IndexedFormBase, NavMenuItemMediaMixin):
                     questions,
                     question_path
                 )
-            for name, question_path in action.preload.items():
+            for question_path, name in action.preload.items():
                 self.add_property_load(
                     app_case_meta,
                     action.case_type,
@@ -2101,9 +2149,6 @@ class AdvancedModule(ModuleBase):
             subcases = actions.get('subcases', None)
             case_type = from_module.case_type
 
-            def convert_preload(preload):
-                return dict(zip(preload.values(),preload.keys()))
-
             base_action = None
             if open:
                 base_action = AdvancedOpenCaseAction(
@@ -2119,7 +2164,7 @@ class AdvancedModule(ModuleBase):
                     case_type=case_type,
                     case_tag='load_{0}_0'.format(case_type),
                     case_properties=update.update if update else {},
-                    preload=convert_preload(preload.preload) if preload else {}
+                    preload=preload.preload if preload else {}
                 )
 
                 if from_module.parent_select.active:
@@ -2224,7 +2269,11 @@ class AdvancedModule(ModuleBase):
 
     def validate_for_build(self):
         errors = super(AdvancedModule, self).validate_for_build()
-
+        if not self.forms and not self.case_list.show:
+            errors.append({
+                'type': 'no forms or case list',
+                'module': self.get_module_info(),
+            })
         if self.case_list_form.form_id:
             forms = self.forms
 
@@ -2577,6 +2626,15 @@ class CareplanModule(ModuleBase):
             errors = self.validate_detail_columns(columns)
             for error in errors:
                 yield error
+
+    def validate_for_build(self):
+        errors = super(CareplanModule, self).validate_for_build()
+        if not self.forms:
+            errors.append({
+                'type': 'no forms',
+                'module': self.get_module_info(),
+            })
+        return errors
 
 
 class VersionedDoc(LazyAttachmentDoc):
@@ -3266,10 +3324,11 @@ class SavedAppBuild(ApplicationBase):
                     '_attachments', 'profile', 'translations'
                     'description', 'short_description'):
             data.pop(key, None)
+        built_on_user_time = ServerTime(self.built_on).user_time(timezone)
         data.update({
             'id': self.id,
-            'built_on_date': utc_to_timezone(data['built_on'], timezone, "%b %d, %Y"),
-            'built_on_time': utc_to_timezone(data['built_on'], timezone, "%H:%M %Z"),
+            'built_on_date': built_on_user_time.ui_string(USER_DATE_FORMAT),
+            'built_on_time': built_on_user_time.ui_string(USER_TIME_FORMAT),
             'build_label': self.built_with.get_label(),
             'jar_path': self.get_jar_path(),
             'short_name': self.short_name,
@@ -3306,7 +3365,6 @@ class Application(ApplicationBase, TranslationMixin, HQMediaMixin):
     commtrack_enabled = BooleanProperty(default=False)
     commtrack_requisition_mode = StringProperty(choices=CT_REQUISITION_MODES)
     auto_gps_capture = BooleanProperty(default=False)
-    logo_refs = DictProperty()
 
     @classmethod
     def wrap(cls, data):
@@ -3441,6 +3499,21 @@ class Application(ApplicationBase, TranslationMixin, HQMediaMixin):
                 map_item.version = pre_map_item.version
             else:
                 map_item.version = self.version
+
+    def ensure_module_unique_ids(self, should_save=False):
+        """
+            Creates unique_ids for modules that don't have unique_id attributes
+            should_save: the doc will be saved only if should_save is set to True
+
+            WARNING: If called on the same doc in different requests without saving,
+            this function will set different uuid each time,
+            likely causing unexpected behavior
+        """
+        if any(not mod.unique_id for mod in self.modules):
+            for mod in self.modules:
+                mod.get_or_create_unique_id()
+            if should_save:
+                self.save()
 
     def create_app_strings(self, lang):
         gen = app_strings.CHOICES[self.translation_strategy]
@@ -3872,6 +3945,8 @@ class Application(ApplicationBase, TranslationMixin, HQMediaMixin):
                 if xmlns_count[xmlns] > 1:
                     errors.append({'type': "duplicate xmlns", "xmlns": xmlns})
 
+        if any(not module.unique_id for module in self.get_modules()):
+            raise ModuleIdMissingException
         modules_dict = {m.unique_id: m for m in self.get_modules()}
 
         def _parent_select_fn(module):

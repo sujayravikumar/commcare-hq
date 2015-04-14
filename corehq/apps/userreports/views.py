@@ -67,17 +67,20 @@ def get_datasource_config_or_404(config_id, domain):
     return config, is_static
 
 
+@login_and_domain_required
 @toggles.USER_CONFIGURABLE_REPORTS.required_decorator()
 def configurable_reports_home(request, domain):
     return render(request, 'userreports/configurable_reports_home.html', _shared_context(domain))
 
 
+@login_and_domain_required
 @toggles.USER_CONFIGURABLE_REPORTS.required_decorator()
 def edit_report(request, domain, report_id):
     config = get_document_or_404(ReportConfiguration, domain, report_id)
     return _edit_report_shared(request, domain, config)
 
 
+@login_and_domain_required
 @toggles.USER_CONFIGURABLE_REPORTS.required_decorator()
 def create_report(request, domain):
     return _edit_report_shared(request, domain, ReportConfiguration(domain=domain))
@@ -296,6 +299,7 @@ def delete_report(request, domain, report_id):
     return HttpResponseRedirect(reverse('configurable_reports_home', args=[domain]))
 
 
+@login_and_domain_required
 @toggles.USER_CONFIGURABLE_REPORTS.required_decorator()
 def import_report(request, domain):
     if request.method == "POST":
@@ -318,6 +322,7 @@ def import_report(request, domain):
     return render(request, "userreports/import_report.html", context)
 
 
+@login_and_domain_required
 @toggles.USER_CONFIGURABLE_REPORTS.required_decorator()
 def report_source_json(request, domain, report_id):
     config = get_document_or_404(ReportConfiguration, domain, report_id)
@@ -325,17 +330,20 @@ def report_source_json(request, domain, report_id):
     return json_response(config)
 
 
+@login_and_domain_required
 @toggles.USER_CONFIGURABLE_REPORTS.required_decorator()
 def edit_data_source(request, domain, config_id):
     config, is_static = get_datasource_config_or_404(config_id, domain)
     return _edit_data_source_shared(request, domain, config, read_only=is_static)
 
 
+@login_and_domain_required
 @toggles.USER_CONFIGURABLE_REPORTS.required_decorator()
 def create_data_source(request, domain):
     return _edit_data_source_shared(request, domain, DataSourceConfiguration(domain=domain))
 
 
+@login_and_domain_required
 @toggles.USER_CONFIGURABLE_REPORTS.required_decorator()
 def create_data_source_from_app(request, domain):
     if request.method == 'POST':
@@ -399,7 +407,6 @@ def _delete_data_source_shared(request, domain, config_id):
                      _(u'Data source "{}" has been deleted.'.format(config.display_name)))
 
 
-
 @toggles.USER_CONFIGURABLE_REPORTS.required_decorator()
 @require_POST
 def rebuild_data_source(request, domain, config_id):
@@ -415,6 +422,7 @@ def rebuild_data_source(request, domain, config_id):
     return HttpResponseRedirect(reverse('edit_configurable_data_source', args=[domain, config._id]))
 
 
+@login_and_domain_required
 @toggles.USER_CONFIGURABLE_REPORTS.required_decorator()
 def preview_data_source(request, domain, config_id):
     config, is_static = get_datasource_config_or_404(config_id, domain)

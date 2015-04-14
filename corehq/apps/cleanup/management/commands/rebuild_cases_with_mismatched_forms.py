@@ -14,7 +14,10 @@ def get_records_to_process(search_key, batch_size):
         id = row["id"]
         doc = ExceptionRecord.get(id)
         domain = doc.domain if hasattr(doc, "domain") else ""
-        domain, case_id = domain.split(',')
+        try:
+            domain, case_id = domain.split(',')
+        except ValueError:
+            return {'exception': doc}
         return {
             'domain': domain,
             'case_id': case_id,
@@ -35,29 +38,41 @@ class Command(BaseCommand):
         make_option(
             '--limit',
             action='store',
+            type='int',
             dest='limit',
             default=1000,
             help="Only reprocess this many cases."),
         make_option(
             '--batch-size',
             action='store',
+            type='int',
             dest='batch',
             default=100,
             help="Size of batches to process"),
+        make_option(
+            '-q',
+            action='store_true',
+            dest='quiet',
+            default=False,
+            help="Don't print output"),
     )
 
     def handle(self, *args, **options):
-        count = 0
-        limit = options['limit']
-        batch = options['batch']
+        count = 1
+        limit, batch, quiet = options['limit'], options['batch'], options['quiet']
         while True:
+            if not quiet:
+                print 'Fetching new batch'
             total, records = get_records_to_process('CASE XFORM MISMATCH', batch)
             for record in records:
+                if 'case_id' not in record:
+                    record['exception'].archive('system')
+                    continue
                 case_id = record['case_id']
                 try:
                     rebuild_case(case_id)
                     record['exception'].archive('system')
-                    if count % 100 == 0:
+                    if not quiet:
                         print 'rebuilt %s/%s cases' % (count, total)
                 except Exception, e:
                     logging.exception("couldn't rebuild case {id}. {msg}".format(id=case_id, msg=str(e)))

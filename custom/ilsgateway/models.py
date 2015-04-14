@@ -16,6 +16,7 @@ class ILSGatewayConfig(Document):
     username = StringProperty()
     password = StringProperty()
     steady_sync = BooleanProperty(default=False)
+    all_stock_data = BooleanProperty(default=False)
 
     @classmethod
     def for_domain(cls, name):
@@ -159,7 +160,7 @@ class SupplyPointStatus(models.Model):
 class DeliveryGroupReport(models.Model):
     supply_point = models.CharField(max_length=100, db_index=True)
     quantity = models.IntegerField()
-    report_date = models.DateTimeField(default=datetime.now())
+    report_date = models.DateTimeField(default=datetime.utcnow())
     message = models.CharField(max_length=100, db_index=True)
     delivery_group = models.CharField(max_length=1)
     external_id = models.PositiveIntegerField(null=True, db_index=True)
@@ -381,21 +382,21 @@ class DeliveryGroups(object):
             facs = self.facs
         if not facs:
             return []
-        return filter(lambda f: self.current_delivering_group(month) in f.metadata.get('groups', []), facs)
+        return filter(lambda f: self.current_delivering_group(month) == f.metadata.get('group', None), facs)
 
     def processing(self, facs=None, month=None):
         if not facs:
             facs = self.facs
         if not facs:
             return []
-        return filter(lambda f: self.current_processing_group(month) in f.metadata.get('groups', []), facs)
+        return filter(lambda f: self.current_processing_group(month) == f.metadata.get('group', None), facs)
 
     def submitting(self, facs=None, month=None):
         if not facs:
             facs = self.facs
         if not facs:
             return []
-        return filter(lambda f: self.current_submitting_group(month) in f.metadata.get('groups', []), facs)
+        return filter(lambda f: self.current_submitting_group(month) == f.metadata.get('group', None), facs)
 
 
 # Ported from:

@@ -9,6 +9,7 @@ import cStringIO
 import itertools
 from datetime import datetime, timedelta, date
 from urllib2 import URLError
+from corehq.util.timezones.utils import get_timezone_for_user
 from dimagi.utils.decorators.memoized import memoized
 from unidecode import unidecode
 from dateutil.parser import parse
@@ -49,11 +50,10 @@ from couchexport.exceptions import (
     CouchExportException,
     SchemaMismatchException
 )
-from couchexport.groupexports import rebuild_export
 from couchexport.models import FakeSavedExportSchema, SavedBasicExport
 from couchexport.shortcuts import (export_data_shared, export_raw_data,
     export_response)
-from couchexport.tasks import rebuild_schemas
+from couchexport.tasks import rebuild_schemas, rebuild_export_task
 from couchexport.util import SerializableFunction
 from dimagi.utils.chunked import chunked
 from dimagi.utils.couch.bulk import wrapped_docs
@@ -82,7 +82,7 @@ from filters.users import UserTypeFilter
 from corehq.apps.domain.decorators import (login_or_digest)
 from corehq.apps.export.custom_export_helpers import CustomExportHelper
 from corehq.apps.groups.models import Group
-from corehq.apps.hqcase.export import export_cases_and_referrals
+from corehq.apps.hqcase.export import export_cases
 from corehq.apps.reports.dispatcher import ProjectReportDispatcher
 from corehq.apps.reports.models import (
     ReportConfig,
@@ -108,8 +108,6 @@ from corehq.apps.users.models import Permissions
 from corehq.apps.domain.decorators import login_and_domain_required
 
 from casexml.apps.case.xform import extract_case_blocks
-
-DATE_FORMAT = "%Y-%m-%d"
 
 datespan_default = datespan_in_request(
     from_param="startdate",
@@ -421,11 +419,14 @@ def hq_download_saved_export(req, domain, export_id):
 def hq_update_saved_export(req, domain):
     group_id = req.POST['group_export_id']
     index = int(req.POST['index'])
-    group_config = HQGroupExportConfiguration.get(group_id)
-    assert domain == group_config.domain
+    group_config = get_document_or_404(HQGroupExportConfiguration, domain, group_id)
     config, schema = group_config.all_exports[index]
-    rebuild_export(config, schema, 'couch')
-    messages.success(req, _('The data for {} has been refreshed!').format(config.name))
+    rebuild_export_task.delay(group_id, index)
+    messages.success(
+        req,
+        _('Data update for {} has started and the saved export will be automatically updated soon. '
+          'Please refresh the page periodically to check the status.').format(config.name)
+    )
     return HttpResponseRedirect(reverse(DataInterfaceDispatcher.name(),
                                         args=[domain, req.POST['report_slug']]))
 
@@ -652,7 +653,7 @@ def recalculate_hour(hour, hour_difference, minute_difference):
 
 
 def get_timezone_difference(domain):
-    return datetime.now(pytz.timezone(Domain._get_by_name(domain)['default_timezone'])).strftime('%z')
+    return datetime.now(pytz.timezone(Domain.get_by_name(domain)['default_timezone'])).strftime('%z')
 
 
 def calculate_day(interval, day, day_change):
@@ -730,7 +731,7 @@ def edit_scheduled_report(request, domain, scheduled_report_id=None,
     form.fields['recipient_emails'].choices = web_user_emails
 
     form.fields['hour'].help_text = "This scheduled report's timezone is %s (%s GMT)"  % \
-                                    (Domain._get_by_name(domain)['default_timezone'],
+                                    (Domain.get_by_name(domain)['default_timezone'],
                                     get_timezone_difference(domain)[:3] + ':' + get_timezone_difference(domain)[3:])
 
 
@@ -877,7 +878,7 @@ def view_scheduled_report(request, domain, scheduled_report_id):
 @login_and_domain_required
 @require_GET
 def case_details(request, domain, case_id):
-    timezone = util.get_timezone(request.couch_user, domain)
+    timezone = get_timezone_for_user(request.couch_user, domain)
 
     try:
         case = get_document_or_404(CommCareCase, domain, case_id)
@@ -950,6 +951,19 @@ def rebuild_case_view(request, domain, case_id):
     case = get_document_or_404(CommCareCase, domain, case_id)
     rebuild_case(case_id)
     messages.success(request, _(u'Case %s was rebuilt from its forms.' % case.name))
+    return HttpResponseRedirect(reverse('case_details', args=[domain, case_id]))
+
+
+@require_case_view_permission
+@require_permission(Permissions.edit_data)
+@require_POST
+def resave_case(request, domain, case_id):
+    case = get_document_or_404(CommCareCase, domain, case_id)
+    CommCareCase.get_db().save_doc(case._doc)  # don't just call save to avoid signals
+    messages.success(
+        request,
+        _(u'Case %s was successfully saved. Hopefully it will show up in all reports momentarily.' % case.name),
+    )
     return HttpResponseRedirect(reverse('case_details', args=[domain, case_id]))
 
 
@@ -1073,7 +1087,7 @@ def generate_case_export_payload(domain, include_closed, format, group, user_fil
     fd, path = tempfile.mkstemp()
     with os.fdopen(fd, 'wb') as file:
         workbook = WorkBook(file, format)
-        export_cases_and_referrals(
+        export_cases(
             domain,
             stream_cases(case_ids),
             workbook,
@@ -1129,7 +1143,7 @@ def download_cases(request, domain):
 
 
 def _get_form_context(request, domain, instance_id):
-    timezone = util.get_timezone(request.couch_user, domain)
+    timezone = get_timezone_for_user(request.couch_user, domain)
     instance = _get_form_or_404(instance_id)
     try:
         assert domain == instance.domain
@@ -1213,6 +1227,7 @@ def download_attachment(request, domain, instance_id):
     assert(domain == instance.domain)
     return couchforms_views.download_attachment(request, instance_id, attachment)
 
+
 @require_form_view_permission
 @require_permission(Permissions.edit_data)
 @require_POST
@@ -1258,6 +1273,7 @@ def archive_form(request, domain, instance_id):
 
     return HttpResponseRedirect(redirect)
 
+
 @require_form_view_permission
 @require_permission(Permissions.edit_data)
 def unarchive_form(request, domain, instance_id):
@@ -1273,6 +1289,17 @@ def unarchive_form(request, domain, instance_id):
     if not redirect:
         redirect = reverse('render_form_data', args=[domain, instance_id])
     return HttpResponseRedirect(redirect)
+
+
+@require_form_view_permission
+@require_permission(Permissions.edit_data)
+@require_POST
+def resave_form(request, domain, instance_id):
+    instance = _get_form_or_404(instance_id)
+    assert instance.domain == domain
+    XFormInstance.get_db().save_doc(instance.to_json())
+    messages.success(request, _("Form was successfully resaved. It should reappear in reports shortly."))
+    return HttpResponseRedirect(reverse('render_form_data', args=[domain, instance_id]))
 
 
 # Weekly submissions by xmlns

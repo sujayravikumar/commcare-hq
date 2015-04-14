@@ -11,6 +11,7 @@ from casexml.apps.case.util import reverse_indices
 from casexml.apps.case.xform import CaseDbCache
 from casexml.apps.phone.models import CaseState
 from dimagi.utils.decorators.memoized import memoized
+from dimagi.utils.parsing import string_to_utc_datetime
 
 logger = logging.getLogger(__name__)
 
@@ -42,17 +43,16 @@ def get_related_cases(initial_cases, domain, strip_history=False, search_up=True
     relevant_cases = {}
     relevant_deleted_case_ids = []
 
-    queue = list(case for case in initial_cases)
+    cases_to_process = list(case for case in initial_cases)
     directly_referenced_indices = itertools.chain(
         *[[index['referenced_id'] for index in indices(case)]
           for case in initial_cases]
     )
     case_db.populate(directly_referenced_indices)
 
-    def process_queue():
+    def process_cases(cases):
         new_relations = set()
-        while queue:
-            case = queue.pop()
+        for case in cases:
             if case and case['_id'] not in relevant_cases:
                 relevant_cases[case['_id']] = case
                 if case['doc_type'] == 'CommCareCase-Deleted':
@@ -61,10 +61,10 @@ def get_related_cases(initial_cases, domain, strip_history=False, search_up=True
 
         if new_relations:
             case_db.populate(new_relations)
-            queue.extend(case_db.get(related_case) for related_case in new_relations)
+            return [case_db.get(related_case) for related_case in new_relations]
 
-    while queue:
-        process_queue()
+    while cases_to_process:
+        cases_to_process = process_cases(cases_to_process)
 
     if relevant_deleted_case_ids:
         logging.info('deleted cases included in footprint (restore): %s' % (
@@ -107,108 +107,6 @@ def _to_case_id_set(cases):
     return set([c.case_id for c in cases])
 
 
-class CaseSyncOperation(object):
-    """
-    A record of a user's sync operation
-    """
-    
-    def __init__(self, user, last_sync):
-        self.user = user
-        self.last_sync = last_sync
-
-    @property
-    @memoized
-    def actual_owned_cases(self):
-        try:
-            keys = [[owner_id, False] for owner_id in self.user.get_owner_ids()]
-        except AttributeError:
-            keys = [[self.user.user_id, False]]
-
-        def _user_case_domain_match(case):
-            if self.user.domain:
-                return self.user.domain == case.domain
-            return True
-
-        cases = CommCareCase.view("case/by_owner_lite", keys=keys).all()
-        return set(filter(_user_case_domain_match, cases))
-
-    @property
-    @memoized
-    def actual_cases_to_sync(self):
-        # the world to sync involves
-        # Union(cases on the phone, footprint of those,
-        #       cases the server thinks are the phone's, footprint of those)
-        # intersected with:
-        # (cases modified by someone else since the last sync)
-
-        # TODO: clean this up. Basically everything is a set of cases,
-        # but in order to do proper comparisons we use IDs so all of these
-        # operations look much more complicated than they should be.
-        actual_cases_to_sync = []
-        for _, case in self.all_potential_to_sync_dict.items():
-            sync_update = CaseSyncUpdate(case, self.last_sync)
-            if sync_update.required_updates:
-                actual_cases_to_sync.append(sync_update)
-
-        return actual_cases_to_sync
-
-    @property
-    @memoized
-    def _all_relevant_cases(self):
-        return get_footprint(self.actual_owned_cases, domain=self.user.domain, strip_history=True)
-
-    @property
-    @memoized
-    def actual_relevant_cases(self):
-        return set(self._all_relevant_cases.values())
-
-    @property
-    @memoized
-    def actual_extended_cases(self):
-        return set([
-            self._get_case(case_id) for case_id in
-            _to_case_id_set(self.actual_relevant_cases) -
-            _to_case_id_set(self.actual_owned_cases)
-        ])
-
-    @property
-    @memoized
-    def phone_relevant_cases(self):
-        return set([
-            self._get_case(case_id) for case_id
-            in self.last_sync.get_footprint_of_cases_on_phone()
-        ]) if self.last_sync else set()
-
-    @property
-    @memoized
-    def all_potential_cases(self):
-        return set([
-            self._get_case(case_id) for case_id in
-            _to_case_id_set(self.actual_relevant_cases) |
-            _to_case_id_set(self.phone_relevant_cases)
-        ])
-
-    @property
-    @memoized
-    def all_potential_to_sync(self):
-        return filter_cases_modified_elsewhere_since_sync(list(self.all_potential_cases), self.last_sync)
-
-    @property
-    @memoized
-    def all_potential_to_sync_dict(self):
-        # this is messy but forces uniqueness at the case_id level, without
-        # having to reload all the cases from the DB
-        return dict((case.get_id, case) for case in self.all_potential_to_sync)
-
-    def _get_case(self, case_id):
-        if case_id in self._all_relevant_cases:
-            return self._all_relevant_cases[case_id]
-        else:
-            case = CommCareCase.get_with_rebuild(case_id)
-            self._all_relevant_cases[case_id] = case
-            return case
-
-
 class GlobalSyncState(object):
     """
     Object containing global state for a BatchedCaseSyncOperation.
@@ -237,18 +135,31 @@ class GlobalSyncState(object):
 
     @property
     def actual_owned_cases(self):
+        """
+        Cases directly owned by the user or one of the user's groups.
+        """
         return self.actual_owned_cases_dict.values()
 
     @property
     def actual_extended_cases(self):
+        """
+        Cases that are indexed by any cases owned by the user (but now owned directly)
+        """
         return list(set(self.actual_relevant_cases) - set(self.actual_owned_cases))
 
     @property
     def actual_relevant_cases(self):
+        """
+        All cases relevant to the user (owned and linked to)
+        """
         return self.actual_relevant_cases_dict.values()
 
     @property
     def all_synced_cases(self):
+        """
+        All cases that were included in the restore response i.e. cases that have updates
+        which the phone doesn't know about
+        """
         return self.all_synced_cases_dict.values()
 
     def update_owned_cases(self, cases):
@@ -280,10 +191,9 @@ class BatchedCaseSyncOperation(object):
     Global sync state is also available via the 'global_state' field.
 
     Usage:
-    op = BatchedCaseSyncOperation(user, last_sync, chunk_size)
-    for batch in op.batches():
-        case_updates = batch.case_updates_to_sync
-
+    op = BatchedCaseSyncOperation(user, last_synclog, chunk_size)
+    case_updates_generator = op.get_all_case_updates()
+    list(case_updates_generator)  # consume case updates generator to update global state
     global_state = op.global_state
 
     Throughout this process any case should be assumed to only contain the following properties:
@@ -296,9 +206,9 @@ class BatchedCaseSyncOperation(object):
     # use class variable to allow patching in tests
     chunk_size = 1000
 
-    def __init__(self, user, last_sync, chunk_size=None):
+    def __init__(self, user, last_synclog, chunk_size=None):
         self.user = user
-        self.last_sync = last_sync
+        self.last_synclog = last_synclog
         if chunk_size:
             self.chunk_size = chunk_size
         self.domain = self.user.domain
@@ -309,14 +219,15 @@ class BatchedCaseSyncOperation(object):
             self.owner_keys = [[self.user.user_id, False]]
 
         self.case_sharing = len(self.owner_keys) > 1
-        self.global_state = GlobalSyncState(self.last_sync, self.case_sharing)
+        self.global_state = GlobalSyncState(self.last_synclog, self.case_sharing)
+        self.batch_count = 0
 
     def batches(self):
         for key in self.owner_keys:
             batch = CaseSyncCouchBatch(
                 self.global_state,
                 self.domain,
-                self.last_sync,
+                self.last_synclog,
                 self.chunk_size,
                 key,
                 case_sharing=self.case_sharing
@@ -326,14 +237,26 @@ class BatchedCaseSyncOperation(object):
                 batch = batch.next_batch
                 yield batch
 
-        if self.last_sync:
+        if self.last_synclog:
             yield CaseSyncPhoneBatch(
                 self.global_state,
                 self.domain,
-                self.last_sync,
+                self.last_synclog,
                 self.chunk_size,
                 case_sharing=self.case_sharing
             )
+
+    def get_all_case_updates(self):
+        """
+        Returns a generator that yields the case updates for this user.
+        Iterating through the updates also has the effect of updating this object's GlobalSyncState.
+        """
+        def get_updates(batch):
+            logger.debug(batch)
+            self.batch_count += 1
+            return batch.case_updates_to_sync()
+
+        return itertools.chain.from_iterable(get_updates(batch) for batch in self.batches())
 
 
 class CaseSyncBatch(object):
@@ -548,32 +471,52 @@ class CaseSyncCouchBatch(CaseSyncBatch):
         )
 
 
-def get_case_updates(user, last_sync):
+def filter_cases_modified_elsewhere_since_sync(cases, last_sync_token):
     """
-    Given a user, get the open/updated cases since the last sync
-    operation.  This returns a CaseSyncOperation object containing
-    various properties about cases that should sync.
-    """
-    return CaseSyncOperation(user, last_sync)
+    This function takes in a list of unwrapped case dicts and a last_sync token and
+    returns the set of cases that should be applicable to be sent down on top of that
+    sync token.
 
-def filter_cases_modified_elsewhere_since_sync(cases, last_sync):
-    # this function is pretty ugly and is heavily optimized to reduce the number
+    This includes:
+
+      1. All cases that were modified since the last sync date by any phone other
+         than the phone that is associated with the sync token.
+      2. All cases that were not on the phone at the time of last sync that are
+         now on the phone.
+    """
+    # todo: this function is pretty ugly and is heavily optimized to reduce the number
     # of queries to couch.
-    if not last_sync:
+    if not last_sync_token:
         return cases
     else:
-        # todo: if this case list is huge i'm guessing this query is pretty expensive
-        case_ids = [case['_id'] for case in cases]
+        # we can start by filtering out our base set of cases to check for only
+        # things that have been modified since we last synced
+        def _is_relevant(case_or_case_state_dict):
+            if case_or_case_state_dict:
+                # only case-like things have this.
+                if 'server_modified_on' in case_or_case_state_dict:
+                    return string_to_utc_datetime(case['server_modified_on']) >= last_sync_token.date
+            # for case states default to always checking for recent updates
+            return True
+
+        recently_modified_case_ids = [case['_id'] for case in cases if _is_relevant(case)]
+        # create a mapping of all cases to sync logs for all cases that were modified
+        # in the appropriate ranges.
+        # todo: this should really have a better way to filter out updates from sync logs
+        # that we already have in a better way.
+        # todo: if this recently modified case list is huge i'm guessing this query is
+        # pretty expensive
         case_log_map = CommCareCase.get_db().view(
             'phone/cases_to_sync_logs',
-            keys=case_ids,
+            keys=recently_modified_case_ids,
             reduce=False,
         )
 
-        # create a set of tuples of the format (case_id, log_id)
         unique_combinations = set((row['key'], row['value']) for row in case_log_map)
 
-        # todo: and this could arguably be even worse
+        # todo: and this one is also going to be very bad. see note above about how we might
+        # be able to reduce it - by finding a way to only query for sync tokens that are more
+        # likely to be relevant.
         modification_dates = CommCareCase.get_db().view(
             'phone/case_modification_status',
             keys=[list(combo) for combo in unique_combinations],
@@ -584,23 +527,27 @@ def filter_cases_modified_elsewhere_since_sync(cases, last_sync):
         # { case_id: [{'token': 'token value', 'date': 'date value'}, ...]}
         all_case_updates_by_sync_token = defaultdict(list)
         for row in modification_dates:
-            # incoming format is a list of objects that look like this:
+            # format from couch is a list of objects that look like this:
             # {
             #   'value': '2012-08-22T08:55:14Z', (most recent date updated)
-            #   'key': ['[case id]', '[sync token id]']
+            #   'key': ['case-id', 'sync-token-id']
             # }
             if row['value']:
-                all_case_updates_by_sync_token[row['key'][0]].append(
-                    {'token': row['key'][1], 'date': datetime.strptime(row['value'], '%Y-%m-%dT%H:%M:%SZ')}
-                )
+                modification_date = datetime.strptime(row['value'], '%Y-%m-%dT%H:%M:%SZ')
+                if modification_date >= last_sync_token.date:
+                    case_id, sync_token_id = row['key']
+                    all_case_updates_by_sync_token[case_id].append(
+                        {'token': sync_token_id, 'date': modification_date}
+                    )
 
         def case_modified_elsewhere_since_sync(case_id):
             # NOTE: uses closures
-            return any([row['date'] >= last_sync.date and row['token'] != last_sync._id
+            return any([row['date'] >= last_sync_token.date and row['token'] != last_sync_token._id
                         for row in all_case_updates_by_sync_token[case_id]])
 
         def relevant(case):
             case_id = case['_id']
-            return case_modified_elsewhere_since_sync(case_id) or not last_sync.phone_is_holding_case(case_id)
+            return (case_modified_elsewhere_since_sync(case_id)
+                    or not last_sync_token.phone_is_holding_case(case_id))
 
         return filter(relevant, cases)

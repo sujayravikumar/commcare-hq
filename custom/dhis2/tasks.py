@@ -191,6 +191,13 @@ def create_case_from_dhis2(dhis2_child, domain, user):
     """
     case_id = uuid.uuid4().hex
     update = {k: dhis2_child[v] for k, v in NUTRITION_ASSESSMENT_PROGRAM_FIELDS.iteritems()}
+    update['dhis_org_id'] = dhis2_child['Org unit']
+    # Do the inverse of push_case() to 'Gender' / 'child_gender'
+    if 'child_gender' in update:
+        if update['child_gender'] == 'Undefined':
+            del update['child_gender']
+        else:
+            update['child_gender'] = update['child_gender'].lower()
     caseblock = CaseBlock(
         create=True,
         case_id=case_id,
@@ -247,7 +254,8 @@ def gen_children_only_ours(domain):
             yield CommCareCase.wrap(doc)
 
 
-@periodic_task(run_every=timedelta(hours=6))  # Check for new cases on DHIS2 every 6 hours
+# Check for new cases on DHIS2 every 6 hours
+@periodic_task(run_every=timedelta(hours=6), queue='background_queue')
 def fetch_cases():
     """
     Import new child cases from DHIS2 for nutrition tracking
@@ -259,7 +267,7 @@ def fetch_cases():
 
 
 # There is a large number of org units, but the lookup table is not deployed to handsets.
-@periodic_task(run_every=crontab(minute=3, hour=3))  # Run daily at 03h03
+@periodic_task(run_every=crontab(minute=3, hour=3), queue='background_queue')
 def fetch_org_units():
     """
     Synchronize DHIS2 Organization Units with local data.

@@ -10,7 +10,7 @@ from collections import defaultdict, OrderedDict
 import datetime
 import logging
 import pickle
-import simplejson
+import json
 import re
 from dateutil import parser
 
@@ -19,6 +19,7 @@ from django.template import RequestContext
 from django.template.loader import render_to_string
 from django.utils.translation import ugettext_noop, ugettext as _
 from sqlagg.filters import RawFilter, IN, EQFilter
+from corehq.const import SERVER_DATETIME_FORMAT
 from couchexport.models import Format
 from custom.common import ALL_OPTION
 
@@ -520,6 +521,11 @@ class BaseReport(BaseMixin, GetParamsMixin, MonthYearMixin, CustomProjectReport,
         return bool(self.request.GET.get('debug'))
 
     @property
+    def export_name(self):
+        return "%s %s/%s" % (super(BaseReport, self).export_name, self.request.GET.get('month'),
+                             self.request.GET.get('year'))
+
+    @property
     def show_html(self):
         return getattr(self, 'rendered_as', 'html') not in ('print', 'export')
 
@@ -542,9 +548,8 @@ class BaseReport(BaseMixin, GetParamsMixin, MonthYearMixin, CustomProjectReport,
             sd = parser.parse(startdate)
             ed = parser.parse(enddate)
             subtitles.append(" From %s to %s" % (str(sd.date()), str(ed.date())))
-        datetime_format = "%Y-%m-%d %H:%M:%S"
         subtitles.append("Generated {}".format(
-            datetime.datetime.utcnow().strftime(datetime_format)))
+            datetime.datetime.utcnow().strftime(SERVER_DATETIME_FORMAT)))
         return subtitles
 
     def filter(self, fn, filter_fields=None):
@@ -660,7 +665,7 @@ class BaseReport(BaseMixin, GetParamsMixin, MonthYearMixin, CustomProjectReport,
         return {}
 
     @property
-    @request_cache("raw")
+    @request_cache()
     def print_response(self):
         """
         Returns the report for printing.
@@ -926,7 +931,7 @@ class MetReport(CaseReportMixin, BaseReport):
                 ])
 
     @property
-    @request_cache("raw")
+    @request_cache()
     def print_response(self):
         """
         Returns the report for printing.
@@ -1006,12 +1011,16 @@ class NewHealthStatusReport(CaseReportMixin, BaseReport):
     """
     name = "New Health Status Report"
     slug = 'health_status_report'
-    report_template_path = "opm/beneficiary_report.html"
-    # report_template_path = "opm/hsr_report.html"
+    report_template_path = "opm/new_hsr_report.html"
     model = AWCHealthStatus
+    fix_left_col = True
 
     def get_row_data(self, row, **kwargs):
         return OPMCaseRow(row, self)
+
+    @property
+    def fixed_cols_spec(self):
+        return dict(num=7, width=600)
 
     @property
     def headers(self):
@@ -1019,6 +1028,27 @@ class NewHealthStatusReport(CaseReportMixin, BaseReport):
         for __, title, text, __ in self.model.method_map:
             headers.append(DataTablesColumn(name=title, help_text=text))
         return DataTablesHeader(*headers)
+
+    @property
+    @request_cache("raw")
+    def print_response(self):
+        self.is_rendered_as_email = True
+        self.use_datatables = False
+        self.override_template = "opm/new_hsr_print.html"
+        self.update_report_context()
+        self.pagination.count = 1000000
+        headers = self.headers
+        for h in headers:
+            if h.help_text:
+                h.html = "%s (%s)" % (h.html, h.help_text)
+                h.help_text = None
+
+        self.context['report_table'].update(
+            headers=headers
+        )
+        rendered_report = render_to_string(self.template_report, self.context,
+                                           context_instance=RequestContext(self.request))
+        return HttpResponse(rendered_report)
 
     @property
     @memoized
@@ -1078,7 +1108,7 @@ class NewHealthStatusReport(CaseReportMixin, BaseReport):
         def headers():
             headers = []
             for __, title, __, denom in self.model.method_map:
-                if denom == 'no_denom':
+                if denom == 'no_denom' or denom == 'one':
                     headers.append(DataTablesColumn(name=title))
                 else:
                     for template in [u"{}", u"{} - denominator", u"{} - percent"]:
@@ -1175,7 +1205,7 @@ def this_month_if_none(month, year):
             "You must pass either nothing or a month AND a year"
         return month, year
     else:
-        this_month = datetime.datetime.now()
+        this_month = datetime.datetime.utcnow()
         return this_month.month, this_month.year
 
 
@@ -1194,6 +1224,11 @@ class HealthStatusReport(DatespanMixin, BaseReport):
         ret = list(super(HealthStatusReport, self).rows)
         self.total_row = calculate_total_row(ret)
         return ret
+
+    @property
+    def export_name(self):
+        return "%s %s to %s" % (super(BaseReport, self).export_name, self.datespan.startdate_display,
+                             self.datespan.enddate_display)
 
     @property
     def fields(self):
@@ -1234,7 +1269,7 @@ class HealthStatusReport(DatespanMixin, BaseReport):
             block_term = get_nested_terms_filter("user_data.block", self.blocks)
             es_filters["bool"]["must"].append(block_term)
         q["query"]["filtered"]["query"].update({"match_all": {}})
-        logging.info("ESlog: [%s.%s] ESquery: %s" % (self.__class__.__name__, self.domain, simplejson.dumps(q)))
+        logging.info("ESlog: [%s.%s] ESquery: %s" % (self.__class__.__name__, self.domain, json.dumps(q)))
         return es_query(q=q, es_url=USER_INDEX + '/_search', dict_only=False,
                         start_at=self.pagination.start, size=self.pagination.count)
 
@@ -1266,7 +1301,7 @@ class HealthStatusReport(DatespanMixin, BaseReport):
         return dict(num=2, width=300)
 
     @property
-    @request_cache("raw")
+    @request_cache()
     def print_response(self):
         """
         Returns the report for printing.
