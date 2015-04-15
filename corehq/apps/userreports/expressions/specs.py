@@ -115,3 +115,26 @@ class RelatedDocExpressionSpec(JsonObject):
             return self._value_expression(doc, EvaluationContext(doc, 0))
         except ResourceNotFound:
             return None
+
+
+class AbtSupervisorExpressionSpec(JsonObject):
+    type = TypeProperty('abt_supervisor')
+
+    def __call__(self, item, context=None):
+        """
+        Given a document (item), return a list of documents representing each
+        of the flagged questions.
+        """
+        # TODO: Instead, take a list of tuples which are paths and flag answers.
+        flag_specs = [
+            (['breakfast'], 'no'),
+            (['equipment'], 'yes'),
+        ]
+        docs = []
+        for path, danger_value in flag_specs:
+            v = item['form']
+            for key in path:
+                v = v[key]
+            if v == danger_value:
+                docs.append({'flag': path[-1]})
+        return docs
