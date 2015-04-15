@@ -1,3 +1,4 @@
+from collections import namedtuple
 import json
 from couchdbkit.exceptions import ResourceNotFound
 from jsonobject import JsonObject, StringProperty, ListProperty, DictProperty
@@ -125,19 +126,48 @@ class AbtSupervisorExpressionSpec(JsonObject):
         Given a document (item), return a list of documents representing each
         of the flagged questions.
         """
-        # TODO: Instead, take a list of tuples which are paths and flag answers.
-        flag_specs = [
-            ("adequate_distance", ['q2'], 'No'),
-            ("leak_free", ['q5'], 'No'),
-        ]
-        docs = []
-        try:
-            for flag_id, path, danger_value in flag_specs:
+        # TODO: Don't define these for every call
+        FlagSpec = namedtuple("FlagSpec", [
+            "flag_id",
+            "path",
+            "danger_value",
+            "warning_string",
+            "warning_property_path"
+        ])
+
+        def get_val(item, path):
+            try:
                 v = item['form']
                 for key in path:
                     v = v[key]
-                if v == danger_value:
-                    docs.append({'flag': flag_id})
-        except KeyError as e:
-            pass
+                return v
+            except KeyError:
+                return None
+
+        # TODO: Instead, take a list of tuples which are paths and flag answers.
+        flag_specs = [
+            FlagSpec(
+                flag_id="adequate_distance",
+                path=["q2"],
+                danger_value="No",
+                warning_string="The nearest sensitive receptor is {} meters away",
+                warning_property_path=['q2_next']
+            ),
+            FlagSpec(
+                flag_id="leak_free",
+                path=["q5"],
+                danger_value="No",
+                warning_string="The leak will be repaired on {}",
+                warning_property_path=['q5_action_two']
+            )
+        ]
+        docs = []
+        for spec in flag_specs: #flag_id, path, danger_value in flag_specs:
+            if get_val(item, spec.path) == spec.danger_value:
+                docs.append({
+                    'flag': spec.flag_id,
+                    'warning': spec.warning_string.format(
+                        get_val(item, spec.warning_property_path)
+                    )
+                })
         return docs
