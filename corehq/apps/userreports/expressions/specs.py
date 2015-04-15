@@ -128,6 +128,7 @@ class AbtSupervisorExpressionSpec(JsonObject):
         """
         # TODO: Don't define these for every call
         FlagSpec = namedtuple("FlagSpec", [
+            "form_xmlns",
             "flag_id",
             "path",
             "danger_value",
@@ -147,27 +148,48 @@ class AbtSupervisorExpressionSpec(JsonObject):
         # TODO: Instead, take a list of tuples which are paths and flag answers.
         flag_specs = [
             FlagSpec(
+                form_xmlns="http://openrosa.org/formdesigner/BB2BF979-BD8F-4B8D-BCF8-A46451228BA9",
                 flag_id="adequate_distance",
                 path=["q2"],
                 danger_value="No",
-                warning_string="The nearest sensitive receptor is {} meters away",
+                warning_string="The nearest sensitive receptor is {msg} meters away",
                 warning_property_path=['q2_next']
             ),
             FlagSpec(
+                form_xmlns="http://openrosa.org/formdesigner/BB2BF979-BD8F-4B8D-BCF8-A46451228BA9",
                 flag_id="leak_free",
                 path=["q5"],
                 danger_value="No",
-                warning_string="The leak will be repaired on {}",
+                warning_string="The leak will be repaired on {msg}",
                 warning_property_path=['q5_action_two']
+            ),
+            FlagSpec(
+                form_xmlns="dummy",
+                flag_id="dummy flag",
+                path=["dummy"],
+                danger_value="dummy",
+                warning_string="foo{msg}",
+                warning_property_path=['bloop']
+            ),
+            FlagSpec(
+                form_xmlns="http://openrosa.org/formdesigner/54338047-CFB6-4D5B-861B-2256A10BBBC8",
+                flag_id="eaten_breakfast",
+                path=["q2"],
+                danger_value="No",
+                warning_string="{msg}",
+                warning_property_path=['nothing_pls']
             )
         ]
         docs = []
+        print item['xmlns']
         for spec in flag_specs: #flag_id, path, danger_value in flag_specs:
-            if get_val(item, spec.path) == spec.danger_value:
-                docs.append({
-                    'flag': spec.flag_id,
-                    'warning': spec.warning_string.format(
-                        get_val(item, spec.warning_property_path)
-                    )
-                })
+            if item['xmlns'] == spec.form_xmlns:
+                if get_val(item, spec.path) == spec.danger_value:
+                    docs.append({
+                        'flag': spec.flag_id,
+                        'warning': spec.warning_string.format(
+                            msg=get_val(item, spec.warning_property_path) or ""
+                        )
+                    })
+
         return docs
