@@ -12,6 +12,7 @@ from corehq.apps.userreports.indicators.specs import DataTypeProperty
 from corehq.apps.userreports.specs import TypeProperty, EvaluationContext
 from corehq.util.quickcache import quickcache
 from dimagi.utils.couch.database import get_db
+from dimagi.utils.decorators.memoized import memoized
 
 
 class ConstantGetterSpec(JsonObject):
@@ -121,12 +122,9 @@ class RelatedDocExpressionSpec(JsonObject):
 class AbtSupervisorExpressionSpec(JsonObject):
     type = TypeProperty('abt_supervisor')
 
-    def __call__(self, item, context=None):
-        """
-        Given a document (item), return a list of documents representing each
-        of the flagged questions.
-        """
-        # TODO: Don't define these for every call
+    @property
+    @memoized
+    def _flag_specs(self):
         FlagSpec = namedtuple("FlagSpec", [
             "form_xmlns",
             "flag_id",
@@ -135,18 +133,7 @@ class AbtSupervisorExpressionSpec(JsonObject):
             "warning_string",
             "warning_property_path"
         ])
-
-        def get_val(item, path):
-            try:
-                v = item['form']
-                for key in path:
-                    v = v[key]
-                return v
-            except KeyError:
-                return None
-
-        # TODO: Instead, take a list of tuples which are paths and flag answers.
-        flag_specs = [
+        return [
             FlagSpec(
                 form_xmlns="http://openrosa.org/formdesigner/BB2BF979-BD8F-4B8D-BCF8-A46451228BA9",
                 flag_id="adequate_distance",
@@ -180,9 +167,26 @@ class AbtSupervisorExpressionSpec(JsonObject):
                 warning_property_path=['nothing_pls']
             )
         ]
+
+    def __call__(self, item, context=None):
+        """
+        Given a document (item), return a list of documents representing each
+        of the flagged questions.
+        """
+        # TODO: Don't define FlagSpec and get_val for every call
+
+        def get_val(item, path):
+            try:
+                v = item['form']
+                for key in path:
+                    v = v[key]
+                return v
+            except KeyError:
+                return None
+
         docs = []
         print item['xmlns']
-        for spec in flag_specs: #flag_id, path, danger_value in flag_specs:
+        for spec in self._flag_specs:
             if item['xmlns'] == spec.form_xmlns:
                 if get_val(item, spec.path) == spec.danger_value:
                     docs.append({
@@ -191,5 +195,4 @@ class AbtSupervisorExpressionSpec(JsonObject):
                             msg=get_val(item, spec.warning_property_path) or ""
                         )
                     })
-
         return docs
