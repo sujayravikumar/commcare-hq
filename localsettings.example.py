@@ -30,6 +30,11 @@ STAGING_DOMAINS = []
 #COUCHDB URI {http|https}://username:password@host:optionalport/dbname
 PRODUCTION_COUCHDB_URI = ""
 
+######## Celery ########
+# Execute tasks locally by blocking, instead of in the queue.
+CELERY_ALWAYS_EAGER = True
+CELERY_EAGER_PROPAGATES_EXCEPTIONS = True
+
 ####### # Email setup ########
 # email settings: these ones are the custom hq ones
 EMAIL_LOGIN = "notifications@dimagi.com"
