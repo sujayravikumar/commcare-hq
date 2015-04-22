@@ -71,8 +71,8 @@ from corehq.apps.domain.forms import (
     DomainGlobalSettingsForm, DomainMetadataForm, SnapshotSettingsForm,
     SnapshotApplicationForm, DomainInternalForm, PrivacySecurityForm,
     ConfirmNewSubscriptionForm, ProBonoForm, EditBillingAccountInfoForm,
-    ConfirmSubscriptionRenewalForm, SnapshotFixtureForm, TransferDomainForm
-)
+    ConfirmSubscriptionRenewalForm, SnapshotFixtureForm, TransferDomainForm,
+    SelectSubscriptionTypeForm, DimagiOnlyEnterpriseForm)
 from corehq.apps.domain.models import Domain, LICENSES, TransferDomainRequest
 from corehq.apps.domain.utils import normalize_domain_name
 from corehq.apps.hqwebapp.views import BaseSectionPageView, BasePageView, CRUDPaginatedViewMixin
@@ -1169,6 +1169,50 @@ class BillingStatementPdfView(View):
             return HttpResponse(_("Could not obtain billing statement. "
                                   "An issue has been submitted."))
         return response
+
+
+class InternalSubscriptionManagementView(BaseAdminProjectSettingsView):
+    template_name = 'domain/internal_subscription_management.html'
+    urlname = 'internal_subscription_mgmt'
+    page_title = ugettext_noop("Dimagi Internal Subscription Management")
+
+    @method_decorator(require_superuser)
+    def get(self, request, *args, **kwargs):
+        return super(InternalSubscriptionManagementView, self).get(request, *args, **kwargs)
+
+    @method_decorator(require_superuser)
+    def post(self, request, *args, **kwargs):
+        print self.request.POST
+        form = self.get_post_form
+        if form.is_valid():
+            form.process_subscription_management()
+        return self.get(request, *args, **kwargs)
+
+    @property
+    def page_context(self):
+        return {
+            'plan_name': Subscription.get_subscribed_plan_by_domain(self.domain)[1].plan_version,
+            'select_subscription_type_form': self.select_subscription_type_form,
+            'subscription_management_forms': [
+                self.dimagi_only_enterprise_form,
+            ]
+        }
+
+    @property
+    def get_post_form(self):
+        if DimagiOnlyEnterpriseForm.slug in self.request.POST:
+            return self.dimagi_only_enterprise_form
+
+    @property
+    def select_subscription_type_form(self):
+        return SelectSubscriptionTypeForm()
+
+    @property
+    def dimagi_only_enterprise_form(self):
+        if self.request.method == 'POST':
+            return DimagiOnlyEnterpriseForm(self.request.POST)
+        return DimagiOnlyEnterpriseForm()
+
 
 
 class SelectPlanView(DomainAccountingSettings):
