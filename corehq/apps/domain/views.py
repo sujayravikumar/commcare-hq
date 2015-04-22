@@ -1185,14 +1185,14 @@ class InternalSubscriptionManagementView(BaseAdminProjectSettingsView):
         print self.request.POST
         form = self.get_post_form
         if form.is_valid():
-            form.process_subscription_management(self.domain)
+            form.process_subscription_management()
             return HttpResponseRedirect(reverse(DomainSubscriptionView.urlname, args=[self.domain]))
         return self.get(request, *args, **kwargs)
 
     @property
     def page_context(self):
         return {
-            'plan_name': Subscription.get_subscribed_plan_by_domain(self.domain)[1].plan_version,
+            'plan_name': Subscription.get_subscribed_plan_by_domain(self.domain)[0],
             'select_subscription_type_form': self.select_subscription_type_form,
             'subscription_management_forms': [
                 self.dimagi_only_enterprise_form,
@@ -1211,9 +1211,8 @@ class InternalSubscriptionManagementView(BaseAdminProjectSettingsView):
     @property
     def dimagi_only_enterprise_form(self):
         if self.request.method == 'POST':
-            return DimagiOnlyEnterpriseForm(self.request.POST)
-        return DimagiOnlyEnterpriseForm()
-
+            return DimagiOnlyEnterpriseForm(self.domain, self.request.POST)
+        return DimagiOnlyEnterpriseForm(self.domain)
 
 
 class SelectPlanView(DomainAccountingSettings):
