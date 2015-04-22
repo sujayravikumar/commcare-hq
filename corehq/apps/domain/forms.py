@@ -1177,7 +1177,7 @@ class InternalSubscriptionManagementForm(forms.Form):
     def subscription_type(self):
         raise NotImplementedError
 
-    def process_subscription_management(self):
+    def process_subscription_management(self, domain):
         raise NotImplementedError
 
 
@@ -1191,6 +1191,11 @@ class DimagiOnlyEnterpriseForm(InternalSubscriptionManagementForm):
         self.helper = FormHelper()
         self.helper.form_class = 'form-horizontal'
         self.helper.layout = crispy.Layout(
+            crispy.HTML(ugettext_noop(
+                '(i) You will have access to all features for free as soon as '
+                'you hit "update".  Please make sure this is an internal '
+                'Dimagi test space, not in use by a partner.'
+            )),
             FormActions(
                 crispy.ButtonHolder(
                     crispy.Submit(

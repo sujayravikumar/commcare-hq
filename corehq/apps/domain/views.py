@@ -1185,7 +1185,8 @@ class InternalSubscriptionManagementView(BaseAdminProjectSettingsView):
         print self.request.POST
         form = self.get_post_form
         if form.is_valid():
-            form.process_subscription_management()
+            form.process_subscription_management(self.domain)
+            return HttpResponseRedirect(reverse(DomainSubscriptionView.urlname, args=[self.domain]))
         return self.get(request, *args, **kwargs)
 
     @property
