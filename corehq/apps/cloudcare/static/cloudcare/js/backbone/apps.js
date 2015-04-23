@@ -677,6 +677,17 @@ cloudCare.AppView = Backbone.View.extend({
         data.onload = function (adapter, resp) {
             cloudCare.dispatch.trigger("form:ready", form, caseModel);
         };
+        data.answerCallback = function (sessionId) {
+            // every time a question is answered show the form
+            // todo: make the url reasonable
+            var renderUrl = 'http://127.0.0.1:8000/a/cory/cloudcare/render_form/' + sessionId;
+            $.ajax({
+                url: renderUrl,
+                success: function (data) {
+                    showRenderedForm(data.rendered_form, $("#cloudcare-notifications"));
+                }
+            });
+        };
         data.resourceMap = function(resource_path) {
             if (resource_path.substring(0, 7) === 'http://') {
                 return resource_path;

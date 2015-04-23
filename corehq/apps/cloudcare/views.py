@@ -439,6 +439,22 @@ def get_ledgers(request, domain):
     )
 
 
+@cloudcare_api
+def render_form(request, domain, session_id):
+    # get session
+    try:
+        session = EntrySession.objects.get(session_id=session_id)
+    except EntrySession.DoesNotExist:
+        session = None
+    # query touchforms to get XML
+    # turn XML to json
+    # turn json to html
+    # send back to browser
+    return json_response({
+        'rendered_form': '<h1>from django: {}</h1>'.format(session_id)
+    })
+
+
 class HttpResponseConflict(HttpResponse):
     status_code = 409
 
