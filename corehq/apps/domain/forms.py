@@ -36,7 +36,8 @@ from corehq.apps.accounting.models import (
     Subscription,
     SubscriptionAdjustmentMethod,
     SubscriptionType,
-    BillingAccount, SoftwarePlanVersion, DefaultProductPlan)
+    BillingAccount, SoftwarePlanVersion, DefaultProductPlan, BillingAccountType,
+    Currency, EntryPoint)
 from corehq.apps.app_manager.models import (Application, RemoteApp,
                                             FormBase, get_apps_in_domain)
 
@@ -1183,7 +1184,7 @@ class InternalSubscriptionManagementForm(forms.Form):
 
     @property
     @memoized
-    def account(self):
+    def current_account(self):
         return BillingAccount.get_account_by_domain(self.domain)
 
     @property
@@ -1191,15 +1192,18 @@ class InternalSubscriptionManagementForm(forms.Form):
     def current_subscription(self):
         return Subscription.get_subscribed_plan_by_domain(self.domain)[1]
 
+    def __init__(self, domain, web_user, *args, **kwargs):
+        super(InternalSubscriptionManagementForm, self).__init__(*args, **kwargs)
+        self.domain = domain
+        self.web_user = web_user
+
 
 class DimagiOnlyEnterpriseForm(InternalSubscriptionManagementForm):
     slug = 'dimagi_only_enterprise'
     subscription_type = ugettext_noop('Test or Demo Project')
 
-    def __init__(self, domain, *args, **kwargs):
-        self.domain = domain
-
-        super(DimagiOnlyEnterpriseForm, self).__init__(*args, **kwargs)
+    def __init__(self, domain, web_user, *args, **kwargs):
+        super(DimagiOnlyEnterpriseForm, self).__init__(domain, web_user, *args, **kwargs)
 
         self.helper = FormHelper()
         self.helper.form_class = 'form-horizontal'
@@ -1226,21 +1230,33 @@ class DimagiOnlyEnterpriseForm(InternalSubscriptionManagementForm):
         if self.current_subscription:
             new_subscription = self.current_subscription.change_plan(
                 enterprise_plan_version,
-                web_user=None, # TODO use web_user
+                web_user=self.web_user,
             )
-            # TODO transfer the account
+            new_subscription.account = self.next_account
         else:
             new_subscription = Subscription.new_domain_subscription(
-                self.account, # TODO use correct account
+                self.next_account,
                 self.domain,
                 enterprise_plan_version,
-                web_user=None, # TODO use web_user
+                is_active=True,
+                web_user=self.web_user,
             )
-            new_subscription.is_active = True
-        # TODO add partner contact emails
         new_subscription.do_not_invoice = True
         new_subscription.save()
 
+    @property
+    @memoized
+    def next_account(self):
+        account = BillingAccount(
+            name="Dimagi Internal Test Account for Project %s" % self.domain,
+            created_by=self.web_user,
+            created_by_domain=self.domain,
+            currency=Currency.get_default(),
+            # account_type=BillingAccountType,
+            # entry_point=EntryPoint,
+        )
+        account.save()
+        return account
 
 
 class SelectSubscriptionTypeForm(forms.Form):

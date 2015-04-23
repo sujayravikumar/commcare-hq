@@ -1182,7 +1182,6 @@ class InternalSubscriptionManagementView(BaseAdminProjectSettingsView):
 
     @method_decorator(require_superuser)
     def post(self, request, *args, **kwargs):
-        print self.request.POST
         form = self.get_post_form
         if form.is_valid():
             form.process_subscription_management()
@@ -1211,8 +1210,8 @@ class InternalSubscriptionManagementView(BaseAdminProjectSettingsView):
     @property
     def dimagi_only_enterprise_form(self):
         if self.request.method == 'POST':
-            return DimagiOnlyEnterpriseForm(self.domain, self.request.POST)
-        return DimagiOnlyEnterpriseForm(self.domain)
+            return DimagiOnlyEnterpriseForm(self.domain, self.request.couch_user.username, self.request.POST)
+        return DimagiOnlyEnterpriseForm(self.domain, self.request.couch_user.username)
 
 
 class SelectPlanView(DomainAccountingSettings):
