@@ -1205,7 +1205,7 @@ class DimagiOnlyEnterpriseForm(InternalSubscriptionManagementForm):
         self.helper.form_class = 'form-horizontal'
         self.helper.layout = crispy.Layout(
             crispy.HTML(ugettext_noop(
-                '(i) You will have access to all features for free as soon as '
+                '<i class="icon-info-sign"></i>You will have access to all features for free as soon as '
                 'you hit "update".  Please make sure this is an internal '
                 'Dimagi test space, not in use by a partner.'
             )),
