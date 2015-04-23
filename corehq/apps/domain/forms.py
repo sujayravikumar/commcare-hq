@@ -1144,6 +1144,10 @@ class InternalSubscriptionManagementForm(forms.Form):
         raise NotImplementedError
 
     @property
+    def next_account(self):
+        raise NotImplementedError
+
+    @property
     @memoized
     def current_account(self):
         return BillingAccount.get_account_by_domain(self.domain)
