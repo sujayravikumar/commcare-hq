@@ -1358,7 +1358,82 @@ class AdvancedExtendedTrialForm(InternalSubscriptionManagementForm):
         return account
 
 
+class ContractedPartnerForm(InternalSubscriptionManagementForm):
+    slug = 'contracted_partner'
+    subscription_type = ugettext_noop('Contracted Partner')
+
+    fogbugz_client_name = forms.CharField(
+        label=ugettext_noop('Fogbugz Client Name'),
+        max_length=BillingAccount._meta.get_field('name').max_length,
+    )
+
+    partner_contact_emails = forms.CharField(
+        label=ugettext_noop('Partner Contact Emails'),
+    )
+
+    start_date = forms.DateField(
+        label=ugettext_noop('Start Date'),
+    )
+
+    end_date = forms.DateField(
+        label=ugettext_noop('End Date'),
+    )
+
+    def __init__(self, domain, web_user, *args, **kwargs):
+        kwargs['initial'] = {
+            'start_date': datetime.date.today(),
+            'end_date': datetime.date.today() + relativedelta(years=1),
+        }
+
+        super(ContractedPartnerForm, self).__init__(domain, web_user, *args, **kwargs)
+
+        self.helper = FormHelper()
+        self.helper.form_class = 'form-horizontal'
+        self.helper.layout = crispy.Layout(
+            crispy.Field('fogbugz_client_name'),
+            crispy.Field('partner_contact_emails'),
+            crispy.Field('start_date'),
+            crispy.Field('end_date'),
+            self.form_actions
+        )
+
+    def process_subscription_management(self):
+        new_plan_version = DefaultProductPlan.get_default_plan_by_domain(
+            self.domain, edition=SoftwarePlanEdition.PRO,
+        )
+        new_subscription = Subscription.new_domain_subscription(
+            self.next_account,
+            self.domain,
+            new_plan_version,
+            date_start=self.cleaned_data['start_date'],
+            date_end=self.cleaned_data['end_date'],
+            web_user=self.web_user,
+        )
+        if new_subscription.date_start <= datetime.date.today() and datetime.date.today() < new_subscription.date_end:
+            new_subscription.is_active = True
+        new_subscription.do_not_invoice = False
+        new_subscription.auto_generate_credits = True
+        new_subscription.save()
+
+    @property
+    @memoized
+    def next_account(self):
+        # TODO contact emails
+        account = BillingAccount(
+            name=self.cleaned_data['fogbugz_client_name'],
+            created_by=self.web_user,
+            created_by_domain=self.domain,
+            currency=Currency.get_default(),
+            dimagi_contact=self.web_user,
+            # account_type=BillingAccountType,
+            # entry_point=EntryPoint,
+        )
+        account.save()
+        return account
+
+
 INTERNAL_SUBSCRIPTION_MANAGEMENT_FORMS = [
+    ContractedPartnerForm,
     DimagiOnlyEnterpriseForm,
     AdvancedExtendedTrialForm,
 ]
