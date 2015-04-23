@@ -1197,6 +1197,17 @@ class InternalSubscriptionManagementForm(forms.Form):
         self.domain = domain
         self.web_user = web_user
 
+    @property
+    def form_actions(self):
+        return FormActions(
+            crispy.ButtonHolder(
+                crispy.Submit(
+                    self.slug,
+                    ugettext_noop('Update')
+                )
+            )
+        )
+
 
 class DimagiOnlyEnterpriseForm(InternalSubscriptionManagementForm):
     slug = 'dimagi_only_enterprise'
@@ -1213,14 +1224,7 @@ class DimagiOnlyEnterpriseForm(InternalSubscriptionManagementForm):
                 'you hit "Update".  Please make sure this is an internal '
                 'Dimagi test space, not in use by a partner.'
             )),
-            FormActions(
-                crispy.ButtonHolder(
-                    crispy.Submit(
-                        self.slug,
-                        ugettext_noop('Update')
-                    )
-                )
-            )
+            self.form_actions
         )
 
     def process_subscription_management(self):
@@ -1259,15 +1263,33 @@ class DimagiOnlyEnterpriseForm(InternalSubscriptionManagementForm):
         return account
 
 
+class AdvancedExtendedTrialForm(InternalSubscriptionManagementForm):
+    slug = 'advanced_extended_trial'
+    subscription_type = ugettext_noop('3 Month Trial')
+
+    def __init__(self, domain, web_user, *args, **kwargs):
+        super(AdvancedExtendedTrialForm, self).__init__(domain, web_user, *args, **kwargs)
+
+        self.helper = FormHelper()
+        self.helper.form_class = 'form-horizontal'
+        self.helper.layout = crispy.Layout(
+            self.form_actions
+        )
+
+
+INTERNAL_SUBSCRIPTION_MANAGEMENT_FORMS = [
+    DimagiOnlyEnterpriseForm,
+    AdvancedExtendedTrialForm,
+]
+
+
 class SelectSubscriptionTypeForm(forms.Form):
     subscription_type = forms.ChoiceField(
         choices=[
             ('', ugettext_noop('Select a subscription type...'))
         ] + [
             (form.slug, form.subscription_type)
-            for form in [
-                DimagiOnlyEnterpriseForm,
-            ]
+            for form in INTERNAL_SUBSCRIPTION_MANAGEMENT_FORMS
         ],
         label=ugettext_noop('Subscription Type'),
         required=False,
