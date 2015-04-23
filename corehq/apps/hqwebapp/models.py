@@ -1246,6 +1246,7 @@ class ProjectSettingsTab(UITab):
                 from corehq.apps.domain.views import (
                     DomainSubscriptionView, EditExistingBillingAccountView,
                     DomainBillingStatementsView, ConfirmSubscriptionRenewalView,
+                    InternalSubscriptionManagementView,
                 )
                 subscription = [
                     {
@@ -1280,6 +1281,14 @@ class ProjectSettingsTab(UITab):
                                            args=[self.domain]),
                         }
                     )
+                if self.couch_user.is_superuser:
+                    subscription.append({
+                        'title': _('Internal Subscription Management (Dimagi Only)'),
+                        'url': reverse(
+                            InternalSubscriptionManagementView.urlname,
+                            args=[self.domain],
+                        )
+                    })
                 items.append((_('Subscription'), subscription))
 
         if any(toggles.PRIME_RESTORE.enabled(item) for item in [self.couch_user.username, self.domain]):
