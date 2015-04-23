@@ -1,7 +1,9 @@
 import copy
 import logging
 from urlparse import urlparse, parse_qs
+import datetime
 import dateutil
+from dateutil.relativedelta import relativedelta
 import re
 import io
 from PIL import Image
@@ -1267,14 +1269,89 @@ class AdvancedExtendedTrialForm(InternalSubscriptionManagementForm):
     slug = 'advanced_extended_trial'
     subscription_type = ugettext_noop('3 Month Trial')
 
+    organization_name = forms.CharField(
+        label=ugettext_noop('Organization Name'),
+        max_length=BillingAccount._meta.get_field('name').max_length,
+    )
+
+    partner_contact_emails = forms.CharField(
+        label=ugettext_noop('Partner Contact Emails'),
+    )
+
+    end_date = forms.DateField(
+        widget=forms.HiddenInput,
+    )
+
     def __init__(self, domain, web_user, *args, **kwargs):
+        end_date = datetime.date.today() + relativedelta(months=3)
+        kwargs['initial'] = {
+            'end_date': end_date,
+        }
+
         super(AdvancedExtendedTrialForm, self).__init__(domain, web_user, *args, **kwargs)
 
         self.helper = FormHelper()
         self.helper.form_class = 'form-horizontal'
         self.helper.layout = crispy.Layout(
+            crispy.Field('organization_name'),
+            crispy.Field('partner_contact_emails'),
+            crispy.Field('end_date'),
+            crispy.HTML(_(
+                '<p><i class="icon-info-sign"></i> The 3 month trial includes '
+                'access to all features, 5 mobile workers, and 25 SMS.  Fees '
+                'apply for users or SMS in excess of these limits (1 '
+                'USD/user/month, regular SMS fees).</p>'
+            )),
+            crispy.HTML(_(
+                '<p><i class="icon-info-sign"></i> The trial will begin as soon '
+                'as you hit "Update" and end on %(end_date)s.  On %(end_date)s '
+                ' the project space will automatically be subscribed to the '
+                'Community plan.</p>'
+            ) % {
+                'end_date': end_date,
+            }),
             self.form_actions
         )
+
+    def process_subscription_management(self):
+        advanced_trial_plan_version = DefaultProductPlan.get_default_plan_by_domain(
+            self.domain, edition=SoftwarePlanEdition.ADVANCED, is_trial=True,
+        )
+        if self.current_subscription:
+            new_subscription = self.current_subscription.change_plan(
+                advanced_trial_plan_version,
+                date_end=self.cleaned_data['end_date'],
+                web_user=self.web_user,
+            )
+            new_subscription.account = self.next_account
+        else:
+            new_subscription = Subscription.new_domain_subscription(
+                self.next_account,
+                self.domain,
+                advanced_trial_plan_version,
+                date_end=self.cleaned_data['end_date'],
+                is_active=True,
+                web_user=self.web_user,
+            )
+        new_subscription.do_not_invoice = False
+        new_subscription.auto_generate_credits = False
+        new_subscription.save()
+
+    @property
+    @memoized
+    def next_account(self):
+        # TODO contact emails
+        account = BillingAccount(
+            name=self.cleaned_data['organization_name'],
+            created_by=self.web_user,
+            created_by_domain=self.domain,
+            currency=Currency.get_default(),
+            dimagi_contact=self.web_user,
+            # account_type=BillingAccountType,
+            # entry_point=EntryPoint,
+        )
+        account.save()
+        return account
 
 
 INTERNAL_SUBSCRIPTION_MANAGEMENT_FORMS = [
