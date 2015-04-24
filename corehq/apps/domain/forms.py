@@ -1423,19 +1423,38 @@ class ContractedPartnerForm(InternalSubscriptionManagementForm):
         new_plan_version = DefaultProductPlan.get_default_plan_by_domain(
             self.domain, edition=self.cleaned_data['software_plan'],
         )
-        new_subscription = Subscription.new_domain_subscription(
-            self.next_account,
-            self.domain,
-            new_plan_version,
-            date_start=self.cleaned_data['start_date'],
-            date_end=self.cleaned_data['end_date'],
-            web_user=self.web_user,
-        )
-        if new_subscription.date_start <= datetime.date.today() and datetime.date.today() < new_subscription.date_end:
-            new_subscription.is_active = True
-        new_subscription.do_not_invoice = False
-        new_subscription.auto_generate_credits = True
-        new_subscription.save()
+        revert_current_subscription_end_date = None
+        if self.current_subscription and self.cleaned_data['start_date'] < self.current_subscription.date_end:
+            revert_current_subscription_end_date = self.current_subscription.date_end
+            self.current_subscription.date_end = self.cleaned_data['start_date']
+            self.current_subscription.save()
+        try:
+            if not self.current_subscription or self.cleaned_data['start_date'] > datetime.date.today():
+                new_subscription = Subscription.new_domain_subscription(
+                    self.next_account,
+                    self.domain,
+                    new_plan_version,
+                    date_start=self.cleaned_data['start_date'],
+                    date_end=self.cleaned_data['end_date'],
+                    web_user=self.web_user,
+                )
+            else:
+                new_subscription = self.current_subscription.change_plan(
+                    new_plan_version,
+                    date_end=self.cleaned_data['end_date'],
+                    web_user=self.web_user,
+                )
+            if new_subscription.date_start <= datetime.date.today() and datetime.date.today() < new_subscription.date_end:
+                new_subscription.is_active = True
+            new_subscription.do_not_invoice = False
+            new_subscription.auto_generate_credits = True
+            new_subscription.save()
+        except:
+            # If the entire transaction did not go through, rollback saved changes
+            if revert_current_subscription_end_date:
+                self.current_subscription.date_end = revert_current_subscription_end_date
+                self.current_subscription.save()
+            raise
 
     @property
     @memoized
