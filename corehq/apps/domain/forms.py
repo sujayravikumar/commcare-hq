@@ -31,15 +31,20 @@ from django.contrib.auth.forms import PasswordResetForm
 from django.utils.safestring import mark_safe
 from django_countries.countries import COUNTRIES
 from corehq.apps.accounting.models import (
+    BillingAccount,
     BillingAccountAdmin,
     BillingContactInfo,
+    CreditAdjustmentReason,
+    CreditLine,
+    Currency,
+    DefaultProductPlan,
+    FeatureType,
     ProBonoStatus,
     SoftwarePlanEdition,
     Subscription,
     SubscriptionAdjustmentMethod,
     SubscriptionType,
-    BillingAccount, SoftwarePlanVersion, DefaultProductPlan, BillingAccountType,
-    Currency, EntryPoint)
+)
 from corehq.apps.app_manager.models import (Application, RemoteApp,
                                             FormBase, get_apps_in_domain)
 
@@ -1394,6 +1399,16 @@ class ContractedPartnerForm(InternalSubscriptionManagementForm):
         label=ugettext_noop('End Date'),
     )
 
+    sms_credits = forms.DecimalField(
+        initial=0,
+        label=ugettext_noop('SMS Credits'),
+    )
+
+    user_credits = forms.IntegerField(
+        initial=0,
+        label=ugettext_noop('User Credits'),
+    )
+
     def __init__(self, domain, web_user, *args, **kwargs):
         kwargs['initial'] = {
             'start_date': datetime.date.today(),
@@ -1410,6 +1425,8 @@ class ContractedPartnerForm(InternalSubscriptionManagementForm):
             crispy.Field('emails', css_class='input-xxlarge'),
             crispy.Field('start_date', css_class='date-picker'),
             crispy.Field('end_date', css_class='date-picker'),
+            crispy.Field('sms_credits'),
+            crispy.Field('user_credits'),
             crispy.HTML(_(
                 '<p><i class="icon-info-sign"></i> Clicking "Update" will set '
                 'up the subscription in CommCareHQ to one of our standard '
@@ -1455,6 +1472,21 @@ class ContractedPartnerForm(InternalSubscriptionManagementForm):
                 self.current_subscription.date_end = revert_current_subscription_end_date
                 self.current_subscription.save()
             raise
+
+        CreditLine.add_credit(
+            self.cleaned_data['sms_credits'],
+            feature_type=FeatureType.SMS,
+            subscription=new_subscription,
+            web_user=self.web_user,
+            reason=CreditAdjustmentReason.MANUAL,
+        )
+        CreditLine.add_credit(
+            self.cleaned_data['user_credits'],
+            feature_type=FeatureType.USER,
+            subscription=new_subscription,
+            web_user=self.web_user,
+            reason=CreditAdjustmentReason.MANUAL,
+        )
 
     @property
     @memoized
