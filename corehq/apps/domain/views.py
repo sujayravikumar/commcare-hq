@@ -8,6 +8,7 @@ from corehq.const import USER_DATE_FORMAT
 from custom.dhis2.forms import Dhis2SettingsForm
 from custom.dhis2.models import Dhis2Settings
 import dateutil
+from django.contrib import messages
 from django.core.mail import send_mail
 from django.core.paginator import Paginator
 from django.views.generic import View
@@ -18,7 +19,10 @@ from corehq.apps.accounting.invoicing import DomainWireInvoiceFactory
 from corehq.apps.accounting.decorators import (
     require_billing_admin, requires_privilege_with_fallback,
 )
-from corehq.apps.accounting.exceptions import PaymentRequestError
+from corehq.apps.accounting.exceptions import (
+    NewSubscriptionError,
+    PaymentRequestError,
+)
 from corehq.apps.accounting.payment_handlers import (
     BulkStripePaymentHandler,
     CreditStripePaymentHandler,
@@ -1186,8 +1190,11 @@ class InternalSubscriptionManagementView(BaseAdminProjectSettingsView):
     def post(self, request, *args, **kwargs):
         form = self.get_post_form
         if form.is_valid():
-            form.process_subscription_management()
-            return HttpResponseRedirect(reverse(DomainSubscriptionView.urlname, args=[self.domain]))
+            try:
+                form.process_subscription_management()
+                return HttpResponseRedirect(reverse(DomainSubscriptionView.urlname, args=[self.domain]))
+            except NewSubscriptionError as e:
+                messages.error(self.request, e.message)
         return self.get(request, *args, **kwargs)
 
     @property
