@@ -1262,6 +1262,7 @@ class DimagiOnlyEnterpriseForm(InternalSubscriptionManagementForm):
             created_by=self.web_user,
             created_by_domain=self.domain,
             currency=Currency.get_default(),
+            dimagi_contact=self.web_user,
             # account_type=BillingAccountType,
             # entry_point=EntryPoint,
         )
