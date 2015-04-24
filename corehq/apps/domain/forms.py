@@ -6,6 +6,7 @@ import re
 import io
 from PIL import Image
 import uuid
+from dimagi.utils.decorators.memoized import memoized
 from django.contrib.auth import get_user_model
 from corehq import privileges, toggles
 from corehq.apps.accounting.exceptions import SubscriptionRenewalError
@@ -35,7 +36,7 @@ from corehq.apps.accounting.models import (
     Subscription,
     SubscriptionAdjustmentMethod,
     SubscriptionType,
-)
+    BillingAccount, SoftwarePlanVersion, DefaultProductPlan)
 from corehq.apps.app_manager.models import (Application, RemoteApp,
                                             FormBase, get_apps_in_domain)
 
@@ -1163,3 +1164,104 @@ class ProBonoForm(forms.Form):
             logging.error("Couldn't send pro-bono application email. "
                           "Contact: %s" % self.cleaned_data['contact_email']
             )
+
+
+class InternalSubscriptionManagementForm(forms.Form):
+    @property
+    def slug(self):
+        raise NotImplementedError
+
+    @property
+    def subscription_type(self):
+        raise NotImplementedError
+
+    def process_subscription_management(self):
+        raise NotImplementedError
+
+    @property
+    @memoized
+    def account(self):
+        return BillingAccount.get_account_by_domain(self.domain)
+
+    @property
+    @memoized
+    def current_subscription(self):
+        return Subscription.get_subscribed_plan_by_domain(self.domain)[1]
+
+
+class DimagiOnlyEnterpriseForm(InternalSubscriptionManagementForm):
+    slug = 'dimagi_only_enterprise'
+    subscription_type = ugettext_noop('Test or Demo Project')
+
+    def __init__(self, domain, *args, **kwargs):
+        self.domain = domain
+
+        super(DimagiOnlyEnterpriseForm, self).__init__(*args, **kwargs)
+
+        self.helper = FormHelper()
+        self.helper.form_class = 'form-horizontal'
+        self.helper.layout = crispy.Layout(
+            crispy.HTML(ugettext_noop(
+                '(i) You will have access to all features for free as soon as '
+                'you hit "update".  Please make sure this is an internal '
+                'Dimagi test space, not in use by a partner.'
+            )),
+            FormActions(
+                crispy.ButtonHolder(
+                    crispy.Submit(
+                        self.slug,
+                        ugettext_noop('Update')
+                    )
+                )
+            )
+        )
+
+    def process_subscription_management(self):
+        enterprise_plan_version = DefaultProductPlan.get_default_plan_by_domain(
+            self.domain, SoftwarePlanEdition.ENTERPRISE
+        ).plan.get_version()
+        if self.current_subscription:
+            new_subscription = self.current_subscription.change_plan(
+                enterprise_plan_version,
+                web_user=None, # TODO use web_user
+            )
+            # TODO transfer the account
+        else:
+            new_subscription = Subscription.new_domain_subscription(
+                self.account, # TODO use correct account
+                self.domain,
+                enterprise_plan_version,
+                web_user=None, # TODO use web_user
+            )
+            new_subscription.is_active = True
+        # TODO add partner contact emails
+        new_subscription.do_not_invoice = True
+        new_subscription.save()
+
+
+
+class SelectSubscriptionTypeForm(forms.Form):
+    subscription_type = forms.ChoiceField(
+        choices=[
+            ('', ugettext_noop('Select a subscription type...'))
+        ] + [
+            (form.slug, form.subscription_type)
+            for form in [
+                DimagiOnlyEnterpriseForm,
+            ]
+        ],
+        label=ugettext_noop('Subscription Type'),
+        required=False,
+    )
+
+    def __init__(self, *args, **kwargs):
+        super(SelectSubscriptionTypeForm, self).__init__(*args, **kwargs)
+
+        self.helper = FormHelper()
+        self.helper.form_class = 'form-horizontal'
+        self.helper.layout = crispy.Layout(
+            crispy.Field(
+                'subscription_type',
+                data_bind='value: subscriptionType',
+            )
+        )

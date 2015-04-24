@@ -14,6 +14,7 @@ from django.views.generic import View
 from casexml.apps.case.mock import CaseBlock
 from casexml.apps.case.xml import V2
 from corehq.apps.accounting.async_handlers import Select2BillingInfoHandler
+from corehq.apps.accounting.invoicing import DomainWireInvoiceFactory
 from corehq.apps.accounting.decorators import (
     require_billing_admin, requires_privilege_with_fallback,
 )
@@ -51,8 +52,7 @@ from corehq.apps.accounting.models import (
     DefaultProductPlan, SoftwarePlanEdition, BillingAccount,
     BillingAccountType, BillingAccountAdmin,
     Invoice, BillingRecord, InvoicePdf, PaymentMethodType,
-    PaymentMethod,
-    EntryPoint,
+    PaymentMethod, EntryPoint, WireInvoice
 )
 from corehq.apps.accounting.usage import FeatureUsageCalculator
 from corehq.apps.accounting.user_text import get_feature_name, PricingTable, DESC_BY_EDITION
@@ -71,8 +71,8 @@ from corehq.apps.domain.forms import (
     DomainGlobalSettingsForm, DomainMetadataForm, SnapshotSettingsForm,
     SnapshotApplicationForm, DomainInternalForm, PrivacySecurityForm,
     ConfirmNewSubscriptionForm, ProBonoForm, EditBillingAccountInfoForm,
-    ConfirmSubscriptionRenewalForm, SnapshotFixtureForm, TransferDomainForm
-)
+    ConfirmSubscriptionRenewalForm, SnapshotFixtureForm, TransferDomainForm,
+    SelectSubscriptionTypeForm, DimagiOnlyEnterpriseForm)
 from corehq.apps.domain.models import Domain, LICENSES, TransferDomainRequest
 from corehq.apps.domain.utils import normalize_domain_name
 from corehq.apps.hqwebapp.views import BaseSectionPageView, BasePageView, CRUDPaginatedViewMixin
@@ -898,6 +898,10 @@ class DomainBillingStatementsView(DomainAccountingSettings, CRUDPaginatedViewMix
                 BulkStripePaymentView.urlname,
                 args=[self.domain],
             ),
+            'process_wire_invoice_url': reverse(
+                WireInvoiceView.urlname,
+                args=[self.domain],
+            ),
             'stripe_cards': self.stripe_cards,
         })
         return pagination_context
@@ -1028,6 +1032,7 @@ class BaseStripePaymentView(DomainAccountingSettings):
                     )
                 }
             }
+
         return json_response(response)
 
 
@@ -1095,6 +1100,27 @@ class BulkStripePaymentView(BaseStripePaymentView):
         )
 
 
+class WireInvoiceView(View):
+    http_method_names = ['post']
+    urlname = 'domain_wire_invoice'
+
+    @method_decorator(login_and_domain_required)
+    @method_decorator(require_billing_admin())
+    def dispatch(self, request, *args, **kwargs):
+        return super(WireInvoiceView, self).dispatch(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        emails = request.POST.get('emails', []).split()
+        balance = Decimal(request.POST.get('customPaymentAmount', 0))
+        wire_invoice_factory = DomainWireInvoiceFactory(request.domain, contact_emails=emails)
+        try:
+            wire_invoice_factory.create_wire_invoice(balance)
+        except Exception, e:
+            return json_response({'error': {'message', e}})
+
+        return json_response({'success': True})
+
+
 class BillingStatementPdfView(View):
     urlname = 'domain_billing_statement_download'
 
@@ -1113,18 +1139,24 @@ class BillingStatementPdfView(View):
         except ResourceNotFound:
             raise Http404()
 
-        # verify domain
         try:
             invoice = Invoice.objects.get(pk=invoice_pdf.invoice_id)
         except Invoice.DoesNotExist:
-            raise Http404()
-        if invoice.subscription.subscriber.domain != domain:
+            try:
+                invoice = WireInvoice.objects.get(pk=invoice_pdf.invoice_id)
+            except WireInvoice.DoesNotExist:
+                raise Http404()
+        if invoice.get_domain() != domain:
             raise Http404()
 
+        if invoice.is_wire:
+            edition = 'Bulk'
+        else:
+            edition = DESC_BY_EDITION[invoice.subscription.plan_version.plan.edition]['name']
         filename = "%(pdf_id)s_%(domain)s_%(edition)s_%(filename)s" % {
             'pdf_id': invoice_pdf._id,
             'domain': domain,
-            'edition': DESC_BY_EDITION[invoice.subscription.plan_version.plan.edition]['name'],
+            'edition': edition,
             'filename': invoice_pdf.get_filename(invoice),
         }
         try:
@@ -1136,6 +1168,50 @@ class BillingStatementPdfView(View):
             return HttpResponse(_("Could not obtain billing statement. "
                                   "An issue has been submitted."))
         return response
+
+
+class InternalSubscriptionManagementView(BaseAdminProjectSettingsView):
+    template_name = 'domain/internal_subscription_management.html'
+    urlname = 'internal_subscription_mgmt'
+    page_title = ugettext_noop("Dimagi Internal Subscription Management")
+
+    @method_decorator(require_superuser)
+    def get(self, request, *args, **kwargs):
+        return super(InternalSubscriptionManagementView, self).get(request, *args, **kwargs)
+
+    @method_decorator(require_superuser)
+    def post(self, request, *args, **kwargs):
+        print self.request.POST
+        form = self.get_post_form
+        if form.is_valid():
+            form.process_subscription_management()
+            return HttpResponseRedirect(reverse(DomainSubscriptionView.urlname, args=[self.domain]))
+        return self.get(request, *args, **kwargs)
+
+    @property
+    def page_context(self):
+        return {
+            'plan_name': Subscription.get_subscribed_plan_by_domain(self.domain)[0],
+            'select_subscription_type_form': self.select_subscription_type_form,
+            'subscription_management_forms': [
+                self.dimagi_only_enterprise_form,
+            ]
+        }
+
+    @property
+    def get_post_form(self):
+        if DimagiOnlyEnterpriseForm.slug in self.request.POST:
+            return self.dimagi_only_enterprise_form
+
+    @property
+    def select_subscription_type_form(self):
+        return SelectSubscriptionTypeForm()
+
+    @property
+    def dimagi_only_enterprise_form(self):
+        if self.request.method == 'POST':
+            return DimagiOnlyEnterpriseForm(self.domain, self.request.POST)
+        return DimagiOnlyEnterpriseForm(self.domain)
 
 
 class SelectPlanView(DomainAccountingSettings):
