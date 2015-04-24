@@ -608,6 +608,7 @@ class ESQuerySet(object):
         else:
             raise TypeError('Unsupported type: %s', type(idx))
 
+
 def validate_date(date):
     try:
         datetime.datetime.strptime(date, ISO_DATE_FORMAT)
@@ -621,7 +622,7 @@ def validate_date(date):
                 raise DateTimeError("Date not in the correct format")
     return date
 
-RESERVED_QUERY_PARAMS=set(['limit', 'offset', 'order_by', 'q', '_search'])
+RESERVED_QUERY_PARAMS = set(['limit', 'offset', 'order_by', 'q', '_search'])
 
 # Note that dates are already in a string format when they arrive as query params
 query_param_transforms = {

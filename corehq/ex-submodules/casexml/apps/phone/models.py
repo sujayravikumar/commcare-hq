@@ -2,6 +2,7 @@ from collections import defaultdict
 from copy import copy
 from datetime import datetime
 from couchdbkit.exceptions import ResourceConflict, ResourceNotFound
+from dimagi.ext.couchdbkit import *
 from couchdbkit.ext.django.schema import *
 from django.db import models
 from dimagi.utils.couch.database import SafeSaveDocument
