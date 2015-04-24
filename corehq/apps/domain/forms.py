@@ -1384,7 +1384,7 @@ class ContractedPartnerForm(InternalSubscriptionManagementForm):
 
     emails = forms.CharField(
         label=ugettext_noop('Partner Contact Emails'),
-        max_length=BillingContactInfo._meta.get_field('emails').max_length
+        max_length=BillingContactInfo._meta.get_field('emails').max_length,
     )
 
     start_date = forms.DateField(
