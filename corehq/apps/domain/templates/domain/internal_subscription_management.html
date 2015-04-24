@@ -4,6 +4,7 @@
 {% load hq_shared_tags %}
 
 {% block js %}{{ block.super }}
+    <script src="{% static 'hqwebapp/js/lib/jquery-ui-datepicker/jquery-ui-1.8.17.custom.datepicker.min.js' %}"></script>
     <script src="{% static 'hqwebapp/js/lib/select2/select2.js' %}"></script>
     <script src="{% static 'accounting/js/accounting.billing_info_handler.js' %}"></script>
 {% endblock %}
@@ -22,9 +23,14 @@
         );
         billingInfoHandler.init();
     </script>
+
+    <script>
+        $('.date-picker').datepicker({ dateFormat: "yy-mm-dd" });
+    </script>
 {% endblock %}
 
 {% block head %}{{ block.super }}
+    <link rel="stylesheet" href="{% static 'hqwebapp/js/lib/jquery-ui-datepicker/datepicker-theme/jquery-ui-1.8.17.custom.css' %}" />
     <link href="{% static 'hqwebapp/js/lib/select2/select2.css' %}" rel="stylesheet"/>
 {% endblock %}
 

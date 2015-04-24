@@ -1408,8 +1408,8 @@ class ContractedPartnerForm(InternalSubscriptionManagementForm):
             crispy.Field('software_plan'),
             crispy.Field('fogbugz_client_name'),
             crispy.Field('emails', css_class='input-xxlarge'),
-            crispy.Field('start_date'),
-            crispy.Field('end_date'),
+            crispy.Field('start_date', css_class='date-picker'),
+            crispy.Field('end_date', css_class='date-picker'),
             crispy.HTML(_(
                 '<p><i class="icon-info-sign"></i> Clicking "Update" will set '
                 'up the subscription in CommCareHQ to one of our standard '
