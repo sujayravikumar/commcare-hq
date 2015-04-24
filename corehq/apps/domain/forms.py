@@ -1347,7 +1347,6 @@ class AdvancedExtendedTrialForm(InternalSubscriptionManagementForm):
     @property
     @memoized
     def next_account(self):
-        # TODO contact emails
         account = BillingAccount(
             name=self.cleaned_data['organization_name'],
             created_by=self.web_user,
@@ -1441,7 +1440,6 @@ class ContractedPartnerForm(InternalSubscriptionManagementForm):
     @property
     @memoized
     def next_account(self):
-        # TODO contact emails
         account = BillingAccount(
             name=self.cleaned_data['fogbugz_client_name'],
             created_by=self.web_user,
