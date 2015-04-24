@@ -1279,7 +1279,7 @@ class AdvancedExtendedTrialForm(InternalSubscriptionManagementForm):
         max_length=BillingAccount._meta.get_field('name').max_length,
     )
 
-    partner_contact_emails = forms.CharField(
+    emails = forms.CharField(
         label=ugettext_noop('Partner Contact Emails'),
     )
 
@@ -1299,7 +1299,7 @@ class AdvancedExtendedTrialForm(InternalSubscriptionManagementForm):
         self.helper.form_class = 'form-horizontal'
         self.helper.layout = crispy.Layout(
             crispy.Field('organization_name'),
-            crispy.Field('partner_contact_emails'),
+            crispy.Field('emails', css_class='input-xxlarge'),
             crispy.Field('end_date'),
             crispy.HTML(_(
                 '<p><i class="icon-info-sign"></i> The 3 month trial includes '
@@ -1368,7 +1368,7 @@ class ContractedPartnerForm(InternalSubscriptionManagementForm):
         max_length=BillingAccount._meta.get_field('name').max_length,
     )
 
-    partner_contact_emails = forms.CharField(
+    emails = forms.CharField(
         label=ugettext_noop('Partner Contact Emails'),
     )
 
@@ -1392,7 +1392,7 @@ class ContractedPartnerForm(InternalSubscriptionManagementForm):
         self.helper.form_class = 'form-horizontal'
         self.helper.layout = crispy.Layout(
             crispy.Field('fogbugz_client_name'),
-            crispy.Field('partner_contact_emails'),
+            crispy.Field('emails', css_class='input-xxlarge'),
             crispy.Field('start_date'),
             crispy.Field('end_date'),
             self.form_actions
