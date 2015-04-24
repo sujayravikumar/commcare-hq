@@ -806,6 +806,9 @@ LOGGING = {
             'level': 'ERROR',
             'class': 'raven.contrib.django.raven_compat.handlers.SentryHandler',
         },
+        'null': {
+            'class': 'django.utils.log.NullHandler',
+        },
     },
     'loggers': {
         '': {
@@ -817,6 +820,10 @@ LOGGING = {
             'handlers': ['mail_admins'],
             'level': 'ERROR',
             'propagate': True,
+        },
+        'django.security.DisallowedHost': {
+            'handlers': ['null'],
+            'propagate': False,
         },
         'notify': {
             'handlers': ['mail_admins'],
