@@ -1282,6 +1282,7 @@ class AdvancedExtendedTrialForm(InternalSubscriptionManagementForm):
 
     emails = forms.CharField(
         label=ugettext_noop('Partner Contact Emails'),
+        max_length=BillingContactInfo._meta.get_field('emails').max_length
     )
 
     end_date = forms.DateField(
@@ -1357,6 +1358,9 @@ class AdvancedExtendedTrialForm(InternalSubscriptionManagementForm):
             # entry_point=EntryPoint,
         )
         account.save()
+        contact_info, _ = BillingContactInfo.objects.get_or_create(account=account)
+        contact_info.emails = self.cleaned_data['emails']
+        contact_info.save()
         return account
 
 
@@ -1371,6 +1375,7 @@ class ContractedPartnerForm(InternalSubscriptionManagementForm):
 
     emails = forms.CharField(
         label=ugettext_noop('Partner Contact Emails'),
+        max_length=BillingContactInfo._meta.get_field('emails').max_length
     )
 
     start_date = forms.DateField(
@@ -1431,6 +1436,9 @@ class ContractedPartnerForm(InternalSubscriptionManagementForm):
             # entry_point=EntryPoint,
         )
         account.save()
+        contact_info, _ = BillingContactInfo.objects.get_or_create(account=account)
+        contact_info.emails = self.cleaned_data['emails']
+        contact_info.save()
         return account
 
 
