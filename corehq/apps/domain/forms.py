@@ -1368,6 +1368,15 @@ class ContractedPartnerForm(InternalSubscriptionManagementForm):
     slug = 'contracted_partner'
     subscription_type = ugettext_noop('Contracted Partner')
 
+    software_plan = forms.ChoiceField(
+        choices=(
+            (SoftwarePlanEdition.STANDARD, SoftwarePlanEdition.STANDARD),
+            (SoftwarePlanEdition.PRO, SoftwarePlanEdition.PRO),
+            (SoftwarePlanEdition.ADVANCED, SoftwarePlanEdition.ADVANCED),
+        ),
+        label=ugettext_noop('Software Plan'),
+    )
+
     fogbugz_client_name = forms.CharField(
         label=ugettext_noop('Fogbugz Client Name'),
         max_length=BillingAccount._meta.get_field('name').max_length,
@@ -1397,6 +1406,7 @@ class ContractedPartnerForm(InternalSubscriptionManagementForm):
         self.helper = FormHelper()
         self.helper.form_class = 'form-horizontal'
         self.helper.layout = crispy.Layout(
+            crispy.Field('software_plan'),
             crispy.Field('fogbugz_client_name'),
             crispy.Field('emails', css_class='input-xxlarge'),
             crispy.Field('start_date'),
@@ -1412,7 +1422,7 @@ class ContractedPartnerForm(InternalSubscriptionManagementForm):
 
     def process_subscription_management(self):
         new_plan_version = DefaultProductPlan.get_default_plan_by_domain(
-            self.domain, edition=SoftwarePlanEdition.PRO,
+            self.domain, edition=self.cleaned_data['software_plan'],
         )
         new_subscription = Subscription.new_domain_subscription(
             self.next_account,
