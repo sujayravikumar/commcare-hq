@@ -1401,6 +1401,12 @@ class ContractedPartnerForm(InternalSubscriptionManagementForm):
             crispy.Field('emails', css_class='input-xxlarge'),
             crispy.Field('start_date'),
             crispy.Field('end_date'),
+            crispy.HTML(_(
+                '<p><i class="icon-info-sign"></i> Clicking "Update" will set '
+                'up the subscription in CommCareHQ to one of our standard '
+                'contracted plans.  If you need to set up a non-standard plan, '
+                'please email accounts@dimagi.com.</p>'
+            )),
             self.form_actions
         )
 
