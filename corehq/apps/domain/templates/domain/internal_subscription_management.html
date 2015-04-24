@@ -3,6 +3,11 @@
 {% load crispy_forms_tags %}
 {% load hq_shared_tags %}
 
+{% block js %}{{ block.super }}
+    <script src="{% static 'hqwebapp/js/lib/select2/select2.js' %}"></script>
+    <script src="{% static 'accounting/js/accounting.billing_info_handler.js' %}"></script>
+{% endblock %}
+
 {% block js-inline %}{{ block.super }}
     <script type="text/javascript">
         var viewModel = {
@@ -11,6 +16,16 @@
         ko.applyBindings(viewModel, document.getElementById('subscription_management'));
     </script>
 
+    <script>
+        var billingInfoHandler = new BillingContactInfoHandler(
+            "{% trans "Please enter a valid email." %}"
+        );
+        billingInfoHandler.init();
+    </script>
+{% endblock %}
+
+{% block head %}{{ block.super }}
+    <link href="{% static 'hqwebapp/js/lib/select2/select2.css' %}" rel="stylesheet"/>
 {% endblock %}
 
 {% block main_column %}

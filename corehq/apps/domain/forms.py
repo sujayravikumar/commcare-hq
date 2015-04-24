@@ -1,7 +1,9 @@
 import copy
 import logging
 from urlparse import urlparse, parse_qs
+import datetime
 import dateutil
+from dateutil.relativedelta import relativedelta
 import re
 import io
 from PIL import Image
@@ -36,7 +38,8 @@ from corehq.apps.accounting.models import (
     Subscription,
     SubscriptionAdjustmentMethod,
     SubscriptionType,
-    BillingAccount, SoftwarePlanVersion, DefaultProductPlan)
+    BillingAccount, SoftwarePlanVersion, DefaultProductPlan, BillingAccountType,
+    Currency, EntryPoint)
 from corehq.apps.app_manager.models import (Application, RemoteApp,
                                             FormBase, get_apps_in_domain)
 
@@ -1179,8 +1182,12 @@ class InternalSubscriptionManagementForm(forms.Form):
         raise NotImplementedError
 
     @property
+    def next_account(self):
+        raise NotImplementedError
+
+    @property
     @memoized
-    def account(self):
+    def current_account(self):
         return BillingAccount.get_account_by_domain(self.domain)
 
     @property
@@ -1188,32 +1195,40 @@ class InternalSubscriptionManagementForm(forms.Form):
     def current_subscription(self):
         return Subscription.get_subscribed_plan_by_domain(self.domain)[1]
 
+    def __init__(self, domain, web_user, *args, **kwargs):
+        super(InternalSubscriptionManagementForm, self).__init__(*args, **kwargs)
+        self.domain = domain
+        self.web_user = web_user
+
+    @property
+    def form_actions(self):
+        return FormActions(
+            crispy.ButtonHolder(
+                crispy.Submit(
+                    self.slug,
+                    ugettext_noop('Update')
+                )
+            )
+        )
+
 
 class DimagiOnlyEnterpriseForm(InternalSubscriptionManagementForm):
     slug = 'dimagi_only_enterprise'
     subscription_type = ugettext_noop('Test or Demo Project')
 
-    def __init__(self, domain, *args, **kwargs):
-        self.domain = domain
-
-        super(DimagiOnlyEnterpriseForm, self).__init__(*args, **kwargs)
+    def __init__(self, domain, web_user, *args, **kwargs):
+        super(DimagiOnlyEnterpriseForm, self).__init__(domain, web_user, *args, **kwargs)
 
         self.helper = FormHelper()
         self.helper.form_class = 'form-horizontal'
         self.helper.layout = crispy.Layout(
             crispy.HTML(ugettext_noop(
-                '(i) You will have access to all features for free as soon as '
-                'you hit "update".  Please make sure this is an internal '
-                'Dimagi test space, not in use by a partner.'
+                '<i class="icon-info-sign"></i> You will have access to all '
+                'features for free as soon as you hit "Update".  Please make '
+                'sure this is an internal Dimagi test space, not in use by a '
+                'partner.'
             )),
-            FormActions(
-                crispy.ButtonHolder(
-                    crispy.Submit(
-                        self.slug,
-                        ugettext_noop('Update')
-                    )
-                )
-            )
+            self.form_actions
         )
 
     def process_subscription_management(self):
@@ -1223,21 +1238,228 @@ class DimagiOnlyEnterpriseForm(InternalSubscriptionManagementForm):
         if self.current_subscription:
             new_subscription = self.current_subscription.change_plan(
                 enterprise_plan_version,
-                web_user=None, # TODO use web_user
+                web_user=self.web_user,
             )
-            # TODO transfer the account
+            new_subscription.account = self.next_account
         else:
             new_subscription = Subscription.new_domain_subscription(
-                self.account, # TODO use correct account
+                self.next_account,
                 self.domain,
                 enterprise_plan_version,
-                web_user=None, # TODO use web_user
+                is_active=True,
+                web_user=self.web_user,
             )
-            new_subscription.is_active = True
-        # TODO add partner contact emails
         new_subscription.do_not_invoice = True
         new_subscription.save()
 
+    @property
+    @memoized
+    def next_account(self):
+        account = BillingAccount(
+            name="Dimagi Internal Test Account for Project %s" % self.domain,
+            created_by=self.web_user,
+            created_by_domain=self.domain,
+            currency=Currency.get_default(),
+            dimagi_contact=self.web_user,
+            # account_type=BillingAccountType,
+            # entry_point=EntryPoint,
+        )
+        account.save()
+        return account
+
+
+class AdvancedExtendedTrialForm(InternalSubscriptionManagementForm):
+    slug = 'advanced_extended_trial'
+    subscription_type = ugettext_noop('3 Month Trial')
+
+    organization_name = forms.CharField(
+        label=ugettext_noop('Organization Name'),
+        max_length=BillingAccount._meta.get_field('name').max_length,
+    )
+
+    emails = forms.CharField(
+        label=ugettext_noop('Partner Contact Emails'),
+        max_length=BillingContactInfo._meta.get_field('emails').max_length
+    )
+
+    end_date = forms.DateField(
+        widget=forms.HiddenInput,
+    )
+
+    def __init__(self, domain, web_user, *args, **kwargs):
+        end_date = datetime.date.today() + relativedelta(months=3)
+        kwargs['initial'] = {
+            'end_date': end_date,
+        }
+
+        super(AdvancedExtendedTrialForm, self).__init__(domain, web_user, *args, **kwargs)
+
+        self.helper = FormHelper()
+        self.helper.form_class = 'form-horizontal'
+        self.helper.layout = crispy.Layout(
+            crispy.Field('organization_name'),
+            crispy.Field('emails', css_class='input-xxlarge'),
+            crispy.Field('end_date'),
+            crispy.HTML(_(
+                '<p><i class="icon-info-sign"></i> The 3 month trial includes '
+                'access to all features, 5 mobile workers, and 25 SMS.  Fees '
+                'apply for users or SMS in excess of these limits (1 '
+                'USD/user/month, regular SMS fees).</p>'
+            )),
+            crispy.HTML(_(
+                '<p><i class="icon-info-sign"></i> The trial will begin as soon '
+                'as you hit "Update" and end on %(end_date)s.  On %(end_date)s '
+                ' the project space will automatically be subscribed to the '
+                'Community plan.</p>'
+            ) % {
+                'end_date': end_date,
+            }),
+            self.form_actions
+        )
+
+    def process_subscription_management(self):
+        advanced_trial_plan_version = DefaultProductPlan.get_default_plan_by_domain(
+            self.domain, edition=SoftwarePlanEdition.ADVANCED, is_trial=True,
+        )
+        if self.current_subscription:
+            new_subscription = self.current_subscription.change_plan(
+                advanced_trial_plan_version,
+                date_end=self.cleaned_data['end_date'],
+                web_user=self.web_user,
+            )
+            new_subscription.account = self.next_account
+        else:
+            new_subscription = Subscription.new_domain_subscription(
+                self.next_account,
+                self.domain,
+                advanced_trial_plan_version,
+                date_end=self.cleaned_data['end_date'],
+                is_active=True,
+                web_user=self.web_user,
+            )
+        new_subscription.do_not_invoice = False
+        new_subscription.auto_generate_credits = False
+        new_subscription.save()
+
+    @property
+    @memoized
+    def next_account(self):
+        # TODO contact emails
+        account = BillingAccount(
+            name=self.cleaned_data['organization_name'],
+            created_by=self.web_user,
+            created_by_domain=self.domain,
+            currency=Currency.get_default(),
+            dimagi_contact=self.web_user,
+            # account_type=BillingAccountType,
+            # entry_point=EntryPoint,
+        )
+        account.save()
+        contact_info, _ = BillingContactInfo.objects.get_or_create(account=account)
+        contact_info.emails = self.cleaned_data['emails']
+        contact_info.save()
+        return account
+
+
+class ContractedPartnerForm(InternalSubscriptionManagementForm):
+    slug = 'contracted_partner'
+    subscription_type = ugettext_noop('Contracted Partner')
+
+    software_plan = forms.ChoiceField(
+        choices=(
+            (SoftwarePlanEdition.STANDARD, SoftwarePlanEdition.STANDARD),
+            (SoftwarePlanEdition.PRO, SoftwarePlanEdition.PRO),
+            (SoftwarePlanEdition.ADVANCED, SoftwarePlanEdition.ADVANCED),
+        ),
+        label=ugettext_noop('Software Plan'),
+    )
+
+    fogbugz_client_name = forms.CharField(
+        label=ugettext_noop('Fogbugz Client Name'),
+        max_length=BillingAccount._meta.get_field('name').max_length,
+    )
+
+    emails = forms.CharField(
+        label=ugettext_noop('Partner Contact Emails'),
+        max_length=BillingContactInfo._meta.get_field('emails').max_length
+    )
+
+    start_date = forms.DateField(
+        label=ugettext_noop('Start Date'),
+    )
+
+    end_date = forms.DateField(
+        label=ugettext_noop('End Date'),
+    )
+
+    def __init__(self, domain, web_user, *args, **kwargs):
+        kwargs['initial'] = {
+            'start_date': datetime.date.today(),
+            'end_date': datetime.date.today() + relativedelta(years=1),
+        }
+
+        super(ContractedPartnerForm, self).__init__(domain, web_user, *args, **kwargs)
+
+        self.helper = FormHelper()
+        self.helper.form_class = 'form-horizontal'
+        self.helper.layout = crispy.Layout(
+            crispy.Field('software_plan'),
+            crispy.Field('fogbugz_client_name'),
+            crispy.Field('emails', css_class='input-xxlarge'),
+            crispy.Field('start_date'),
+            crispy.Field('end_date'),
+            crispy.HTML(_(
+                '<p><i class="icon-info-sign"></i> Clicking "Update" will set '
+                'up the subscription in CommCareHQ to one of our standard '
+                'contracted plans.  If you need to set up a non-standard plan, '
+                'please email accounts@dimagi.com.</p>'
+            )),
+            self.form_actions
+        )
+
+    def process_subscription_management(self):
+        new_plan_version = DefaultProductPlan.get_default_plan_by_domain(
+            self.domain, edition=self.cleaned_data['software_plan'],
+        )
+        new_subscription = Subscription.new_domain_subscription(
+            self.next_account,
+            self.domain,
+            new_plan_version,
+            date_start=self.cleaned_data['start_date'],
+            date_end=self.cleaned_data['end_date'],
+            web_user=self.web_user,
+        )
+        if new_subscription.date_start <= datetime.date.today() and datetime.date.today() < new_subscription.date_end:
+            new_subscription.is_active = True
+        new_subscription.do_not_invoice = False
+        new_subscription.auto_generate_credits = True
+        new_subscription.save()
+
+    @property
+    @memoized
+    def next_account(self):
+        # TODO contact emails
+        account = BillingAccount(
+            name=self.cleaned_data['fogbugz_client_name'],
+            created_by=self.web_user,
+            created_by_domain=self.domain,
+            currency=Currency.get_default(),
+            dimagi_contact=self.web_user,
+            # account_type=BillingAccountType,
+            # entry_point=EntryPoint,
+        )
+        account.save()
+        contact_info, _ = BillingContactInfo.objects.get_or_create(account=account)
+        contact_info.emails = self.cleaned_data['emails']
+        contact_info.save()
+        return account
+
+
+INTERNAL_SUBSCRIPTION_MANAGEMENT_FORMS = [
+    ContractedPartnerForm,
+    DimagiOnlyEnterpriseForm,
+    AdvancedExtendedTrialForm,
+]
 
 
 class SelectSubscriptionTypeForm(forms.Form):
@@ -1246,9 +1468,7 @@ class SelectSubscriptionTypeForm(forms.Form):
             ('', ugettext_noop('Select a subscription type...'))
         ] + [
             (form.slug, form.subscription_type)
-            for form in [
-                DimagiOnlyEnterpriseForm,
-            ]
+            for form in INTERNAL_SUBSCRIPTION_MANAGEMENT_FORMS
         ],
         label=ugettext_noop('Subscription Type'),
         required=False,
