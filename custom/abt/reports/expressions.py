@@ -10,57 +10,70 @@ class AbtSupervisorExpressionSpec(JsonObject):
     @property
     @memoized
     def _flag_specs(self):
+        """
+        Return a dict where keys are form xmlns and values are lists of FlagSpecs
+        """
         FlagSpec = namedtuple("FlagSpec", [
-            "form_xmlns",
-            "flag_id",
             "path",
-            "danger_value",
+            "danger_value", # empty list is a sentinal that means any answer
             "warning_string",
             "warning_property_path"
         ])
-        return [
-            FlagSpec(
-                form_xmlns="http://openrosa.org/formdesigner/BB2BF979-BD8F-4B8D-BCF8-A46451228BA9",
-                flag_id="adequate_distance",
-                path=["q2"],
-                danger_value="No",
-                warning_string="The nearest sensitive receptor is {msg} meters away",
-                warning_property_path=['q2_next']
-            ),
-            FlagSpec(
-                form_xmlns="http://openrosa.org/formdesigner/BB2BF979-BD8F-4B8D-BCF8-A46451228BA9",
-                flag_id="leak_free",
-                path=["q5"],
-                danger_value="No",
-                warning_string="The leak will be repaired on {msg}",
-                warning_property_path=['q5_action_two']
-            ),
-            FlagSpec(
-                form_xmlns="dummy",
-                flag_id="dummy flag",
-                path=["dummy"],
-                danger_value="dummy",
-                warning_string="foo{msg}",
-                warning_property_path=['bloop']
-            ),
-            FlagSpec(
-                form_xmlns="http://openrosa.org/formdesigner/54338047-CFB6-4D5B-861B-2256A10BBBC8",
-                flag_id="eaten_breakfast",
-                path=["q2"],
-                danger_value="No",
-                warning_string="{msg}",
-                warning_property_path=['nothing_pls']
-            )
-        ]
+        return {
+            # # Form 2
+            # "http://openrosa.org/formdesigner/BBBA67FC-4E25-46B4-AB64-56F820D48A9E": [
+            #     FlagSpec(
+            #         path=['q1_action'],
+            #         danger_value=[],
+            #         warning_string="Problem noted: Vehicle(s) or driver(s) do(es) not possess the required certificate or license. Vehicle or driver cannot be used until certificate is obtained.",
+            #         warning_property_path=None
+            #     ),
+            # ],
+            # Form 3
+            "http://openrosa.org/formdesigner/54338047-CFB6-4D5B-861B-2256A10BBBC8": [
+                FlagSpec(
+                    path=["q2_action"],
+                    danger_value=[],
+                    warning_string="Problem reported: Spray operator(s) not properly fed or hydrated prior to donning PPE.",
+                    warning_property_path=None,
+                ),
+            ]
+        }
 
-    def __call__(self, item, context=None):
-        """
-        Given a document (item), return a list of documents representing each
-        of the flagged questions.
-        """
-        # TODO: Don't define FlagSpec and get_val for every call
+        # [
+        #     FlagSpec(
+        #         form_xmlns="http://openrosa.org/formdesigner/BB2BF979-BD8F-4B8D-BCF8-A46451228BA9",
+        #         path=["q2"],
+        #         danger_value="No",
+        #         warning_string="The nearest sensitive receptor is {msg} meters away",
+        #         warning_property_path=['q2_next']
+        #     ),
+        #     FlagSpec(
+        #         form_xmlns="http://openrosa.org/formdesigner/BB2BF979-BD8F-4B8D-BCF8-A46451228BA9",
+        #         path=["q5"],
+        #         danger_value="No",
+        #         warning_string="The leak will be repaired on {msg}",
+        #         warning_property_path=['q5_action_two']
+        #     ),
+        #     FlagSpec(
+        #         form_xmlns="dummy",
+        #         path=["dummy"],
+        #         danger_value="dummy",
+        #         warning_string="foo{msg}",
+        #         warning_property_path=['bloop']
+        #     ),
+        #     FlagSpec(
+        #         form_xmlns="http://openrosa.org/formdesigner/54338047-CFB6-4D5B-861B-2256A10BBBC8",
+        #         path=["q2"],
+        #         danger_value="No",
+        #         warning_string="{msg}",
+        #         warning_property_path=['nothing_pls']
+        #     )
+        # ]
 
-        def get_val(item, path):
+    @classmethod
+    def _get_val(cls, item, path):
+        if path:
             try:
                 v = item['form']
                 for key in path:
@@ -69,17 +82,24 @@ class AbtSupervisorExpressionSpec(JsonObject):
             except KeyError:
                 return None
 
+    def __call__(self, item, context=None):
+        """
+        Given a document (item), return a list of documents representing each
+        of the flagged questions.
+        """
+
         docs = []
-        print item['xmlns']
-        for spec in self._flag_specs:
-            if item['xmlns'] == spec.form_xmlns:
-                if get_val(item, spec.path) == spec.danger_value:
-                    docs.append({
-                        'flag': spec.flag_id,
-                        'warning': spec.warning_string.format(
-                            msg=get_val(item, spec.warning_property_path) or ""
-                        )
-                    })
+        for spec in self._flag_specs.get(item['xmlns'], []):
+            if (
+                self._get_val(item, spec.path) == spec.danger_value or
+                spec.danger_value == [] # [] is a sentinel meaning any value should raise the flag
+            ):
+                docs.append({
+                    'flag': spec.path[-1],
+                    'warning': spec.warning_string.format(
+                        msg=self._get_val(item, spec.warning_property_path) or ""
+                    )
+                })
         return docs
 
 
