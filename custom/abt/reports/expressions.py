@@ -1,5 +1,6 @@
-from collections import namedtuple
+import os
 from jsonobject import JsonObject
+import yaml
 from corehq.apps.userreports.specs import TypeProperty
 from dimagi.utils.decorators.memoized import memoized
 
@@ -13,66 +14,15 @@ class AbtSupervisorExpressionSpec(JsonObject):
         """
         Return a dict where keys are form xmlns and values are lists of FlagSpecs
         """
-        FlagSpec = namedtuple("FlagSpec", [
-            "path",
-            "danger_value", # empty list is a sentinal that means any answer
-            "warning_string",
-            "warning_property_path"
-        ])
-        return {
-            # # Form 2
-            # "http://openrosa.org/formdesigner/BBBA67FC-4E25-46B4-AB64-56F820D48A9E": [
-            #     FlagSpec(
-            #         path=['q1_action'],
-            #         danger_value=[],
-            #         warning_string="Problem noted: Vehicle(s) or driver(s) do(es) not possess the required certificate or license. Vehicle or driver cannot be used until certificate is obtained.",
-            #         warning_property_path=None
-            #     ),
-            # ],
-            # Form 3
-            "http://openrosa.org/formdesigner/54338047-CFB6-4D5B-861B-2256A10BBBC8": [
-                FlagSpec(
-                    path=["q2_action"],
-                    danger_value=[],
-                    warning_string="Problem reported: Spray operator(s) not properly fed or hydrated prior to donning PPE.",
-                    warning_property_path=None,
-                ),
-            ]
-        }
-
-        # [
-        #     FlagSpec(
-        #         form_xmlns="http://openrosa.org/formdesigner/BB2BF979-BD8F-4B8D-BCF8-A46451228BA9",
-        #         path=["q2"],
-        #         danger_value="No",
-        #         warning_string="The nearest sensitive receptor is {msg} meters away",
-        #         warning_property_path=['q2_next']
-        #     ),
-        #     FlagSpec(
-        #         form_xmlns="http://openrosa.org/formdesigner/BB2BF979-BD8F-4B8D-BCF8-A46451228BA9",
-        #         path=["q5"],
-        #         danger_value="No",
-        #         warning_string="The leak will be repaired on {msg}",
-        #         warning_property_path=['q5_action_two']
-        #     ),
-        #     FlagSpec(
-        #         form_xmlns="dummy",
-        #         path=["dummy"],
-        #         danger_value="dummy",
-        #         warning_string="foo{msg}",
-        #         warning_property_path=['bloop']
-        #     ),
-        #     FlagSpec(
-        #         form_xmlns="http://openrosa.org/formdesigner/54338047-CFB6-4D5B-861B-2256A10BBBC8",
-        #         path=["q2"],
-        #         danger_value="No",
-        #         warning_string="{msg}",
-        #         warning_property_path=['nothing_pls']
-        #     )
-        # ]
+        path = os.path.join(os.path.dirname(__file__), 'flagspecs.yaml')
+        with open(path) as f:
+            return yaml.load(f)
 
     @classmethod
     def _get_val(cls, item, path):
+        '''
+        Return empty tuple if path is not in item
+        '''
         if path:
             try:
                 v = item['form']
@@ -80,7 +30,7 @@ class AbtSupervisorExpressionSpec(JsonObject):
                     v = v[key]
                 return v
             except KeyError:
-                return None
+                return ()
 
     def __call__(self, item, context=None):
         """
@@ -90,14 +40,13 @@ class AbtSupervisorExpressionSpec(JsonObject):
 
         docs = []
         for spec in self._flag_specs.get(item['xmlns'], []):
-            if (
-                self._get_val(item, spec.path) == spec.danger_value or
-                spec.danger_value == [] # [] is a sentinel meaning any value should raise the flag
-            ):
+            form_value = self._get_val(item, spec['question'])
+            danger_value = spec.get('answer', [])
+            if form_value == danger_value or (form_value != () and danger_value == []):
                 docs.append({
-                    'flag': spec.path[-1],
-                    'warning': spec.warning_string.format(
-                        msg=self._get_val(item, spec.warning_property_path) or ""
+                    'flag': spec['question'][-1],
+                    'warning': spec['warning'].format(
+                        msg=self._get_val(item, spec.get('warning_question', None)) or ""
                     )
                 })
         return docs
