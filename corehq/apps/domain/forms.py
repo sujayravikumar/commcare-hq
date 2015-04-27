@@ -54,6 +54,7 @@ from corehq.apps.reminders.models import CaseReminderHandler
 
 from corehq.apps.users.models import WebUser, CommCareUser
 from corehq.apps.groups.models import Group
+from corehq.apps.hqwebapp.crispy import TextField
 from dimagi.utils.django.email import send_HTML_email
 from corehq.util.timezones.fields import TimeZoneField
 from corehq.util.timezones.forms import TimeZoneChoiceField
@@ -1410,31 +1411,52 @@ class ContractedPartnerForm(InternalSubscriptionManagementForm):
     )
 
     def __init__(self, domain, web_user, *args, **kwargs):
-        kwargs['initial'] = {
-            'start_date': datetime.date.today(),
-            'end_date': datetime.date.today() + relativedelta(years=1),
-        }
-
         super(ContractedPartnerForm, self).__init__(domain, web_user, *args, **kwargs)
 
         self.helper = FormHelper()
         self.helper.form_class = 'form-horizontal'
-        self.helper.layout = crispy.Layout(
-            crispy.Field('software_plan_edition'),
-            crispy.Field('fogbugz_client_name'),
-            crispy.Field('emails', css_class='input-xxlarge'),
-            crispy.Field('start_date', css_class='date-picker'),
-            crispy.Field('end_date', css_class='date-picker'),
-            crispy.Field('sms_credits'),
-            crispy.Field('user_credits'),
-            crispy.HTML(_(
-                '<p><i class="icon-info-sign"></i> Clicking "Update" will set '
-                'up the subscription in CommCareHQ to one of our standard '
-                'contracted plans.  If you need to set up a non-standard plan, '
-                'please email accounts@dimagi.com.</p>'
-            )),
-            self.form_actions
-        )
+
+        plan_edition = self.current_subscription.plan_version.plan.edition
+        if plan_edition not in [
+            first for first, second in self.fields['software_plan_edition'].choices
+        ]:
+            self.fields['start_date'].initial = datetime.date.today()
+            self.fields['end_date'].initial = datetime.date.today() + relativedelta(years=1)
+            self.helper.layout = crispy.Layout(
+                crispy.Field('software_plan_edition'),
+                crispy.Field('fogbugz_client_name'),
+                crispy.Field('emails', css_class='input-xxlarge'),
+                crispy.Field('start_date', css_class='date-picker'),
+                crispy.Field('end_date', css_class='date-picker'),
+                crispy.Field('sms_credits'),
+                crispy.Field('user_credits'),
+                crispy.HTML(_(
+                    '<p><i class="icon-info-sign"></i> Clicking "Update" will set '
+                    'up the subscription in CommCareHQ to one of our standard '
+                    'contracted plans.  If you need to set up a non-standard plan, '
+                    'please email accounts@dimagi.com.</p>'
+                )),
+                self.form_actions
+            )
+        else:
+            self.fields['fogbugz_client_name'].initial = self.current_subscription.account.name
+            self.fields['emails'].initial = self.current_subscription.account.billingcontactinfo.emails
+            self.fields['end_date'].initial = self.current_subscription.date_end
+            self.helper.layout = crispy.Layout(
+                TextField('software_plan_edition', plan_edition),
+                crispy.Hidden('software_plan_edition', plan_edition),
+                crispy.Field('fogbugz_client_name'),
+                crispy.Field('emails', css_class='input-xxlarge'),
+                TextField('start_date', self.current_subscription.date_start),
+                crispy.Hidden('start_date', self.current_subscription.date_start),
+                crispy.Field('end_date', css_class='date-picker'),
+                crispy.Hidden('sms_credits', 0),
+                crispy.Hidden('user_credits', 0),
+                crispy.HTML(_(
+                    'text goes here'
+                )),
+                self.form_actions
+            )
 
     def process_subscription_management(self):
         new_plan_version = DefaultProductPlan.get_default_plan_by_domain(
