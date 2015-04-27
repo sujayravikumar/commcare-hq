@@ -1187,12 +1187,40 @@ class InternalSubscriptionManagementForm(forms.Form):
     def subscription_type(self):
         raise NotImplementedError
 
+    @property
+    def account_name(self):
+        raise NotImplementedError
+
+    @property
+    def account_emails(self):
+        return []
+
     def process_subscription_management(self):
         raise NotImplementedError
 
     @property
+    @memoized
     def next_account(self):
-        raise NotImplementedError
+        matching_accounts = BillingAccount.objects.filter(name=self.account_name).order_by('date_created')
+        if len(matching_accounts): # TODO len needed?
+            account = matching_accounts[0]
+        else:
+            account = BillingAccount(
+                name=self.account_name,
+                created_by=self.web_user,
+                created_by_domain=self.domain,
+                currency=Currency.get_default(),
+                dimagi_contact=self.web_user,
+            )
+            account.save()
+        contact_info, _ = BillingContactInfo.objects.get_or_create(account=account)
+        emails = (contact_info.emails or '').split(',')
+        for email in self.account_emails:
+            if email not in emails:
+                emails.append(email)
+        contact_info.emails = ','.join(emails)
+        contact_info.save()
+        return account
 
     @property
     @memoized
@@ -1262,19 +1290,8 @@ class DimagiOnlyEnterpriseForm(InternalSubscriptionManagementForm):
         new_subscription.save()
 
     @property
-    @memoized
-    def next_account(self):
-        account = BillingAccount(
-            name="Dimagi Internal Test Account for Project %s" % self.domain,
-            created_by=self.web_user,
-            created_by_domain=self.domain,
-            currency=Currency.get_default(),
-            dimagi_contact=self.web_user,
-            # account_type=BillingAccountType,
-            # entry_point=EntryPoint,
-        )
-        account.save()
-        return account
+    def account_name(self):
+        return "Dimagi Internal Test Account for Project %s" % self.domain
 
 
 class AdvancedExtendedTrialForm(InternalSubscriptionManagementForm):
@@ -1351,22 +1368,12 @@ class AdvancedExtendedTrialForm(InternalSubscriptionManagementForm):
         new_subscription.save()
 
     @property
-    @memoized
-    def next_account(self):
-        account = BillingAccount(
-            name=self.cleaned_data['organization_name'],
-            created_by=self.web_user,
-            created_by_domain=self.domain,
-            currency=Currency.get_default(),
-            dimagi_contact=self.web_user,
-            # account_type=BillingAccountType,
-            # entry_point=EntryPoint,
-        )
-        account.save()
-        contact_info, _ = BillingContactInfo.objects.get_or_create(account=account)
-        contact_info.emails = self.cleaned_data['emails']
-        contact_info.save()
-        return account
+    def account_name(self):
+        return self.cleaned_data['organization_name']
+
+    @property
+    def account_emails(self):
+        return self.cleaned_data['emails']
 
 
 class ContractedPartnerForm(InternalSubscriptionManagementForm):
@@ -1524,22 +1531,12 @@ class ContractedPartnerForm(InternalSubscriptionManagementForm):
         )
 
     @property
-    @memoized
-    def next_account(self):
-        account = BillingAccount(
-            name=self.cleaned_data['fogbugz_client_name'],
-            created_by=self.web_user,
-            created_by_domain=self.domain,
-            currency=Currency.get_default(),
-            dimagi_contact=self.web_user,
-            # account_type=BillingAccountType,
-            # entry_point=EntryPoint,
-        )
-        account.save()
-        contact_info, _ = BillingContactInfo.objects.get_or_create(account=account)
-        contact_info.emails = self.cleaned_data['emails']
-        contact_info.save()
-        return account
+    def account_name(self):
+        return self.cleaned_data['fogbugz_client_name']
+
+    @property
+    def account_emails(self):
+        return self.cleaned_data['emails']
 
     def clean_end_date(self):
         end_date = self.cleaned_data['end_date']
