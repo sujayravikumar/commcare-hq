@@ -1388,15 +1388,23 @@ class ContractedPartnerForm(InternalSubscriptionManagementForm):
     )
 
     emails = forms.CharField(
+        help_text=ugettext_noop(
+            'This is who will receive invoices if the Client exceeds the user '
+            'or SMS limits in their plan.'
+        ),
         label=ugettext_noop('Partner Contact Emails'),
         max_length=BillingContactInfo._meta.get_field('emails').max_length,
     )
 
     start_date = forms.DateField(
+        help_text=ugettext_noop('Date the project needs access to features.'),
         label=ugettext_noop('Start Date'),
     )
 
     end_date = forms.DateField(
+        help_text=ugettext_noop(
+            '1 year after the deployment date (date the project goes live).'
+        ),
         label=ugettext_noop('End Date'),
     )
 
