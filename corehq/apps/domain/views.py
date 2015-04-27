@@ -1215,7 +1215,7 @@ class InternalSubscriptionManagementView(BaseAdminProjectSettingsView):
     @memoized
     def slug_to_form(self):
         def create_form(form_class):
-            if self.request.method == 'POST':
+            if self.request.method == 'POST' and form_class.slug in self.request.POST:
                 return form_class(self.domain, self.request.couch_user.username, self.request.POST)
             return form_class(self.domain, self.request.couch_user.username)
         return {form_class.slug: create_form(form_class) for form_class in self.form_classes}
