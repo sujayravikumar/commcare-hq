@@ -1557,6 +1557,24 @@ class ContractedPartnerForm(InternalSubscriptionManagementForm):
             })
         return end_date
 
+    def clean_sms_credits(self):
+        return self._clean_credits(self.cleaned_data['sms_credits'], 10000, _('SMS'))
+
+    def clean_user_credits(self):
+        return self._clean_credits(self.cleaned_data['user_credits'], 2000, _('user'))
+
+    def _clean_credits(self, credits, max_credits, credits_name):
+        if credits > max_credits:
+            raise forms.ValidationError(_(
+                'You tried to add too much %(credits_name)s credit!  Only '
+                'someone on the operations team can add that much credit.  '
+                'Please reach out to %(email)s.'
+            ) % {
+                'credits_name': credits_name,
+                'email': settings.ACCOUNTS_EMAIL,
+            })
+        return credits
+
 
 INTERNAL_SUBSCRIPTION_MANAGEMENT_FORMS = [
     ContractedPartnerForm,
