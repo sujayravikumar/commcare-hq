@@ -1416,7 +1416,7 @@ class ContractedPartnerForm(InternalSubscriptionManagementForm):
         self.helper = FormHelper()
         self.helper.form_class = 'form-horizontal'
 
-        plan_edition = self.current_subscription.plan_version.plan.edition
+        plan_edition = self.current_subscription.plan_version.plan.edition if self.current_subscription else None
         if plan_edition not in [
             first for first, second in self.fields['software_plan_edition'].choices
         ]:
