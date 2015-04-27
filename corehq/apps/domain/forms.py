@@ -1453,7 +1453,12 @@ class ContractedPartnerForm(InternalSubscriptionManagementForm):
                 crispy.Hidden('sms_credits', 0),
                 crispy.Hidden('user_credits', 0),
                 crispy.HTML(_(
-                    'text goes here'
+                    '<div class="alert">'
+                    '<p><strong>Are you sure you want to extend the subscription?</strong></p>'
+                    '<p>If this project is becoming a self-service project and only paying for '
+                    'hosting fees, please have them self-subscribe through the subscription page.  '
+                    'Please use this page only to extend the existing services contract.</p>'
+                    '</div>'
                 )),
                 self.form_actions
             )
