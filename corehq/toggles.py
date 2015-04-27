@@ -444,3 +444,8 @@ OWNERSHIP_CLEANLINESS = PredicatablyRandomToggle(
     namespace=NAMESPACE_DOMAIN,
     help_link='https://docs.google.com/a/dimagi.com/document/d/12WfZLerFL832LZbMwqRAvXt82scdjDL51WZVNa31f28/edit#heading=h.gu9sjekp0u2p',
 )
+
+FM_FACING_SUBSCRIPTIONS = StaticToggle(
+    'fm_facing_subscriptions',
+    'FM Facing Subscription Management Interface'
+)
