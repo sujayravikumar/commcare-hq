@@ -1541,6 +1541,22 @@ class ContractedPartnerForm(InternalSubscriptionManagementForm):
         contact_info.save()
         return account
 
+    def clean_end_date(self):
+        end_date = self.cleaned_data['end_date']
+        if end_date < datetime.date.today():
+            raise forms.ValidationError(_(
+                'End Date cannot be a past date.'
+            ))
+        if end_date > datetime.date.today() + relativedelta(years=5):
+            raise forms.ValidationError(_(
+                'This contract is too long to be managed in this interface.  '
+                'Please contact %(email)s to manage a contract greater than '
+                '5 years.'
+            ) % {
+                'email': settings.ACCOUNTS_EMAIL,
+            })
+        return end_date
+
 
 INTERNAL_SUBSCRIPTION_MANAGEMENT_FORMS = [
     ContractedPartnerForm,
