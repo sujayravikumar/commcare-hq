@@ -12,7 +12,7 @@
 {% block js-inline %}{{ block.super }}
     <script type="text/javascript">
         var viewModel = {
-            subscriptionType: ko.observable()
+            subscriptionType: ko.observable($('#id_subscription_type').val() || null)
         };
         ko.applyBindings(viewModel, document.getElementById('subscription_management'));
     </script>

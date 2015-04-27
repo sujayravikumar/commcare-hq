@@ -1201,7 +1201,7 @@ class InternalSubscriptionManagementView(BaseAdminProjectSettingsView):
     def page_context(self):
         return {
             'plan_name': Subscription.get_subscribed_plan_by_domain(self.domain)[0],
-            'select_subscription_type_form': SelectSubscriptionTypeForm(),
+            'select_subscription_type_form': self.select_subscription_type_form,
             'subscription_management_forms': self.slug_to_form.values(),
         }
 
@@ -1219,6 +1219,18 @@ class InternalSubscriptionManagementView(BaseAdminProjectSettingsView):
                 return form_class(self.domain, self.request.couch_user.username, self.request.POST)
             return form_class(self.domain, self.request.couch_user.username)
         return {form_class.slug: create_form(form_class) for form_class in self.form_classes}
+
+    @property
+    @memoized
+    def select_subscription_type_form(self):
+        if self.request.method == 'POST':
+            for form_slug in self.slug_to_form:
+                if form_slug in self.request.POST:
+                    return SelectSubscriptionTypeForm({
+                        'subscription_type': form_slug,
+                    })
+        return SelectSubscriptionTypeForm()
+
 
 
 class SelectPlanView(DomainAccountingSettings):
