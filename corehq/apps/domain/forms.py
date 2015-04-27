@@ -1372,7 +1372,7 @@ class ContractedPartnerForm(InternalSubscriptionManagementForm):
     slug = 'contracted_partner'
     subscription_type = ugettext_noop('Contracted Partner')
 
-    software_plan = forms.ChoiceField(
+    software_plan_edition = forms.ChoiceField(
         choices=(
             (SoftwarePlanEdition.STANDARD, SoftwarePlanEdition.STANDARD),
             (SoftwarePlanEdition.PRO, SoftwarePlanEdition.PRO),
@@ -1420,7 +1420,7 @@ class ContractedPartnerForm(InternalSubscriptionManagementForm):
         self.helper = FormHelper()
         self.helper.form_class = 'form-horizontal'
         self.helper.layout = crispy.Layout(
-            crispy.Field('software_plan'),
+            crispy.Field('software_plan_edition'),
             crispy.Field('fogbugz_client_name'),
             crispy.Field('emails', css_class='input-xxlarge'),
             crispy.Field('start_date', css_class='date-picker'),
@@ -1438,7 +1438,7 @@ class ContractedPartnerForm(InternalSubscriptionManagementForm):
 
     def process_subscription_management(self):
         new_plan_version = DefaultProductPlan.get_default_plan_by_domain(
-            self.domain, edition=self.cleaned_data['software_plan'],
+            self.domain, edition=self.cleaned_data['software_plan_edition'],
         )
         revert_current_subscription_end_date = None
         if self.current_subscription and self.cleaned_data['start_date'] < self.current_subscription.date_end:
