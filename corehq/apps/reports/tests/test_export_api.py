@@ -1,7 +1,9 @@
+import datetime
 from django.test.client import Client
 from django.test import TestCase
 from couchforms.util import spoof_submission
 import uuid
+from corehq import ReportConfig
 from corehq.apps.receiverwrapper.util import get_submit_url
 from corehq.apps.domain.shortcuts import create_domain
 from django.core.urlresolvers import reverse
@@ -139,3 +141,45 @@ class ExportTest(TestCase):
         resp = get_export_response(c, include_errors=True)
         self.assertEqual(200, resp.status_code)
         self.assertTrue(len(_content(resp)) > len(initial_content))
+
+    def test_decorator_madness(self):
+        """
+        Test if this raises an exception or not.
+        """
+        # TODO: Move this test to a more appropirate place
+        # (doing it here because it has the scafolding I want)
+        c = Client()
+        c.login(**{'username': 'test', 'password': 'foobar'})
+        c.get(
+            '/a/noahtest/reports/email_onceoff/worker_activity/',
+            {
+                u'startdate': [u'2015-04-21'],
+                u'group': [u'_all'],
+                u'view_by': [u''],
+                u'enddate': [u'2015-04-28'],
+                u'send_to_owner': [u'true'],
+                u'subject': [u'Worker Activity']
+            }
+        )
+
+    def test_email_report(self):
+        conf = ReportConfig(
+            _attachments=None,
+            _id=u'dummy',
+            _rev=None,
+            date_range=u'range',
+            days=None,
+            description=None,
+            doc_type=u'ReportConfig',
+            domain=DOMAIN,
+            end_date=datetime.date(2015, 4, 29),
+            filters={u'group': [u'_all'], u'view_by': [u'']},
+            name=u'Emailed report',
+            owner_id=self.couch_user._id,
+            report_slug=u'worker_activity',
+            report_type=u'project_report',
+            start_date=datetime.date(2015, 4, 21),
+            subreport_slug=None
+        )
+        content = conf.get_report_content()
+        self.assertNotEqual(content, (u'An error occurred while generating this report.', None))
