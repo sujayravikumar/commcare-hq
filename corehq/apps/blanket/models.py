@@ -35,6 +35,11 @@ class CouchQuerySummary(DocumentSchema):
     total_view_time = DecimalProperty()
 
 
+class SqlQuerySummary(DocumentSchema):
+    start_time = DateTimeProperty()
+    end_end = DateTimeProperty()
+
+
 class BlanketResponseDocument(Document):
     status_code = IntegerProperty()
     raw_body = StringProperty()
@@ -58,4 +63,4 @@ class BlanketRequestDocument(Document):
     line_profile = StringProperty()
 
     couchdb_queries = SchemaProperty(CouchQuerySummary)
-    # sql_queries = SchemaProperty() # TODO nick don't screw it up
+    sql_queries = SchemaListProperty(SqlQuerySummary)
