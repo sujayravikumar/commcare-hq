@@ -31,6 +31,7 @@ class BlanketMiddleware(object):
             # self._apply_dynamic_mappings()
 
             # Hook in sql profiler
+            # TODO this can be moved elsewhere
             from django.db.models import Manager
             if not hasattr(Manager, '_get_query_set'):
                 Manager._get_query_set = Manager.get_query_set
