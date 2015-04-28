@@ -32,7 +32,7 @@ class BlanketMiddleware(object):
 
             # Hook in sql profiler
             from django.db.models import Manager
-            if not Manager._get_query_set:
+            if not hasattr(Manager, '_get_query_set'):
                 Manager._get_query_set = Manager.get_query_set
                 Manager.get_query_set = get_query_set
 
