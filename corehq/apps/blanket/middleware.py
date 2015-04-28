@@ -3,7 +3,7 @@ import time
 from datetime import datetime
 import couchdbkit
 from corehq.apps.blanket import couchwrapper
-from corehq.apps.blanket.sql import get_query_set
+from corehq.apps.blanket.sql import execute_sql
 
 from dimagi.utils.couch.database import get_db
 from corehq.toggles import BLANKET
@@ -34,10 +34,10 @@ class BlanketMiddleware(object):
 
             # Hook in sql profiler
             # TODO this can be moved elsewhere
-            from django.db.models import Manager
-            if not hasattr(Manager, '_get_query_set'):
-                Manager._get_query_set = Manager.get_query_set
-                Manager.get_query_set = get_query_set
+            from django.db.models.sql.compiler import SQLCompiler
+            if not hasattr(SQLCompiler, '_execute_sql'):
+                SQLCompiler._execute_sql = SQLCompiler.execute_sql
+                SQLCompiler.execute_sql = execute_sql
 
             # Hook in couch profiler
             request.view_offset = len(getattr(couchdbkit.client.ViewResults, '_queries', []))

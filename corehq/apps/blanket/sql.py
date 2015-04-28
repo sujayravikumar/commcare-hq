@@ -1,16 +1,13 @@
-import datetime
 import time
-from corehq import toggle_enabled
-from corehq.apps.blanket.models import SqlQuerySummary
-from corehq.toggles import BLANKET
+from django.db.models.sql import MULTI
 from corehq.util.view_utils import get_request
-from dimagi.utils.couch.database import get_db
 
 from .models import *
 
-def get_query_set(manager):
+
+def execute_sql(query, result_type=MULTI):
     start_time = time.time()
-    query_set = manager._get_query_set()
+    result = query._execute_sql(result_type=result_type)
     end_time = time.time()
 
     # store metadata
@@ -29,4 +26,4 @@ def get_query_set(manager):
         )
         wrapped.save()
 
-    return query_set
+    return result
