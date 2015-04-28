@@ -27,7 +27,8 @@ class DebugDatabase(Database):
         @return: dict, representation of CouchDB document as
          a dict.
         """
-        if get_request().blanket_is_intercepted:
+        blanket_is_intercepted = getattr(get_request(), 'blanket_is_intercepted', False)
+        if blanket_is_intercepted:
             start = datetime.utcnow()
 
             ############################
@@ -127,7 +128,8 @@ class DebugViewResults64(ViewResults):
                 setattr(self, key, self._result_cache[key])
 
     def _debug_fetch_if_needed(self):
-        if get_request().blanket_is_intercepted:
+        blanket_is_intercepted = getattr(get_request(), 'blanket_is_intercepted', False)
+        if blanket_is_intercepted:
             view_args = self._arg.split('/')
 
             if len(view_args) == 4:
@@ -150,19 +152,19 @@ class DebugViewResults64(ViewResults):
             stacktrace = tidy_stacktrace(traceback.extract_stack())
 
             view_req = ViewRequest({
-                    'view_path': self.debug_view,
-                    'duration': duration,
-                    # 'params': self.params,
-                    # 'stacktrace': stacktrace,
-                    # 'start_time': start,
-                    # 'stop_time': stop,
-                    # 'is_slow': (duration > SQL_WARNING_THRESHOLD),
-                    'total_rows': len(self._result_cache.get('rows', [])),
-                    'offset': self._result_cache.get('offset', 0),
-                    'rows': self._result_cache.get('total_rows', 0),
-                    'result_cached': result_cached,
-                    'include_docs': self.params.get('include_docs', False)
-                })
+                'view_path': self.debug_view,
+                'duration': duration,
+                # 'params': self.params,
+                # 'stacktrace': stacktrace,
+                # 'start_time': start,
+                # 'stop_time': stop,
+                # 'is_slow': (duration > SQL_WARNING_THRESHOLD),
+                'total_rows': len(self._result_cache.get('rows', [])),
+                'offset': self._result_cache.get('offset', 0),
+                'rows': self._result_cache.get('total_rows', 0),
+                'result_cached': result_cached,
+                'include_docs': self.params.get('include_docs', False)
+            })
             self._queries.append(view_req)
         else:
             couchdbkit.client._ViewResults.get()
@@ -198,7 +200,8 @@ class DebugViewResults57(ViewResults):
                 setattr(self, key, self._result_cache[key])
 
     def _debug_fetch_if_needed(self):
-        if get_request().blanket_is_intercepted:
+        blanket_is_intercepted = getattr(get_request(), 'blanket_is_intercepted', False)
+        if blanket_is_intercepted:
             start = datetime.utcnow()
 
             if not self._result_cache:
