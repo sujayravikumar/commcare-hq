@@ -1,0 +1,17 @@
+{% extends "style/base_section.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="container-fluid">
+{% for blanket in blankets %}
+<div class="row">
+  <div class="col-md-3">
+    <a href="/blanket/show/{{ blanket.id }}">{{ blanket.doc.path }}</a>
+  </div>
+  <div class="col-md-3">
+  {{ blanket.doc.time_taken }}
+  </div>
+</div>
+{% endfor %}
+</div>
+{% endblock %}

@@ -139,7 +139,7 @@ class RequestModelFactory(object):
             method=self.request.method,
             query_params=query_params,
             view_name=view_name,
-            start_time=datetime.now(),
+            start_time=datetime.utcnow(),
             body=body
         )
         # Text fields are encoded as UTF-8 in Django and hence will try to coerce

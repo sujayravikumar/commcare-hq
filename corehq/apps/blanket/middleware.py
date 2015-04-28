@@ -24,23 +24,18 @@ class BlanketMiddleware(object):
         return d.seconds * 1000 + d.microseconds / 1000
 
     def process_request(self, request):
-        if True:
-            # self._apply_dynamic_mappings()
+        if True and not request.path.startswith('/blanket'):
 
-            # Hook in sql profiler
-#            if not hasattr(SQLCompiler, '_execute_sql'):
-#                SQLCompiler._execute_sql = SQLCompiler.execute_sql
-#                SQLCompiler.execute_sql = execute_sql
-#
-            # Hook in couch profiler
             request.blanket_is_intercepted = True
             request.profiler = Profiler()
             request.profiler.start_python_profiler()
-            request_model = RequestModelFactory(request).construct_request_model()
-            self.db.save_doc(request_model)
-            request.blanket_request_id = request_model['_id']
-        #DataCollector().configure(request_model)
-
+            try:
+                request_model = RequestModelFactory(request).construct_request_model()
+                self.db.save_doc(request_model)
+                request.blanket_request_id = request_model['_id']
+            except Exception, e:
+                print 'NOT LOGGED'
+                request.blanket_is_intercepted = False
 
     def _process_response(self, response, request):
 
@@ -49,7 +44,7 @@ class BlanketMiddleware(object):
         doc = self.db.get(request.blanket_request_id)
         request_model = BlanketRequestDocument.wrap(doc)
         request_model.line_profile = request.profiler.finalize()
-        request_model.end_time = datetime.now()
+        request_model.end_time = datetime.utcnow()
         request_model.time_taken = self.time_taken(request_model.start_time, request_model.end_time)
 
 
@@ -60,22 +55,7 @@ class BlanketMiddleware(object):
         self.db.save_doc(request_model)
 
 
-        #collector = DataCollector()
-        #collector.stop_python_profiler()
-        #silk_request = collector.request
-#        if silk_request:
-#            silk_response = ResponseModelFactory(response).construct_response_model()
-#            silk_response.save()
-#            silk_request.end_time = timezone.now()
-#            collector.finalise()
-#            silk_request.save()
-#        else:
-#            Logger.error(
-#                'No request model was available when processing response. Did something go wrong in '
-#                'process_request/process_view?'
-#            )
-#
     def process_response(self, request, response):
         if getattr(request, 'blanket_is_intercepted', False):
             self._process_response(response, request)
-            return response
+        return response

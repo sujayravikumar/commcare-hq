@@ -521,7 +521,7 @@ class EditSoftwarePlanView(AccountingSectionView, AsyncHandlerMixin):
             'url': SoftwarePlanInterface.get_url(),
         }]
 
-    def post(self, request, *args, **kwargs):
+    def post(self, *args, **kwargs):
         if self.async_response is not None:
             return self.async_response
         if 'update_version' in request.POST:
