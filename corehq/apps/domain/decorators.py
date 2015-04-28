@@ -55,9 +55,9 @@ def domain_specific_login_redirect(request, domain):
 
 def login_and_domain_required(view_func):
     @wraps(view_func)
-    def _inner(req, domain, *args, **kwargs):
+    def _inner(req, domain_, *args, **kwargs):
         user = req.user
-        domain_name, domain = load_domain(req, domain)
+        domain_name, domain = load_domain(req, domain_)
         if domain:
             if user.is_authenticated() and user.is_active:
                 if not domain.is_active:
@@ -171,22 +171,20 @@ def cls_to_view(additional_decorator=None):
     def decorator(func):
         def __outer__(cls, request, *args, **kwargs):
             domain = kwargs.get('domain')
-            new_kwargs = kwargs.copy()
             if not domain:
                 try:
                     domain = args[0]
                 except IndexError:
                     pass
-            else:
-                del new_kwargs['domain']
 
-            def __inner__(request, domain, *args, **new_kwargs):
+            def __inner__(request, domain_, *args, **unused_kwargs):
+                # unused_kwargs name used instead of kwargs to avoid shadowing outer scope
                 return func(cls, request, *args, **kwargs)
 
             if additional_decorator:
-                return additional_decorator(__inner__)(request, domain, *args, **new_kwargs)
+                return additional_decorator(__inner__)(request, domain, *args, **kwargs)
             else:
-                return __inner__(request, domain, *args, **new_kwargs)
+                return __inner__(request, domain, *args, **kwargs)
         return __outer__
     return decorator
 
