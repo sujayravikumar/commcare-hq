@@ -85,3 +85,6 @@
 [submodule "corehq/apps/style/static/style/lib/jquery-cookie"]
 	path = corehq/apps/style/static/style/lib/jquery-cookie
 	url = https://github.com/carhartl/jquery-cookie.git
+[submodule "corehq/apps/style/static/style/lib/bootstrap-tour"]
+	path = corehq/apps/style/static/style/lib/bootstrap-tour
+	url = https://github.com/dimagi/bootstrap-tour.git
