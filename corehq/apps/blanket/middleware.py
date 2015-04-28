@@ -1,6 +1,9 @@
 import logging
 import time
 from datetime import datetime
+import couchdbkit
+from corehq.apps.blanket import couchwrapper
+from corehq.apps.blanket.sql import get_query_set
 
 from dimagi.utils.couch.database import get_db
 from corehq.toggles import BLANKET
@@ -26,6 +29,18 @@ class BlanketMiddleware(object):
 
     def process_request(self, request):
         if True and not request.path.startswith('/blanket'):
+            # self._apply_dynamic_mappings()
+
+            # Hook in sql profiler
+            # TODO this can be moved elsewhere
+            from django.db.models import Manager
+            if not hasattr(Manager, '_get_query_set'):
+                Manager._get_query_set = Manager.get_query_set
+                Manager.get_query_set = get_query_set
+
+            # Hook in couch profiler
+            request.view_offset = len(getattr(couchdbkit.client.ViewResults, '_queries', []))
+            request.get_offset = len(getattr(couchdbkit.client.Database, '_queries', []))
 
             request.blanket_is_intercepted = True
             request.profiler = Profiler()
@@ -49,6 +64,24 @@ class BlanketMiddleware(object):
         request_model.end_time = datetime.utcnow()
         request_model.time_taken = time.time() - request.start * 1000
 
+
+        gets = getattr(couchwrapper.DebugDatabase, '_queries', [])
+        views = getattr(couchwrapper.DebugViewResults, '_queries', [])
+
+        debug_doc = CouchQuerySummary()
+        for ix, r in enumerate(gets[request.get_offset:], start=1):
+            debug_doc.doc_requests.append(r)
+        for ix, v in enumerate(views[request.view_offset:], start=1):
+            debug_doc.view_requests.append(v)
+
+        #summary level info
+        debug_doc.total_doc_requests = len(gets[request.get_offset:])
+        debug_doc.total_doc_time = sum([x['duration'] for x in gets[request.get_offset:]])
+
+        debug_doc.total_view_requests = len(views[request.view_offset:])
+        debug_doc.total_view_time = sum([x['duration'] for x in views[request.view_offset:]])
+
+        print debug_doc
 
         response_model = ResponseModelFactory(response).construct_response_model()
         self.db.save_doc(response_model)
