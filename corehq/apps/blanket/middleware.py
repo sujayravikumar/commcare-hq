@@ -11,6 +11,7 @@ from corehq.toggles import BLANKET
 from .factory import RequestModelFactory, ResponseModelFactory
 from .models import *
 from .profiler import Profiler
+from .couchwrapper import DebugViewResults, DebugDatabase
 
 Logger = logging.getLogger('blanket')
 
@@ -41,6 +42,14 @@ class BlanketMiddleware(object):
             # Hook in couch profiler
             request.view_offset = len(getattr(couchdbkit.client.ViewResults, '_queries', []))
             request.get_offset = len(getattr(couchdbkit.client.Database, '_queries', []))
+            
+            if not hasattr(couchdbkit.client, '_ViewResults'):
+                couchdbkit.client._ViewResults = couchdbkit.ViewResults
+                couchdbkit.client.ViewResults = DebugViewResults
+
+            if not hasattr(couchdbkit.client, '_Database'):
+                couchdbkit.client._Database = couchdbkit.Database
+                couchdbkit.client.Database = DebugDatabase
 
             request.blanket_is_intercepted = True
             request.profiler = Profiler()
@@ -81,12 +90,11 @@ class BlanketMiddleware(object):
         debug_doc.total_view_requests = len(views[request.view_offset:])
         debug_doc.total_view_time = sum([x['duration'] for x in views[request.view_offset:]])
 
-        print debug_doc
-
         response_model = ResponseModelFactory(response).construct_response_model()
         self.db.save_doc(response_model)
 
         request_model.response = response_model
+        request_model.couchdb_queries = debug_doc
         self.db.save_doc(request_model)
 
 

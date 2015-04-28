@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -
+from corehq.util.global_request import get_request
 from .models import DocRequest, ViewRequest
 
 from datetime import datetime
@@ -26,70 +27,73 @@ class DebugDatabase(Database):
         @return: dict, representation of CouchDB document as
          a dict.
         """
-        start = datetime.utcnow()
+        if get_request().blanket_is_intercepted:
+            start = datetime.utcnow()
 
-        ############################
-        #Start Database.open_doc
-        wrapper = None
-        if "wrapper" in params:
-            wrapper = params.pop("wrapper")
-        elif "schema" in params:
-            schema = params.pop("schema")
-            if not hasattr(schema, "wrap"):
-                raise TypeError("invalid schema")
-            wrapper = schema.wrap
+            ############################
+            #Start Database.open_doc
+            wrapper = None
+            if "wrapper" in params:
+                wrapper = params.pop("wrapper")
+            elif "schema" in params:
+                schema = params.pop("schema")
+                if not hasattr(schema, "wrap"):
+                    raise TypeError("invalid schema")
+                wrapper = schema.wrap
 
-        docid = resource.escape_docid(docid)
-        error = None
-        try:
-            doc = self.res.get(docid, **params).json_body
-        except ResourceNotFound, ex:
-            error = ex
-            doc = {}
-        #############################
+            docid = resource.escape_docid(docid)
+            error = None
+            try:
+                doc = self.res.get(docid, **params).json_body
+            except ResourceNotFound, ex:
+                error = ex
+                doc = {}
+            #############################
 
-        #############################
-        #Debug Panel data collection
-        stop = datetime.utcnow()
-        duration = ms_from_timedelta(stop - start)
-        stacktrace = tidy_stacktrace(traceback.extract_stack())
+            #############################
+            #Debug Panel data collection
+            stop = datetime.utcnow()
+            duration = ms_from_timedelta(stop - start)
+            stacktrace = tidy_stacktrace(traceback.extract_stack())
 
-        if wrapper is not None:
-            view_path_display = "GET %s" % wrapper.im_self._doc_type
+            if wrapper is not None:
+                view_path_display = "GET %s" % wrapper.im_self._doc_type
+            else:
+                view_path_display = "Raw GET"
+
+            q = DocRequest({
+                'view_path': view_path_display,
+                'duration': duration,
+                # 'params': params,
+                # 'stacktrace': stacktrace,
+                # 'start_time': start,
+                # 'stop_time': stop,
+                # 'is_slow': (duration > SQL_WARNING_THRESHOLD),
+                # 'total_rows': 1,
+                'response': 200 if error is None else 404,
+                'doc_type': doc.get('doc_type', '[unknown]'),
+                'doc_id': docid,
+                })
+
+            self._queries.append(q)
+
+            #end debug panel data collection
+            ################################
+
+
+            ##################################
+            #Resume original Database.open_doc
+            if error is not None:
+                raise error
+
+            if wrapper is not None:
+                if not callable(wrapper):
+                    raise TypeError("wrapper isn't a callable")
+                return wrapper(doc)
+
+            return doc
         else:
-            view_path_display = "Raw GET"
-
-        q = DocRequest({
-            'view_path': view_path_display,
-            'duration': duration,
-            # 'params': params,
-            # 'stacktrace': stacktrace,
-            # 'start_time': start,
-            # 'stop_time': stop,
-            # 'is_slow': (duration > SQL_WARNING_THRESHOLD),
-            # 'total_rows': 1,
-            'response': 200 if error is None else 404,
-            'doc_type': doc.get('doc_type', '[unknown]'),
-            'doc_id': docid,
-            })
-
-        self._queries.append(q)
-
-        #end debug panel data collection
-        ################################
-
-
-        ##################################
-        #Resume original Database.open_doc
-        if error is not None:
-            raise error
-
-        if wrapper is not None:
-            if not callable(wrapper):
-                raise TypeError("wrapper isn't a callable")
-            return wrapper(doc)
-
-        return doc
+            couchdbkit.client._Database.get(docid, **params)
     get = debug_open_doc
 
 couchdbkit.client.Database = DebugDatabase
@@ -102,6 +106,7 @@ class DebugViewResults64(ViewResults):
         """ Overrided
         fetch results and cache them
         """
+
         # reset dynamic keys
         for key in  self._dynamic_keys:
             try:
@@ -122,42 +127,46 @@ class DebugViewResults64(ViewResults):
                 setattr(self, key, self._result_cache[key])
 
     def _debug_fetch_if_needed(self):
-        view_args = self._arg.split('/')
+        if get_request().blanket_is_intercepted:
+            view_args = self._arg.split('/')
 
-        if len(view_args) == 4:
-            design_doc = view_args[1]
-            view_name = view_args[3]
-            self.debug_view = '%s/%s' % (design_doc, view_name)
+            if len(view_args) == 4:
+                design_doc = view_args[1]
+                view_name = view_args[3]
+                self.debug_view = '%s/%s' % (design_doc, view_name)
+            else:
+                self.debug_view = view_args[0]
+
+            start = datetime.utcnow()
+
+            if not self._result_cache:
+                result_cached = False
+                self.debug_fetch()
+            else:
+                result_cached = True
+
+            stop = datetime.utcnow()
+            duration = ms_from_timedelta(stop - start)
+            stacktrace = tidy_stacktrace(traceback.extract_stack())
+
+            view_req = ViewRequest({
+                    'view_path': self.debug_view,
+                    'duration': duration,
+                    # 'params': self.params,
+                    # 'stacktrace': stacktrace,
+                    # 'start_time': start,
+                    # 'stop_time': stop,
+                    # 'is_slow': (duration > SQL_WARNING_THRESHOLD),
+                    'total_rows': len(self._result_cache.get('rows', [])),
+                    'offset': self._result_cache.get('offset', 0),
+                    'rows': self._result_cache.get('total_rows', 0),
+                    'result_cached': result_cached,
+                    'include_docs': self.params.get('include_docs', False)
+                })
+            self._queries.append(view_req)
         else:
-            self.debug_view = view_args[0]
+            couchdbkit.client._ViewResults.get()
 
-        start = datetime.utcnow()
-
-        if not self._result_cache:
-            result_cached = False
-            self.debug_fetch()
-        else:
-            result_cached = True
-
-        stop = datetime.utcnow()
-        duration = ms_from_timedelta(stop - start)
-        stacktrace = tidy_stacktrace(traceback.extract_stack())
-
-        view_req = ViewRequest({
-                'view_path': self.debug_view,
-                'duration': duration,
-                # 'params': self.params,
-                # 'stacktrace': stacktrace,
-                # 'start_time': start,
-                # 'stop_time': stop,
-                # 'is_slow': (duration > SQL_WARNING_THRESHOLD),
-                'total_rows': len(self._result_cache.get('rows', [])),
-                'offset': self._result_cache.get('offset', 0),
-                'rows': self._result_cache.get('total_rows', 0),
-                'result_cached': result_cached,
-                'include_docs': self.params.get('include_docs', False)
-            })
-        self._queries.append(view_req)
     _fetch_if_needed = _debug_fetch_if_needed
 
 
@@ -189,42 +198,45 @@ class DebugViewResults57(ViewResults):
                 setattr(self, key, self._result_cache[key])
 
     def _debug_fetch_if_needed(self):
-        start = datetime.utcnow()
+        if get_request().blanket_is_intercepted:
+            start = datetime.utcnow()
 
-        if not self._result_cache:
-            self.debug_fetch()
+            if not self._result_cache:
+                self.debug_fetch()
 
-        stop = datetime.utcnow()
-        duration = ms_from_timedelta(stop - start)
-        stacktrace = tidy_stacktrace(traceback.extract_stack())
+            stop = datetime.utcnow()
+            duration = ms_from_timedelta(stop - start)
+            stacktrace = tidy_stacktrace(traceback.extract_stack())
 
-        view_path_arr = self.view.view_path.split('/')
-        if len(view_path_arr) == 4:
-            view_path_display = '%s/%s' % (view_path_arr[1], view_path_arr[3])
+            view_path_arr = self.view.view_path.split('/')
+            if len(view_path_arr) == 4:
+                view_path_display = '%s/%s' % (view_path_arr[1], view_path_arr[3])
+            else:
+                view_path_display = view_path_arr[0] # _all_docs
+
+            if not self._result_cache:
+                result_cached = False
+                self.debug_fetch()
+            else:
+                result_cached = True
+
+            view_req = ViewRequest({
+                    'view_path': self.debug_view,
+                    'duration': duration,
+                    # 'params': self.params,
+                    # 'stacktrace': stacktrace,
+                    # 'start_time': start,
+                    # 'stop_time': stop,
+                    # 'is_slow': (duration > SQL_WARNING_THRESHOLD),
+                    'total_rows': len(self._result_cache.get('rows', [])),
+                    'offset': self._result_cache.get('offset', 0),
+                    'rows': self._result_cache.get('total_rows', 0),
+                    'result_cached': result_cached,
+                    'include_docs': self.params.get('include_docs', False)
+                })
+            self._queries.append(view_req)
         else:
-            view_path_display = view_path_arr[0] # _all_docs
-
-        if not self._result_cache:
-            result_cached = False
-            self.debug_fetch()
-        else:
-            result_cached = True
-
-        view_req = ViewRequest({
-                'view_path': self.debug_view,
-                'duration': duration,
-                # 'params': self.params,
-                # 'stacktrace': stacktrace,
-                # 'start_time': start,
-                # 'stop_time': stop,
-                # 'is_slow': (duration > SQL_WARNING_THRESHOLD),
-                'total_rows': len(self._result_cache.get('rows', [])),
-                'offset': self._result_cache.get('offset', 0),
-                'rows': self._result_cache.get('total_rows', 0),
-                'result_cached': result_cached,
-                'include_docs': self.params.get('include_docs', False)
-            })
-        self._queries.append(view_req)
+            couchdbkit.client._ViewResults.get()
 
     _fetch_if_needed = _debug_fetch_if_needed
 
