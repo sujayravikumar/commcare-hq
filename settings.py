@@ -291,6 +291,7 @@ HQ_APPS = (
     'corehq.apps.styleguide',
     'corehq.apps.grapevine',
     'corehq.apps.dashboard',
+    'corehq.apps.tour',
     'corehq.apps.public',
     'corehq.util',
 
