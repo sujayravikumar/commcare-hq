@@ -103,4 +103,4 @@ class BlanketMiddleware(object):
     def process_response(self, request, response):
         if getattr(request, 'blanket_is_intercepted', False):
             self._process_response(response, request)
-            return response
+        return response
