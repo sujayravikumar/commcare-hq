@@ -62,7 +62,7 @@ class BlanketMiddleware(object):
         request_model = BlanketRequestDocument.wrap(doc)
         request_model.line_profile = request.profiler.finalize()
         request_model.end_time = datetime.utcnow()
-        request_model.time_taken = time.time() - request.start * 1000
+        request_model.time_taken = (time.time() - request.start) * 1000
 
 
         gets = getattr(couchwrapper.DebugDatabase, '_queries', [])
