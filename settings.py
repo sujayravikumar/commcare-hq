@@ -977,6 +977,7 @@ COUCHDB_APPS = [
     'appstore',
     'orgs',
     'builds',
+    ('blanket', 'blanket'),
     'case',
     'callcenter',
     'cleanup',
