@@ -1,5 +1,7 @@
 import logging
 from datetime import datetime
+import couchdbkit
+from corehq.apps.blanket import couchwrapper
 
 from dimagi.utils.couch.database import get_db
 from corehq.toggles import BLANKET
@@ -33,6 +35,9 @@ class BlanketMiddleware(object):
 #                SQLCompiler.execute_sql = execute_sql
 #
             # Hook in couch profiler
+            self.view_offset = len(getattr(couchdbkit.client.ViewResults, '_queries', []))
+            self.get_offset = len(getattr(couchdbkit.client.Database, '_queries', []))
+
             request.blanket_is_intercepted = True
             request.profiler = Profiler()
             request.profiler.start_python_profiler()
@@ -52,6 +57,24 @@ class BlanketMiddleware(object):
         request_model.end_time = datetime.now()
         request_model.time_taken = self.time_taken(request_model.start_time, request_model.end_time)
 
+
+        gets = getattr(couchwrapper.DebugDatabase, '_queries', [])
+        views = getattr(couchwrapper.DebugViewResults, '_queries', [])
+
+        debug_doc = CouchQuerySummary()
+        for ix, r in enumerate(gets[self.get_offset:], start=1):
+            debug_doc.doc_requests.append(r)
+        for ix, v in enumerate(views[self.view_offset:], start=1):
+            debug_doc.view_requests.append(v)
+
+        #summary level info
+        debug_doc.total_doc_requests = len(gets[self.get_offset:])
+        debug_doc.total_doc_time = sum([x['duration'] for x in gets[self.get_offset:]])
+
+        debug_doc.total_view_requests = len(views[self.view_offset:])
+        debug_doc.total_view_time = sum([x['duration'] for x in views[self.view_offset:]])
+
+        print debug_doc
 
         response_model = ResponseModelFactory(response).construct_response_model()
         self.db.save_doc(response_model)
