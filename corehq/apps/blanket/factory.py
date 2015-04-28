@@ -2,6 +2,8 @@ import json
 import logging
 import sys
 import traceback
+from datetime import datetime
+
 from django.core.urlresolvers import resolve
 
 from .models import BlanketResponseDocument, BlanketRequestDocument
@@ -137,6 +139,7 @@ class RequestModelFactory(object):
             method=self.request.method,
             query_params=query_params,
             view_name=view_name,
+            start_time=datetime.now(),
             body=body
         )
         # Text fields are encoded as UTF-8 in Django and hence will try to coerce
