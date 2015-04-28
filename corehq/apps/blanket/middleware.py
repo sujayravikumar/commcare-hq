@@ -1,4 +1,5 @@
 import logging
+import time
 from datetime import datetime
 
 from dimagi.utils.couch.database import get_db
@@ -29,6 +30,7 @@ class BlanketMiddleware(object):
             request.blanket_is_intercepted = True
             request.profiler = Profiler()
             request.profiler.start_python_profiler()
+            request.start = time.time()
             try:
                 request_model = RequestModelFactory(request).construct_request_model()
                 self.db.save_doc(request_model)
@@ -45,7 +47,7 @@ class BlanketMiddleware(object):
         request_model = BlanketRequestDocument.wrap(doc)
         request_model.line_profile = request.profiler.finalize()
         request_model.end_time = datetime.utcnow()
-        request_model.time_taken = self.time_taken(request_model.start_time, request_model.end_time)
+        request_model.time_taken = time.time() - request.start * 1000
 
 
         response_model = ResponseModelFactory(response).construct_response_model()
