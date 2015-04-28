@@ -32,8 +32,9 @@ class BlanketMiddleware(object):
 
             # Hook in sql profiler
             from django.db.models import Manager
-            Manager._get_query_set = Manager.get_query_set
-            Manager.get_query_set = get_query_set
+            if not Manager._get_query_set:
+                Manager._get_query_set = Manager.get_query_set
+                Manager.get_query_set = get_query_set
 
             # Hook in couch profiler
             self.view_offset = len(getattr(couchdbkit.client.ViewResults, '_queries', []))
