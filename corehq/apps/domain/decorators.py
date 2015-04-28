@@ -55,9 +55,9 @@ def domain_specific_login_redirect(request, domain):
 
 def login_and_domain_required(view_func):
     @wraps(view_func)
-    def _inner(req, domain, *args, **kwargs):
+    def _inner(req, domain_, *args, **kwargs):
         user = req.user
-        domain_name, domain = load_domain(req, domain)
+        domain_name, domain = load_domain(req, domain_)
         if domain:
             if user.is_authenticated() and user.is_active:
                 if not domain.is_active:
