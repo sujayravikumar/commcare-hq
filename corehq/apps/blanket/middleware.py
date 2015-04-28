@@ -2,6 +2,7 @@ import logging
 from datetime import datetime
 import couchdbkit
 from corehq.apps.blanket import couchwrapper
+from corehq.apps.blanket.sql import get_query_set
 
 from dimagi.utils.couch.database import get_db
 from corehq.toggles import BLANKET
@@ -30,10 +31,10 @@ class BlanketMiddleware(object):
             # self._apply_dynamic_mappings()
 
             # Hook in sql profiler
-#            if not hasattr(SQLCompiler, '_execute_sql'):
-#                SQLCompiler._execute_sql = SQLCompiler.execute_sql
-#                SQLCompiler.execute_sql = execute_sql
-#
+            from django.db.models import Manager
+            Manager._get_query_set = Manager.get_query_set
+            Manager.get_query_set = get_query_set
+
             # Hook in couch profiler
             self.view_offset = len(getattr(couchdbkit.client.ViewResults, '_queries', []))
             self.get_offset = len(getattr(couchdbkit.client.Database, '_queries', []))
