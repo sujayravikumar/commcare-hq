@@ -20,3 +20,6 @@ class BlanketRequestDocument(Document):
     encoded_headers = StringProperty()
     pyprofile = StringProperty()
     response = SchemaProperty(BlanketResponseDocument)
+
+    couchdb_queries = SchemaProperty() # TODO tyler don't screw it up
+    sql_queries = SchemaProperty() # TODO nick don't screw it up
