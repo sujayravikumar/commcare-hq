@@ -6,7 +6,7 @@ from corehq.apps.users.models import WebUser
 
 
 class Command(BaseCommand):
-    help = "An command line tool for managing and viewing guided tours in HQ."
+    help = "A command line tool for managing and viewing guided tours in HQ."
     option_list = BaseCommand.option_list + (
         make_option('--create', action='store_true',  default=False,
                     help='Create a new Guided Tour.'),
@@ -16,6 +16,8 @@ class Command(BaseCommand):
                     help='Queue a guided tour for a user.'),
         make_option('--list_queued', action='store_true',  default=False,
                     help='List the queue of tours for a user.'),
+        make_option('--deactivate', action='store_true',  default=False,
+                    help='Deactivates a queued tour for a user.'),
     )
 
     def handle(self, *args, **options):
@@ -30,6 +32,10 @@ class Command(BaseCommand):
         if options.get('queue', False):
             self.stdout.write("Let's queue a tour for a web user.")
             self.queue_tour()
+            return
+        if options.get('deactivate', False):
+            self.stdout.write("Deactivates a queued tour.")
+            self.deactivated_queue()
             return
         if options.get('list_queued', False):
             self.stdout.write("Who would you like to see the active tour "
@@ -71,6 +77,29 @@ class Command(BaseCommand):
         )
         queued_tour.save()
         self.stdout.write("Tour queued.")
+
+    def deactivated_queue(self):
+        web_user = self._get_web_user()
+        domain = self._get_domain()
+        tour = self._get_tour_by_slug()
+        confirm = raw_input(
+            "Are you sure you want to deactivate the tour %(tour_slug)s "
+            "for %(web_user)s%(domain)s? Type 'yes' to continue.\n" % {
+                'web_user': web_user,
+                'domain': (' (%s)' % domain) if domain else "",
+                'tour_slug': tour.slug,
+            })
+        if confirm != 'yes':
+            return
+        for queued_tour in QueuedTour.objects.filter(
+                web_user=web_user,
+                domain=domain,
+                tour=tour,
+                is_active=True):
+            queued_tour.is_active = False
+            queued_tour.save()
+            self.stdout.write(".")
+        self.stdout.write("Deactivated.")
 
     def queue_list(self):
         web_user = self._get_web_user()
