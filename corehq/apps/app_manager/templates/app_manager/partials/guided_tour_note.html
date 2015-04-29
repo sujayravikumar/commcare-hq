@@ -1,0 +1,41 @@
+{% load i18n %}
+
+<div id="guided-tour-notes">
+    {% for tour in tours %}
+        <div id="tour-alert-{{ tour.slug }}" class="alert alert-success">
+            <h2>
+                {% ifequal tour.furthest_step 0 %}
+                    {{ tour.text.new.title }}
+                {% else %}
+                    {{ tour.text.resume.title }}
+                {% endifequal %}
+            </h2>
+            <p class="lead">
+                {% ifequal tour.furthest_step 0 %}
+                    {{ tour.text.new.lead }}
+                {% else %}
+                    {{ tour.text.resume.lead }}
+                {% endifequal %}
+            </p>
+            <p>
+                {% ifequal tour.furthest_step 0 %}
+                    {{ tour.text.new.prompt }}
+                {% else %}
+                    {{ tour.text.resume.prompt }}
+                {% endifequal %}
+            </p>
+            <p>
+                <button type="button" class="btn btn-success tour-begin">
+                    {% ifequal tour.furthest_step 0 %}
+                        {% trans 'Yes, Start Tour' %}
+                    {% else %}
+                        {% trans 'Resume Tour' %}
+                    {% endifequal %}
+                </button>
+                <button type="button" class="btn tour-dismiss">
+                    <i class="icon-remove"></i> {% trans 'Dismiss Tour' %}
+                </button>
+            </p>
+        </div>
+    {% endfor %}
+</div>

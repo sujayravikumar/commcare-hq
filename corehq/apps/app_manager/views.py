@@ -1069,6 +1069,15 @@ def view_generic(request, domain, app_id=None, module_id=None, form_id=None, is_
     context['latest_commcare_version'] = get_commcare_versions(request.user)[-1]
     context['usercase_enabled'] = is_usercase_enabled(domain)
 
+    if app and (module is None and form is None):
+        from corehq.apps.tour.models import QueuedTour, TourArea
+        tour_queue = QueuedTour.get_queue_for_user(
+            request.user.username, domain=domain, area=TourArea.APP_MANAGER,
+            as_context=True
+        )
+        context['tours'] = tour_queue
+        context['tour_app'] = app_id
+
     if app and app.doc_type == 'Application' and has_privilege(request, privileges.COMMCARE_LOGO_UPLOADER):
         uploader_slugs = ANDROID_LOGO_PROPERTY_MAPPING.keys()
         from corehq.apps.hqmedia.controller import MultimediaLogoUploadController

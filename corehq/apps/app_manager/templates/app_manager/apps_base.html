@@ -23,12 +23,17 @@
 
 {% block head %}{{ block.super }}
     {% include "imports/jqmodal.html" %}
+    <link type="text/less"
+          rel="stylesheet"
+          media="all"
+          href="{% static 'style/lib/bootstrap-tour/build/css/bootstrap-tour.min.css' %}"/>
 {% endblock %}
 
 {% block js %}{{ block.super }}
     <script src="{% static 'hqwebapp/js/ui-element.js' %}"></script>
     <script src="{% static 'langcodes/js/langcodes.js' %}"></script>
     <script src="{% static 'hqwebapp/js/lib/jquery.textchange.min.js' %}"></script>
+    <script type="text/javascript" src="{% static 'style/lib/bootstrap-tour/build/js/bootstrap-tour.js' %}"></script>
 {% endblock %}
 
 {% block js-inline %}{{ block.super }}
@@ -46,7 +51,26 @@
        $('.app-manager-content').removeClass('hide');
     });
     </script>
+
+    {% for tour in tours %}
+        {% ifequal tour.slug 'new_app' %}
+            <script type="text/javascript"
+                    src="{% static 'tour/js/app_manager.new_app.tour.js' %}"></script>
+            <script>
+                var newAppTour = new NewAppTourManager({
+                    slug: '{{ tour.slug }}',
+                    area: '{{ tour.area }}',
+                    domain: '{{ tour.domain }}',
+                    furthest_step: {{ tour.furthest_step }},
+                    update_url: '{{ tour.update_url }}',
+                    base_url: '{% url 'view_app' domain tour_app %}',
+                });
+                newAppTour.init();
+            </script>
+        {% endifequal %}
+    {% endfor %}
 {% endblock %}
+
 {% block keyboard_shortcuts %}
     <script>
         var nav_key = {{ request.couch_user.keyboard_shortcuts.main_key|JSON }};
