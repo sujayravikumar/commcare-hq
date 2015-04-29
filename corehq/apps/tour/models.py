@@ -1,4 +1,6 @@
+from django.core.urlresolvers import reverse
 from django.db import models
+from corehq.apps.tour.descriptions import TourDescription
 
 
 class TourArea(object):
@@ -39,3 +41,27 @@ class QueuedTour(models.Model):
     date_created = models.DateTimeField(auto_now_add=True)
     date_modified = models.DateTimeField(auto_now=True)
     date_completed = models.DateTimeField(null=True, blank=True)
+
+    @property
+    def context(self):
+        return {
+            'slug': self.tour.slug,
+            'area': self.tour.area,
+            'domain': self.domain,
+            'furthest_step': self.furthest_step,
+            'text': TourDescription.get_by_slug(self.tour.slug),
+            'update_url': reverse('tour_update'),
+        }
+
+    @classmethod
+    def get_queue_for_user(cls, web_user, area=None, domain=None,
+                           as_context=False):
+        queue = cls.objects.filter(is_active=True).filter(
+            models.Q(web_user=web_user, domain=domain) |
+            models.Q(web_user=web_user, domain=None)
+        )
+        if area is not None:
+            queue = queue.filter(tour__area=area)
+        if as_context:
+            return [q.context for q in queue]
+        return queue
