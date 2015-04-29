@@ -126,6 +126,7 @@ urlpatterns = patterns('',
         name=ProBonoStaticView.urlname),
     url(r'^loadtest/', include('corehq.apps.loadtestendpoints.urls')),
     (r'^public/', include('corehq.apps.public.urls')),
+    (r'^tour/', include('corehq.apps.tour.urls')),
 ) + patterns('', *LOCAL_APP_URLS)
 
 # django rosetta support if configured
