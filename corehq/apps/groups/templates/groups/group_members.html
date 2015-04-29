@@ -101,6 +101,12 @@
             $(document).ready(function() {
                 $('#edit_membership').submit(function() {
                     $(this).find(':button').attr('disabled', 'disabled');
+                    // This ajaxSubmit call seems to be failing
+                    // Chrome gives me the following in the console:
+                    // Mixed Content: The page at 'https://staging.commcarehq.org/a/noahtest/settings/users/groups/8489caff0fcc6fcae426a02a4bff334b/' was loaded over HTTPS, but requested an insecure XMLHttpRequest endpoint 'http://staging.commcarehq.org/a/noahtest/settings/users/groups/8489caff0fcc6fcae426a02a4bff334b/'. This request has been blocked; the content must be served over HTTPS.
+                    //
+                    // But in the network pane the failed/canceled request seems to be to url https://staging.commcarehq.org/a/noahtest/groups/update_group_membership/8489caff0fcc6fcae426a02a4bff334b/
+                    //
                     $(this).ajaxSubmit({
                         success: outcome(true, "Group membership", "#edit_membership", "Edit Group Membership"),
                         error: outcome(false, "Group membership", "#edit_membership")
