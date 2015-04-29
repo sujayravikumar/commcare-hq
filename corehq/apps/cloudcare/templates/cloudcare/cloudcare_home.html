@@ -25,11 +25,11 @@
     <script language="javascript" type="text/javascript" src="{% static 'hqwebapp/js/lib/jquery-ui/jquery-ui-1.8.16.min.js' %}"></script>
     <link rel="stylesheet" href="{% static 'hqwebapp/js/lib/jquery-ui/jquery-ui-redmond-1.8.16.css' %}">
     
-    <script language="javascript" type="text/javascript" src="{% static 'formplayer/script/shortcut.js' %}"></script>
+    <script language="javascript" type="text/javascript" src="{% static 'formplayer/script/vendor/shortcut.js' %}"></script>
     <script language="javascript" type="text/javascript" src="{% static 'formplayer/script/xforgasm.js' %}?version={{app_version}}"></script>
     <script language="javascript" type="text/javascript" src="{% static 'formplayer/script/formnav-all.js' %}?version={{app_version}}"></script>
     <script language="javascript" type="text/javascript" src="{% static 'formplayer/script/entrycontrols_full.js' %}?version={{app_version}}"></script>
-    <script language="javascript" type="text/javascript" src="{% static 'formplayer/script/fullform-ui.templates.js' %}?version={{app_version}}"></script>
+    <script language="javascript" type="text/javascript" src="{% static 'formplayer/script/build/fullform-ui.templates.js' %}?version={{app_version}}"></script>
     <script language="javascript" type="text/javascript" src="{% static 'formplayer/script/fullform-ui.js' %}?version={{app_version}}"></script>
 
     <link rel="stylesheet" href="{% static 'formplayer/style/webforms.css' %}">
@@ -111,7 +111,7 @@
     </script>
 {% endblock %}
 
-{% block sidebar %}
+{% block page_navigation %}
 {% if sessions_enabled %}
     <div id="save-indicator" class="alert" style="display: none;"></div>
 {% endif %}
@@ -124,7 +124,7 @@
 {% endif %}
         <!-- keep this well-hidden for now -->
         <nav id="debug-opts" style="display: none;">
-          <ul class="nav nav-list">
+          <ul class="nav nav-hq-sidebar">
             <li>
               <label class="checkbox">
                 <input id="use-offline" type="checkbox" /> Use offline CloudCare
@@ -135,7 +135,7 @@
     </section>
 {% endblock %}
 
-{% block main_column %}
+{% block page_content %}
     {% if request.couch_user.is_web_user %}
         <div class="alert fade in alert-block alert-full alert-warning ">
             <a class="close" data-dismiss="alert" href="#">&times;</a>
@@ -155,7 +155,7 @@
             (It may take a moment to start up once it has downloaded)
         {% endblocktrans %}
     </div>
-    <div id="cloudcare-main" style="position:relative;">
+    <div id="cloudcare-main">
         {% if not apps_raw %}
             <h3>No Apps found</h3>
             {% blocktrans %}
@@ -183,7 +183,7 @@
         </div>
         <section id="case-crumbs" style="width: 800px"></section>
         <section id="cases"></section>
-        <section id="webforms" style="min-width: 800px;"></section>
+        <section id="webforms"></section>
     </div>
 
     {% include 'cloudcare/includes/case_details.html' %}

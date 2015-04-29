@@ -63,6 +63,7 @@ def cloudcare_main(request, domain, urlPath):
         # is a reasonable default for "something went wrong"
         preview = True
 
+    preview = True
     app_access = ApplicationAccess.get_by_domain(domain)
 
     if not preview:

@@ -44,7 +44,7 @@ $.fn.inlineTouchform = function (options) {
                     });
                 },
                 onerror: function (resp) {
-                    $target.html(alertHtml(resp.message, 'alert-error'));
+                    $target.html(alertHtml(resp.message, 'alert-danger'));
                 },
                 onload: function (adapter, resp) {
                     options.onload();
