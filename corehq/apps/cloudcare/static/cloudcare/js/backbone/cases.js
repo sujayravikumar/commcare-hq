@@ -228,7 +228,7 @@ cloudCare.CaseListView = Backbone.View.extend({
     },
     render: function () {
 	    var self = this;
-	    self.el = $('<section />').attr("id", "case-list").addClass("span7");
+	    self.el = $('<section />').attr("id", "case-list").addClass("col-md-7");
         var table = $("<table />").addClass("table table-striped datatable").css('clear', 'both').appendTo($(self.el));
         var thead = $("<thead />").appendTo(table);
         var theadrow = $("<tr />").appendTo(thead);
@@ -289,19 +289,18 @@ cloudCare.CaseListView = Backbone.View.extend({
             bScrollCollapse: true
         });
         var $dataTablesFilter = $(".dataTables_filter");
-        $dataTablesFilter.css('float', 'none').css('padding', '3px').addClass('span12');
-        $dataTablesFilter.addClass("form-search");
+        $dataTablesFilter.addClass("form-search col-md-7");
         var $inputField = $dataTablesFilter.find("input"),
             $inputLabel = $dataTablesFilter.find("label");
 
         $dataTablesFilter.append($inputField);
         $inputField.attr("id", "dataTables-filter-box");
-        $inputField.addClass("search-query").addClass("input-large");
+        $inputField.addClass("search-query form-control col-md-7");
         $inputField.attr("placeholder", "Filter...");
 
         $inputLabel.attr("for", "dataTables-filter-box");
         $inputLabel.text('Filter cases:');
-        this.el.parent().before($('<section class="row-fluid" />').append($dataTablesFilter));
+        this.el.parent().before($('<section class="row" />').append($dataTablesFilter));
     }
 });
 
@@ -316,7 +315,7 @@ cloudCare.CaseDetailsView = Backbone.View.extend(cloudCare.caseViewMixin).extend
     render: function () {
         var self = this;
         if (!self._everRendered) {
-            self.el = $('<section />').attr("id", "case-details").addClass("span5");
+            self.el = $('<section />').attr("id", "case-details").addClass("col-md-5");
             self._everRendered = true;
         }
         $(self.el).html(""); // clear
@@ -343,7 +342,7 @@ cloudCare.CaseMainView = Backbone.View.extend({
         _.bindAll(this, 'render', 'selectCase', 'fetchCaseList');
         // adding an internal section so that the filter button displays correctly
         self.el = self.options.el;
-        self.section = $('<section class="row-fluid" />');
+        self.section = $('<section class="row" />');
         self.section.appendTo(self.el);
         // this is copy-pasted
         self.delegation = self.options.appConfig.form_index === 'task-list';
