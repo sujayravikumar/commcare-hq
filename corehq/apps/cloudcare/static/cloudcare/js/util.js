@@ -114,8 +114,7 @@ var _show = function (message, location, autoHideTime, classes) {
 };
 
 var showLoading = function (selector) {
-    selector = selector || "#loading";
-    $(selector).show();
+    NProgress.start()
 };
 
 var tfLoading = function (selector) {
@@ -124,8 +123,7 @@ var tfLoading = function (selector) {
 }
 
 var hideLoading = function (selector) {
-    selector = selector || "#loading";
-    $(selector).hide();
+    NProgress.done()
 };
 
 var tfLoadingComplete = function (isError) {

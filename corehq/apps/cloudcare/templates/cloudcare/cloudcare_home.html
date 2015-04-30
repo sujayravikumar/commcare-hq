@@ -22,6 +22,7 @@
     <script src="{% static 'cloudcare/js/post.js' %}"></script>
     
     {# touchforms includes #}
+    <script src="{% static 'formplayer/script/vendor/nprogress.js' %}"></script>
     <script language="javascript" type="text/javascript" src="{% static 'hqwebapp/js/lib/jquery-ui/jquery-ui-1.11.2.min.js' %}"></script>
     <link rel="stylesheet" href="{% static 'hqwebapp/js/lib/jquery-ui/jquery-ui-redmond-1.11.2.css' %}">
     
@@ -33,6 +34,7 @@
     <script language="javascript" type="text/javascript" src="{% static 'formplayer/script/build/fullform-ui.templates.js' %}?version={{app_version}}"></script>
     <script language="javascript" type="text/javascript" src="{% static 'formplayer/script/fullform-ui.js' %}?version={{app_version}}"></script>
 
+    <link rel="stylesheet" href="{% static 'formplayer/style/vendor/nprogress.css' %}">
     <link rel="stylesheet" href="{% static 'formplayer/style/webforms.css' %}">
     <link rel="stylesheet" href="{% static 'cloudcare/css/cloudcare.css' %}">
 
@@ -86,8 +88,6 @@
         });
         // TODO: when we figure out what to do about get params, use this
         Backbone.history.start({pushState: true, root: urlRoot});
-
-        set_pin(30, $('#cloudcare-main'), $('#loading'));
 
         function enableOffline() {
             $('#debug-opts').show();
@@ -178,10 +178,6 @@
             {% endif %}
         {% endif %}
         <section id="cloudcare-notifications"></section>
-        <div id="loading" class="well" style="display: none; position: fixed; right: 0; margin-right: 40px; top: 40px;">
-            <img width="32" height="32" alt="Loading" src="{% static 'formplayer/img/loading_transparent.gif' %}" />
-            {% trans "Loading" %}...
-        </div>
         <section id="case-crumbs" style="width: 800px"></section>
         <section id="cases"></section>
         <section id="webforms"></section>
