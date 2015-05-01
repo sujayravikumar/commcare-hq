@@ -447,5 +447,6 @@ OWNERSHIP_CLEANLINESS = PredicatablyRandomToggle(
 
 FM_FACING_SUBSCRIPTIONS = StaticToggle(
     'fm_facing_subscriptions',
-    'FM Facing Subscription Management Interface'
+    'FM Facing Subscription Management Interface',
+    TAG_EXPERIMENTAL,
 )
