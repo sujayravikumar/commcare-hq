@@ -247,6 +247,7 @@
 {% block group-view %}
     <div class="row-fluid">
         <form class="form disable-on-submit" id="edit_membership"
+              {# This is where the url is inserted into the template #}
               action="{% url "update_group_membership" domain group.get_id %}" method='post'>
                 <legend>{% trans 'Edit Group Membership' %}</legend>
                 {% crispy user_form %}
