@@ -4,7 +4,8 @@ from corehq.apps.reports.standard.cases.data_sources import CaseDisplay
 from casexml.apps.case.models import CommCareCase
 from django.utils.translation import ugettext as _
 import logging
-from corehq.util.dates import iso_string_to_datetime
+from corehq.util.dates import iso_string_to_datetime, iso_string_to_date
+from corehq.util.soft_assert import soft_assert
 from custom.bihar.calculations.utils.xmlns import BP, NEW, MTB_ABORT, DELIVERY, REGISTRATION, PNC
 from couchdbkit.exceptions import ResourceNotFound
 from corehq.apps.users.models import CommCareUser, CouchUser
@@ -91,6 +92,17 @@ class MCHDisplay(CaseDisplay):
         return getattr(self, "_caste", EMPTY_FIELD)
 
     def parse_date(self, date_string):
+        if not date_string:
+            return EMPTY_FIELD
+
+        try:
+            iso_string_to_date(date_string)
+        except Exception:
+            soft_assert(['@'.join(['droberts', 'dimagi.com'])]).call(
+                False, 'Bihar parse_date got unexpected input', date_string)
+            return self._sloppy_parse_date(date_string)
+
+    def _sloppy_parse_date(self, date_string):
         if date_string != EMPTY_FIELD and date_string != '' and date_string is not None:
             try:
                 # assuming it's a date string or datetime string,
@@ -249,8 +261,17 @@ class MCHMotherDisplay(MCHDisplay):
 
                 if type(mother_dob) is dict:
                     mother_dob = mother_dob["#value"]
-                days = (date.today() - CaseDisplay.parse_date(self, mother_dob).date()).days
-                mother_dob = self.parse_date(mother_dob)
+                mother_dob_date = self.parse_date(mother_dob)
+                try:
+                    # never mind that date.today() is going
+                    # to give a different day from bihar-time's day
+                    # in the wee hours of the morning
+                    days = (date.today() - mother_dob_date).days
+                except Exception as e:
+                    soft_assert(['@'.join(['droberts', 'dimagi.com'])]).call(
+                        False, 'issue manipulating mother_dob',
+                        (e, mother_dob, mother_dob_date))
+                    days = (date.today() - CaseDisplay.parse_date(self, mother_dob).date()).days
                 return "%s, %s" % (mother_dob, days/365)
             except AttributeError:
                 return _("Bad date format!")
