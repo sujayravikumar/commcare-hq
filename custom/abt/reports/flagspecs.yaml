@@ -181,11 +181,13 @@ http://openrosa.org/formdesigner/BBBA67FC-4E25-46B4-AB64-56F820D48A9E:
 
 # Form 3
 http://openrosa.org/formdesigner/54338047-CFB6-4D5B-861B-2256A10BBBC8:
+  # TODO: French
     - question: [q2_action]
       answer: []
       warning: " Problem reported: Spray operator(s) not properly fed or hydrated prior to donning PPE."
       warning_question: ~
       # answer and warning_question are optional
+    # TODO: q3
     - question: [q4_action]
       warning: "Problem reported: Spray operator(s) eating or drinking after donning PPE."
     - question: [q5_action]
@@ -204,6 +206,11 @@ http://openrosa.org/formdesigner/54338047-CFB6-4D5B-861B-2256A10BBBC8:
     - question: [q12_action]
       warning: "Problem noted: Separate transportation needed for operators and pesticides other than the days supply."
     - question: [q13_action]
+    # TODO:
+    # q14_action
+    # q14_2_action
+    # q15_action
+    # q15_action
       warning: "Problem noted: Mixed goods transportation violation, suggest re-training."
     - question: [q16_action]
       warning: "Problem noted: Drivers do not have cell telephone and/or appropriate PPE."
