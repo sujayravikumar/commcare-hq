@@ -287,10 +287,8 @@ http://openrosa.org/formdesigner/2BAC5FDC-72F3-4AF4-8381-9160E8AE13CF:
   - question: [q26_action]
     warning: "Problem reported; Spray Operator {msg} drinking, or eating during the day"
     warning_question: [q26a]
-  - question: [q27_3]
-    warning: "Problem reported; Accident or expowsure to: {msg} reported, follow up on IRF"
-    warning_question: [q27_3]
-    # NOTE: q27 might change. Text doesn't make sense given the questions.
+  - question: [q27_action]
+    warning: "Problem reported; Accident or expowsure reported, follow up on IRF"
   - question: [q28_action]
     warning: "Problem reported: {msg}"
     warning_question: [q28_2]
