@@ -43,6 +43,12 @@ class SubmissionErrorReport(DeploymentsReport):
     slug = "submit_errors"
     ajax_pagination = True
     asynchronous = False
+    exportable = True
+
+    @property
+    def export_response(self):
+        self.pagination.count = 1000000
+        return super(SubmissionErrorReport, self).export_response
 
     fields = ['corehq.apps.receiverwrapper.filters.SubmissionTypeFilter',
               ]
