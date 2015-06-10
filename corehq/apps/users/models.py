@@ -1675,6 +1675,9 @@ class CommCareUser(CouchUser, SingleMembershipMixin, CommCareMobileContactMixin)
                 return True
 
             for group in groups:
+                group.save()
+                from corehq.apps.groups.models import Group
+                group = Group.get(group._id)
                 ret = False
                 if not group.last_modified or group.last_modified >= last_sync.date:
                     ret = True
@@ -1685,6 +1688,7 @@ class CommCareUser(CouchUser, SingleMembershipMixin, CommCareMobileContactMixin)
                     dsg.modified_times.append(str(group.last_modified))
                     dsg.save()
                 if ret:
+                    group.save()
                     return True
 
             return False
