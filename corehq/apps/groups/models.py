@@ -252,6 +252,12 @@ class Group(UndoableDocument):
         ).format(self=self, users=self.get_users())
 
 
+class DebugSyncGroup(Group):
+    debug = BooleanProperty(default=False)
+    sync_logs = StringListProperty()
+    modified_times = StringListProperty()
+
+
 class UnsavableGroup(Group):
     def save(self, *args, **kwargs):
         raise CantSaveException("Instances of UnsavableGroup cannot be saved")

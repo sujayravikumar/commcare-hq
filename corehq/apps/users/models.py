@@ -1675,7 +1675,16 @@ class CommCareUser(CouchUser, SingleMembershipMixin, CommCareMobileContactMixin)
                 return True
 
             for group in groups:
+                ret = False
                 if not group.last_modified or group.last_modified >= last_sync.date:
+                    ret = True
+                from corehq.apps.groups.models import DebugSyncGroup
+                dsg = DebugSyncGroup.get(group._id)
+                if dsg.debug:
+                    dsg.sync_logs.append(last_sync._id)
+                    dsg.modified_times.append(str(group.last_modified))
+                    dsg.save()
+                if ret:
                     return True
 
             return False
