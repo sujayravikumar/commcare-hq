@@ -60,6 +60,8 @@ class Command(BaseCommand):
                         self.cases_to_save[case.case_id] = case
                         print(u"Case with name " + case.name + u" updated to type " + case.type)
                     else:
+                        print case.name
+                        print(case.name)
                         print(u"Type not updated for case with name " + case.name)
 
         print(str(len(self.cases_to_save)) + " cases to save")
