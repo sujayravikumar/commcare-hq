@@ -176,6 +176,7 @@ DATA_INTERFACES = (
         export.ExcelExportReport,
         export.CaseExportReport,
         export.DeidExportReport,
+        export.FormExportReport,
     )),
 )
 

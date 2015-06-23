@@ -423,3 +423,11 @@ class DataExportInterface(GenericReportView):
         # if not self.can_view_deid:
         #     exports = filter(lambda x: not x.is_safe, exports)
         return sorted(exports, key=lambda x: x.name)
+
+
+class FormExportReport(FormExportReportBase):
+    base_template = 'reports/standard/export_download.html'
+    report_template_path = 'reports/partials/download_export.html'
+    name = ugettext_noop('Download Forms')
+    section_name = "Export Data"
+    slug = 'form_export_revamped'
