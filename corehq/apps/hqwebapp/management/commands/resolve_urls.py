@@ -40,5 +40,5 @@ class Command(LabelCommand):
                 print json.dumps(out)
             except TypeError:
                 errors.append(out)
-            # Write to stderr so we don't try to analyze this
-            sys.stderr.write("Errors: {}".format(len(errors)))
+        # Write to stderr so we don't try to analyze this
+        sys.stderr.write("Errors: {}".format(len(errors)))
