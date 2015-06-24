@@ -26,6 +26,7 @@ class Command(LabelCommand):
     help = "Prints the paths of all the static files"
 
     def handle(self, *args, **options):
+        errors = []
         for line in sys.stdin:
             # Split line and url first
             line = line.strip()
@@ -38,4 +39,6 @@ class Command(LabelCommand):
             try:
                 print json.dumps(out)
             except TypeError:
-                raise TypeError('Cant Serialize: {}'.format(out))
+                errors.append(out)
+            # Write to stderr so we don't try to analyze this
+            sys.stderr.write("Errors: {}".format(len(errors)))
