@@ -431,3 +431,13 @@ class FormExportReport(FormExportReportBase):
     name = ugettext_noop('Download Forms')
     section_name = "Export Data"
     slug = 'form_export_revamped'
+
+    hardcoded_export_id = 'ddb344130972b4aacfca793e15d2365a'
+
+    @property
+    def template_context(self):
+        context = super(FormExportReport, self).template_context
+        context.update({
+            'export': SavedExportSchema.get(self.hardcoded_export_id),
+        })
+        return context
