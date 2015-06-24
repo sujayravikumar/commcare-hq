@@ -9,7 +9,8 @@ if __name__ == '__main__':
     for line in sys.stdin:
         url_info = json.loads(line)
         hits_by_view[url_info.get('view')].append(float(url_info['time']))
-        none_views.append(url_info['url']) if url_info.get('view') is None
+        if not url_info.get('view'):
+            none_views.append(url_info['url'])
     # Items in counts are (view, total time, total views)
     counts = sorted([(key, sum(value), len(value)) for key, value in hits_by_view.items()],
                     key=lambda (key, value, _): -value)
