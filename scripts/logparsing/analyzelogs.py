@@ -1,7 +1,6 @@
 import sys
 import json
 from collections import defaultdict
-from decimal import *
 
 
 if __name__ == '__main__':
@@ -14,5 +13,4 @@ if __name__ == '__main__':
                     key=lambda (key, value, _): -value)
     print '%6s %10s %10s %s' % ('Count', 'Time', 'Avg', 'View')
     for view, total_time, count in counts:
-        getcontext().prec = 7
-        print '%6s %10s %10s %s' % (count, total_time, Decimal(total_time/float(count)), view)
+        print '%6s %10s %.3f %s' % (count, total_time, total_time/float(count), view)
