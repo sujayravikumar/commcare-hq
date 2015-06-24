@@ -35,4 +35,7 @@ class Command(LabelCommand):
                 raise ValueError('Bad URL (no time included) {}'.format(line))
             out = resolve_url(url)
             out['time'] = time
-            print json.dumps(out)
+            try:
+                print json.dumps(out)
+            except TypeError:
+                raise TypeError('Cant Serialize: {}'.format(out))
