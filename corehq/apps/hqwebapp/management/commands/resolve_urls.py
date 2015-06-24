@@ -7,7 +7,7 @@ import sys
 def resolve_url(url):
     if '?' in url:
         try:
-            url, querystring = url.split('?')
+            url, querystring = url.split('?', 1)
         except ValueError:
             raise ValueError("Invalid Url: {}".format(url))
     else:
