@@ -5,7 +5,7 @@ from collections import defaultdict
 
 if __name__ == '__main__':
     hits_by_view = defaultdict(list)
-    none_views = list
+    none_views =  []
     for line in sys.stdin:
         url_info = json.loads(line)
         hits_by_view[url_info.get('view')].append(float(url_info['time']))
