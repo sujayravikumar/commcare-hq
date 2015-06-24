@@ -8,7 +8,9 @@ if __name__ == '__main__':
     for line in sys.stdin:
         url_info = json.loads(line)
         hits_by_view[url_info.get('view')].append(float(url_info['time']))
-    counts = sorted([(key, sum(value)) for key, value in hits_by_view.items()],
-                    key=lambda (key, value): -value)
-    for view, count in counts:
-        print '%10s %s' % (count, view)
+    # Items in counts are (view, total time, total views)
+    counts = sorted([(key, sum(value), len(value)) for key, value in hits_by_view.items()],
+                    key=lambda (key, value, _): -value)
+    for view, total_time, count in counts:
+        print '%6s %10s %s' % ('Count', 'Time', 'View')
+        print '%6s %10s %s' % (count, total_time, view)
