@@ -12,4 +12,4 @@ if __name__ == '__main__':
     counts = sorted([(key, sum(value)) for key, value in hits_by_view.items()],
                     key=lambda (key, value): -value)
     for view, count in counts:
-        print '%6s %s' % (count, view)
+        print '%10s %s' % (count, view)

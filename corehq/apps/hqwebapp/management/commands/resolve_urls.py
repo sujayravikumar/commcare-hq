@@ -41,4 +41,6 @@ class Command(LabelCommand):
             except TypeError:
                 errors.append(out)
         # Write to stderr so we don't try to analyze this
-        sys.stderr.write("Errors: {}".format(len(errors)))
+        sys.stderr.write("Errors: {}\n\n".format(len(errors)))
+        for error in errors:
+            sys.stderr.write("{}\n".format(error))
