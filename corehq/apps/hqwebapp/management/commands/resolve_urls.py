@@ -24,4 +24,12 @@ class Command(LabelCommand):
 
     def handle(self, *args, **options):
         for line in sys.stdin:
-            print json.dumps(resolve_url(line.strip()))
+            # Split line and url first
+            line = line.strip()
+            try:
+                url, time = line.split(' ')
+            except ValueError:
+                raise ValueError('Bad URL (no time included) {}'.format(line))
+            out = resolve_url(url)
+            out['time'] = time
+            print json.dumps(out)
