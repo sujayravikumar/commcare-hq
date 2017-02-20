@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from datetime import datetime, time
 from corehq import privileges
 from corehq.apps.app_manager.dbaccessors import get_app, get_app_ids_in_domain

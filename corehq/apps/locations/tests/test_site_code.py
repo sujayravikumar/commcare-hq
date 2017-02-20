@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from __future__ import absolute_import
 from corehq.apps.commtrack.tests.util import bootstrap_domain
 from django.test import TestCase
 from corehq.apps.locations.models import Location, LocationType

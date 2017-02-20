@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import calendar
 from datetime import datetime
 from dimagi.utils.dates import force_to_datetime

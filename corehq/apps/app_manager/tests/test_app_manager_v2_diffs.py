@@ -1,4 +1,5 @@
 # coding: utf-8
+from __future__ import absolute_import
 import filecmp
 import os
 from corehq.apps.app_manager.management.commands.build_app_manager_v2_diffs import (

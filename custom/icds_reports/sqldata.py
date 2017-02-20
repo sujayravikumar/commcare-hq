@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from corehq.apps.reports.datatables import DataTablesColumn
 from corehq.apps.reports.datatables import DataTablesHeader
 from custom.icds_reports.utils import ICDSMixin

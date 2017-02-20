@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from custom.common import ALL_OPTION
 
 from django.utils.translation import ugettext_noop, ugettext as _

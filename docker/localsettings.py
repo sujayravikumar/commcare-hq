@@ -1,5 +1,6 @@
 ####### Configuration for CommCareHQ Running in docker #######
 
+from __future__ import absolute_import
 import os
 
 DATABASES = {

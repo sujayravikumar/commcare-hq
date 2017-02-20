@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from crispy_forms.bootstrap import AccordionGroup, InlineField
 from crispy_forms.layout import MultiField, Field
 from crispy_forms.utils import render_field, get_template_pack

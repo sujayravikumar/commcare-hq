@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from sqlagg.columns import SimpleColumn
 from corehq.apps.reports.sqlreport import SqlData, DatabaseColumn
 from custom.common import ALL_OPTION

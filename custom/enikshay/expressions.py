@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from jsonobject.properties import ListProperty, StringProperty
 
 from corehq.apps.userreports.expressions.factory import ExpressionFactory

@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from django.test import TestCase
 from casexml.apps.case.mock import CaseBlock
 from casexml.apps.case.tests.util import check_user_has_case

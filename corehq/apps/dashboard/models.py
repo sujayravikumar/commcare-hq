@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from corehq.apps.export.views import ExportsPermissionsMixin
 from django.core.urlresolvers import reverse, resolve, Resolver404
 from corehq.tabs.uitab import url_is_location_safe

@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from corehq.apps.locations.models import SQLLocation
 from corehq.apps.userreports.expressions.factory import ExpressionFactory
 from corehq.apps.userreports.specs import TypeProperty

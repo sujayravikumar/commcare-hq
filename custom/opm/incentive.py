@@ -3,6 +3,7 @@ Field definitions for the Incentive Payment Report.
 Takes a CommCareUser and points to the appropriate fluff indicators
 for each field.
 """
+from __future__ import absolute_import
 from collections import defaultdict
 from corehq.apps.reports.datatables import DTSortType
 

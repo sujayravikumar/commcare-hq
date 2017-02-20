@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from xml.etree import ElementTree
 from django.utils.translation import ugettext as _
 from casexml.apps.phone.models import OTARestoreUser

@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import uuid
 from django.utils.translation import ugettext_noop, ugettext as _
 from casexml.apps.case.models import CommCareCase

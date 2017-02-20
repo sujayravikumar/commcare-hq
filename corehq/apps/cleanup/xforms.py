@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from couchforms.dbaccessors import get_form_ids_by_type
 from couchforms.models import XFormError
 from dimagi.utils.couch.database import iter_docs

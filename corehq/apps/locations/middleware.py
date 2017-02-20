@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from django.utils.translation import ugettext_lazy
 from corehq.apps.hqwebapp.views import no_permissions
 from .permissions import is_location_safe, location_restricted_response

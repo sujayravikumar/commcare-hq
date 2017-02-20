@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from corehq.apps.fixtures.models import FixtureDataItem
 from corehq.util.quickcache import quickcache
 

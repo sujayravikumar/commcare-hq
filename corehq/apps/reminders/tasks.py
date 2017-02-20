@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from datetime import datetime, timedelta
 from celery.task import periodic_task, task
 from corehq.apps.reminders.models import (CaseReminderHandler, CaseReminder,

@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from django.conf import settings
 from sqlalchemy import create_engine
 from sqlalchemy.exc import ProgrammingError

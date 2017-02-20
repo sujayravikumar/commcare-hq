@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from datetime import date
 from ..constants import InvalidRow
 from .case_reports import OPMCaseReportTestBase, OPMCase, MockCaseRow

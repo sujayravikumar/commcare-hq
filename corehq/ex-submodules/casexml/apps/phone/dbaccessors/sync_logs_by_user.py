@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from casexml.apps.phone.models import SyncLog
 from dimagi.utils.couch.database import get_db
 

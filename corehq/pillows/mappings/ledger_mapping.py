@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from corehq.pillows.base import DEFAULT_META
 
 from corehq.pillows.mappings.utils import mapping_from_json

@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from corehq.apps.groups.tests.test_groups import WrapGroupTestMixin
 from corehq.apps.locations.models import Location, LocationType, SQLLocation
 from corehq.apps.locations.tests.util import make_loc

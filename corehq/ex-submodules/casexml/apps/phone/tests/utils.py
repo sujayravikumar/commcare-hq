@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from xml.etree import ElementTree
 from casexml.apps.case.xml import V1
 from casexml.apps.phone.models import (

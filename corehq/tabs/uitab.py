@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from django.core.cache import cache
 from django.core.urlresolvers import reverse, resolve, Resolver404
 from django.utils.translation import get_language

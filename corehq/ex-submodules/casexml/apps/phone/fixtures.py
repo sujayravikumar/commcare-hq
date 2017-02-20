@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from collections import namedtuple
 from casexml.apps.phone.models import OTARestoreUser
 from casexml.apps.case.xml import V1

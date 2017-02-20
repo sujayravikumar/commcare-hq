@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import multiprocessing
 preload_app = True
 workers = multiprocessing.cpu_count()

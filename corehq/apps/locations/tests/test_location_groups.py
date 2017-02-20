@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from mock import patch
 from corehq.apps.locations.fixtures import location_fixture_generator
 from corehq.apps.locations.tests.util import make_loc

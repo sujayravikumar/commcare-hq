@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from corehq.fluff.calculators.case import CasePropertyFilter
 import fluff
 from couchforms.models import XFormInstance

@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import datetime
 from xml.etree.ElementTree import Element
 from django.utils.translation import ugettext as _

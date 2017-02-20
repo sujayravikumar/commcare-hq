@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Fieldset, Hidden, Layout
 from crispy_forms.bootstrap import StrictButton, PrependedText

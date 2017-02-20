@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from corehq.apps.case_search.models import CaseSearchConfig, disable_case_search, enable_case_search
 from django.test import TestCase
 from mock import call, patch

@@ -1,6 +1,7 @@
+from __future__ import absolute_import
 from corehq.apps.domain_migration_flags.exceptions import DomainMigrationProgressError
 from corehq.util.quickcache import skippable_quickcache
-from models import DomainMigrationProgress, MigrationStatus
+from .models import DomainMigrationProgress, MigrationStatus
 
 
 def set_migration_started(domain, slug):

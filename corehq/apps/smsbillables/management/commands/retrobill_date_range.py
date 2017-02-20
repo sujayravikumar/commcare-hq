@@ -1,4 +1,5 @@
 from __future__ import print_function
+from __future__ import absolute_import
 import datetime
 from corehq.apps.domain.models import Domain
 from corehq.apps.sms.models import SMS

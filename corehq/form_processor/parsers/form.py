@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import datetime
 
 from corehq.form_processor.interfaces.dbaccessors import FormAccessors

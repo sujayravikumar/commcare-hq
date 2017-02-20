@@ -3,6 +3,7 @@
 Fluff calculators that pertain to specific cases/beneficiaries (mothers)
 These are used in the Beneficiary Payment Report and Conditions Met Report
 """
+from __future__ import absolute_import
 import re
 import datetime
 from decimal import Decimal

@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from datetime import date, timedelta
 from .case_reports import OPMCaseReportTestBase, OPMCase, MockCaseRow
 

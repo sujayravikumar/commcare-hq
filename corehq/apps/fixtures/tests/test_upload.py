@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from collections import namedtuple
 from django.test import SimpleTestCase
 from corehq.apps.fixtures.exceptions import FixtureUploadError

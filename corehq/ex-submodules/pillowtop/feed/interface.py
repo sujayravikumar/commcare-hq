@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from abc import ABCMeta, abstractmethod
 from jsonobject import DefaultProperty
 from dimagi.ext import jsonobject

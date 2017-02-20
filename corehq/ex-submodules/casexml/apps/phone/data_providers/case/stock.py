@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from collections import defaultdict
 from casexml.apps.stock.consumption import compute_default_monthly_consumption, \
     ConsumptionConfiguration

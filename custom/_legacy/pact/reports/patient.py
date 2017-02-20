@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import logging
 from django.core.urlresolvers import reverse
 from django.http import Http404

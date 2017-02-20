@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from casexml.apps.phone.models import OTARestoreUser
 from corehq.apps.locations.models import Location
 from custom.m4change.constants import M4CHANGE_DOMAINS

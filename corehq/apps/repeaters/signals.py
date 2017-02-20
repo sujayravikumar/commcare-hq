@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from casexml.apps.case.models import CommCareCase
 from corehq.form_processor.models import CommCareCaseSQL
 from casexml.apps.case.signals import case_post_save

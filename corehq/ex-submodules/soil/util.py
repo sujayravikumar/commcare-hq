@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from soil import DownloadBase, CachedDownload, FileDownload, MultipleTaskDownload
 from soil.exceptions import TaskFailedError
 from soil.heartbeat import is_alive, heartbeat_enabled

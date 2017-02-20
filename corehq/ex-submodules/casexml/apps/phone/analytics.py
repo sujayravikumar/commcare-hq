@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from casexml.apps.phone.dbaccessors.sync_logs_by_user import synclog_view
 from casexml.apps.phone.models import properly_wrap_sync_log
 from corehq.util.couch import stale_ok

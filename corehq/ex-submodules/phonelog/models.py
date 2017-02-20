@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from django.db import models
 
 COUCH_UUID_MAX_LEN = 50

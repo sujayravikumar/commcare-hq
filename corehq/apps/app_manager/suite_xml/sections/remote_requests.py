@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from corehq.apps.app_manager import id_strings
 from corehq.apps.app_manager.suite_xml.contributors import SuiteContributorByModule
 from corehq.apps.app_manager.suite_xml.sections.details import DetailsHelper, get_instances_for_module

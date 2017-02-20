@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from datetime import date, datetime, timedelta
 from couchforms.models import XFormInstance
 from ..constants import CHILDREN_FORMS, BIRTH_PREP_XMLNS, CFU1_XMLNS

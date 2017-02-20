@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from corehq.util.decorators import serial_task
 from corehq.apps.commtrack.models import StockState, sync_supply_point
 from corehq.apps.locations.models import SQLLocation

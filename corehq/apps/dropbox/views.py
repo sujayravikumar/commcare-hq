@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from dropbox.client import DropboxOAuth2Flow
 
 from django.core.urlresolvers import reverse

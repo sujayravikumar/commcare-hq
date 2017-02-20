@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from custom.opm.tests.case_reports import (
     OPMCaseReportTestBase, MockDataProvider, OPMCase, MockCaseRow
 )

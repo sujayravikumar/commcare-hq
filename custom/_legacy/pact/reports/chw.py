@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from django.core.urlresolvers import NoReverseMatch, reverse
 from django.http import Http404
 from corehq.apps.api.es import ReportCaseES, ReportXFormES

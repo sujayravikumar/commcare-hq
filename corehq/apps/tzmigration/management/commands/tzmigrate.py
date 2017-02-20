@@ -1,4 +1,5 @@
 from __future__ import print_function
+from __future__ import absolute_import
 from optparse import make_option
 from django.core.management.base import BaseCommand, CommandError
 from corehq.apps.hqcase.dbaccessors import get_case_ids_in_domain

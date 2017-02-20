@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from django.core.urlresolvers import reverse
 from corehq.apps.crud.interface import BaseCRUDAdminInterface
 from corehq.apps.indicators.dispatcher import IndicatorAdminInterfaceDispatcher

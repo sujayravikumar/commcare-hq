@@ -1,4 +1,5 @@
 # coding: utf-8
+from __future__ import absolute_import
 import json
 from mock import patch
 from corehq.apps.app_manager.tests.util import add_build, patch_default_builds

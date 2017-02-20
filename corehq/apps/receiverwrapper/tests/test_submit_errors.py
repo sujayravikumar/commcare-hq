@@ -1,4 +1,5 @@
 # coding: utf-8
+from __future__ import absolute_import
 from django.test import TestCase
 from corehq.apps.users.models import WebUser
 from corehq.apps.domain.shortcuts import create_domain

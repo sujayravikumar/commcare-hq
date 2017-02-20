@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import json
 
 from corehq.apps.domain.decorators import cls_require_superuser_or_developer

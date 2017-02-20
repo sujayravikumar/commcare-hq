@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from django.contrib import messages
 from django.http import Http404, HttpResponse
 from django.shortcuts import render

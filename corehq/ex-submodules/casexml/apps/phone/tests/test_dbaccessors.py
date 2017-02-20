@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import datetime
 from casexml.apps.phone.analytics import get_sync_logs_for_user, update_analytics_indexes
 from dimagi.utils.couch.database import get_db

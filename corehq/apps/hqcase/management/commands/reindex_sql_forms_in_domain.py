@@ -1,4 +1,5 @@
 from __future__ import print_function
+from __future__ import absolute_import
 from dimagi.utils.chunked import chunked
 from django.core.management import BaseCommand
 

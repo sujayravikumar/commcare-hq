@@ -16,6 +16,7 @@
 #
 #class_prepared.connect(longer_username)
 
+from __future__ import absolute_import
 from django.contrib.auth.models import User
 from django.core.validators import MaxLengthValidator
 

@@ -1,6 +1,7 @@
 """
 Fluff IndicatorDocument definitions for the OPM reports.
 """
+from __future__ import absolute_import
 from fluff.filters import CustomFilter
 from corehq.apps.users.models import CommCareUser
 import fluff

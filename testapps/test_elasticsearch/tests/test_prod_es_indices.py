@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from django.conf import settings
 from django.test import SimpleTestCase
 from corehq.pillows.utils import get_all_expected_es_indices

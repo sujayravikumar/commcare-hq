@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from celery.task import task
 from celery import group
 from couchdbkit.exceptions import ResourceNotFound

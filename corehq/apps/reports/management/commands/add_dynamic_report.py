@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from django.core.management import BaseCommand
 from optparse import make_option
 import json

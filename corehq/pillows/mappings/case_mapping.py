@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from corehq.pillows.base import DEFAULT_META
 from corehq.pillows.core import DATE_FORMATS_ARR, DATE_FORMATS_STRING
 from corehq.pillows.mappings import NULL_VALUE

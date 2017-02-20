@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import copy
 from corehq.apps.change_feed.consumer.feed import KafkaChangeFeed, MultiTopicCheckpointEventHandler
 from corehq.apps.change_feed.document_types import COMMCARE_USER, WEB_USER, FORM

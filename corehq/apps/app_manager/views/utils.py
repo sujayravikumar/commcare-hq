@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import json
 from urllib import urlencode
 from django.contrib import messages

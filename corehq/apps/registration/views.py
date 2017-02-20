@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import urllib
 from datetime import datetime
 import logging

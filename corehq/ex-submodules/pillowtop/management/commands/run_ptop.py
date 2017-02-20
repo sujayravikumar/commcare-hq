@@ -1,4 +1,5 @@
 from __future__ import print_function
+from __future__ import absolute_import
 from pillowtop.run_pillowtop import start_pillows, start_pillow
 
 from optparse import make_option

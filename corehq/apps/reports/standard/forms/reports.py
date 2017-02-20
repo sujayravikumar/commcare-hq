@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from django.core.urlresolvers import reverse, NoReverseMatch
 from corehq.apps.reports.standard.deployments import DeploymentsReport
 from corehq.apps.reports.datatables import DataTablesHeader, DataTablesColumn

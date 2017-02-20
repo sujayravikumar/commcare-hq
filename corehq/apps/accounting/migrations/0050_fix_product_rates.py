@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+from __future__ import absolute_import
 from django.db import migrations
 from corehq.apps.accounting.bootstrap.config.user_buckets_jan_2017 import (
     BOOTSTRAP_CONFIG

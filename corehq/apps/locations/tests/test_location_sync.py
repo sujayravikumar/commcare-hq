@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import mock
 from couchdbkit.exceptions import ResourceConflict, ResourceNotFound
 from django.db import DatabaseError

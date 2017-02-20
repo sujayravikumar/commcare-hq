@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import sqlalchemy
 from sqlalchemy import *
 from django.conf import settings

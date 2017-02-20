@@ -1,4 +1,5 @@
 from __future__ import print_function
+from __future__ import absolute_import
 from django.core.management.base import BaseCommand, CommandError
 from datetime import date, timedelta
 from corehq.elastic import get_es_new

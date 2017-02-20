@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import json
 from corehq.apps.api.models import ApiUser, PERMISSION_POST_SMS
 from corehq.apps.domain.models import Domain

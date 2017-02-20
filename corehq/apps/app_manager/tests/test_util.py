@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import corehq.apps.app_manager.util as util
 from corehq.apps.app_manager.models import (
     Module,

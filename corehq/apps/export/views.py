@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from datetime import datetime, date, timedelta
 from couchdbkit import ResourceNotFound
 from django.conf import settings

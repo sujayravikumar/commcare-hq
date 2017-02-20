@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import datetime
 from django.http import HttpResponse, HttpResponseNotFound
 from django.views.decorators.http import require_GET

@@ -1,4 +1,5 @@
 # coding=utf-8
+from __future__ import absolute_import
 from corehq.apps.app_manager.const import CAREPLAN_GOAL, CAREPLAN_TASK
 from corehq.apps.app_manager.exceptions import XFormException, XFormValidationError
 from corehq.apps.app_manager.models import (

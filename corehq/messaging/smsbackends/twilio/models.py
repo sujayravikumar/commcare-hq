@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from corehq.apps.sms.models import SQLSMSBackend, PhoneLoadBalancingMixin
 from corehq.messaging.smsbackends.twilio.forms import TwilioBackendForm
 from twilio.rest import TwilioRestClient

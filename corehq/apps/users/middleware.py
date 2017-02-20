@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from django.conf import settings
 import django.core.exceptions
 from corehq.apps.users.models import CouchUser, InvalidUser

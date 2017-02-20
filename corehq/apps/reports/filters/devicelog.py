@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from django.utils.translation import ugettext_noop, ugettext_lazy
 from corehq.apps.reports.filters.base import BaseReportFilter, BaseSingleOptionFilter, BaseTagsFilter
 from corehq.util.queries import fast_distinct, fast_distinct_in_domain

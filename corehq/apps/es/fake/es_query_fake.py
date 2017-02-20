@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import logging
 import uuid
 from corehq.apps.es.es_query import ESQuerySet

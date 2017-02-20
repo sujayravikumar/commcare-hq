@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from casexml.apps.phone.data_providers import FullResponseDataProvider
 from casexml.apps.phone.data_providers.case.clean_owners import CleanOwnerCaseSyncOperation
 

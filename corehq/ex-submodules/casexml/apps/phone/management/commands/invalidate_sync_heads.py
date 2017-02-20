@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from django.core.management import BaseCommand, CommandError
 
 from casexml.apps.phone.models import SimplifiedSyncLog

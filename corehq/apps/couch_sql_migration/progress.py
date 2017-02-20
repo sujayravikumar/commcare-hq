@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from corehq.apps.domain_migration_flags.api import (
     set_migration_started, set_migration_not_started,
     get_migration_status)

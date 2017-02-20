@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from optparse import make_option
 import re
 from django.core.management import BaseCommand, CommandError

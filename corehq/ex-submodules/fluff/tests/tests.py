@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from django.conf import settings
 from django.test import TestCase
 from pillowtop.feed.couch import change_from_couch_row

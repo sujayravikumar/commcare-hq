@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from casexml.apps.case.exceptions import CommCareCaseError
 from corehq.util.datadog.utils import log_counter
 from corehq.util.datadog.metrics import DATE_OPENED_CASEBLOCK_ERROR_COUNT

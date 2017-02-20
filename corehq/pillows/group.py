@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from corehq.apps.change_feed.consumer.feed import KafkaChangeFeed
 from corehq.apps.change_feed.document_types import GROUP
 from corehq.apps.groups.models import Group

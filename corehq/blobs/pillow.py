@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from os.path import join
 from corehq.apps.change_feed import topics
 from corehq.apps.change_feed.consumer.feed import KafkaChangeFeed

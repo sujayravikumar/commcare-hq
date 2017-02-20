@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from corehq.blobs.mixin import _get_couchdb_name
 from corehq.blobs.pillow import BlobDeletionProcessor
 from corehq.blobs.tests.test_mixin import BaseTestCase

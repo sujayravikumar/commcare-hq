@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from unittest import TestCase
 from datetime import date, datetime
 from couchforms.models import XFormInstance

@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from corehq.toggles import PREVIEW_APP
 from corehq.apps.analytics import ab_tests
 

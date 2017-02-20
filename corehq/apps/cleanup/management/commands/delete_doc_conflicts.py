@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import logging
 from optparse import make_option
 from couchdbkit.exceptions import BulkSaveError

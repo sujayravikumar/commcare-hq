@@ -1,5 +1,6 @@
 
 
+from __future__ import absolute_import
 def get_engine_id(an_object):
     """
     Given an object, get the engine id for it.

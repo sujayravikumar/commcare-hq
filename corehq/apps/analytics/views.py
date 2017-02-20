@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from django.http import HttpResponse
 from django.views.generic import View
 from corehq.apps.analytics.tasks import track_clicked_deploy_on_hubspot

@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import calendar
 import json
 from django.core.urlresolvers import reverse

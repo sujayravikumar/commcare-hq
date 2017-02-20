@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from custom.opm.constants import InvalidRow
 from custom.opm.tests.case_reports import OPMCaseReportTestBase, OPMCase, MockCaseRow
 

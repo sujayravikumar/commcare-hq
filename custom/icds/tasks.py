@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from celery.task import task
 from corehq.apps.reminders.tasks import CELERY_REMINDERS_QUEUE
 from corehq.apps.reminders.util import get_one_way_number_for_recipient

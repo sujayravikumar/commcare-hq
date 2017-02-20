@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from django.http.response import JsonResponse
 from django.utils.decorators import method_decorator
 from django.views.generic.base import View
