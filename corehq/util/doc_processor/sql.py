@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from datetime import datetime
 
 from corehq.sql_db.config import get_sql_db_aliases_in_use

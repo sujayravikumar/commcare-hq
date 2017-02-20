@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from django.conf import settings
 
 from corehq.apps.hqwebapp.tasks import send_mail_async, mail_admins_async
