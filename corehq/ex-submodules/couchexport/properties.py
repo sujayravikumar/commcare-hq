@@ -43,7 +43,7 @@ class TimeStampProperty(DateTimeProperty):
         if isinstance(value, six.string_types):
             try:
                 return parse_date_string(value, self.precise_reads)
-            except ValueError, e:
+            except ValueError as e:
                 raise ValueError('Invalid ISO date/time %r [%s]' %
                         (value, str(e)))
         return value

@@ -252,7 +252,8 @@ def end_report_run(request, domain):
         rr.complete = True
         rr.has_error = True
         rr.save()
-    except ReportRun.DoesNotExist, ReportRun.MultipleObjectsReturned:
+    except ReportRun.DoesNotExist as xxx_todo_changeme:
+        ReportRun.MultipleObjectsReturned = xxx_todo_changeme
         pass
     return HttpResponseRedirect(reverse(ILSConfigView.urlname, kwargs={'domain': domain}))
 

@@ -461,7 +461,7 @@ def _export_default_or_custom_data(request, domain, export_id=None, bulk_export=
                 return HttpResponseForbidden()
         except ResourceNotFound:
             raise Http404()
-        except BadExportConfiguration, e:
+        except BadExportConfiguration as e:
             return HttpResponseBadRequest(str(e))
 
     elif safe_only:
@@ -505,7 +505,7 @@ def _export_default_or_custom_data(request, domain, export_id=None, bulk_export=
     else:
         try:
             resp = export_object.download_data(format, filter=filter, limit=limit)
-        except SchemaMismatchException, e:
+        except SchemaMismatchException as e:
             rebuild_schemas.delay(export_object.index)
             messages.error(
                 request,
@@ -1113,7 +1113,7 @@ def send_test_scheduled_report(request, domain, scheduled_report_id):
 
     try:
         send_delayed_report(notification)
-    except Exception, e:
+    except Exception as e:
         import logging
         logging.exception(e)
         messages.error(request, "An error occured, message unable to send")
