@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import copy
 from datetime import datetime, timedelta
 import json
@@ -27,6 +28,7 @@ from corehq.apps.reports.datatables import DataTablesHeader, DataTablesColumn, D
 from phonelog.reports import BaseDeviceLogReport
 from phonelog.models import DeviceReportEntry
 from corehq.apps.es.domains import DomainES
+import six
 
 INDICATOR_DATA = {
     "active_domain_count": {
@@ -1317,7 +1319,7 @@ class AdminPhoneNumberReport(PhoneNumberReport):
     @memoized
     def phone_number_filter(self):
         value = RequiredPhoneNumberFilter.get_value(self.request, domain=None)
-        if isinstance(value, basestring):
+        if isinstance(value, six.string_types):
             return apply_leniency(value.strip())
 
         return None

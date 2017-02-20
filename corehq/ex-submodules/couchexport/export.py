@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import itertools
 from couchexport.exceptions import SchemaMismatchException,\
     UnsupportedExportFormat
@@ -10,6 +11,7 @@ from couchexport import writers
 from dimagi.utils.decorators.memoized import memoized
 from couchexport.util import get_schema_index_view_keys, default_cleanup
 from datetime import datetime
+import six
 
 
 class ExportConfiguration(object):
@@ -265,7 +267,7 @@ def fit_to_schema(doc, schema):
     if schema == "string":
         if not doc:
             doc = ""
-        if not isinstance(doc, basestring):
+        if not isinstance(doc, six.string_types):
         #log("%s is not a string" % doc)
             doc = unicode(doc)
         return doc
@@ -311,7 +313,7 @@ def _create_intermediate_tables(docs, schema):
         column = []
         id = []
         for k in path:
-            if isinstance(k, basestring):
+            if isinstance(k, six.string_types):
                 if k:
                     column.append(k)
             else:
@@ -372,7 +374,7 @@ class FormattedRow(object):
 
     @property
     def formatted_id(self):
-        if isinstance(self.id, basestring):
+        if isinstance(self.id, six.string_types):
             return self.id
         return self.separator.join(map(unicode, self.id))
 
@@ -381,7 +383,7 @@ class FormattedRow(object):
 
     @property
     def compound_id(self):
-        if isinstance(self.id, basestring):
+        if isinstance(self.id, six.string_types):
             return [self.id]
         return self.id
 
@@ -412,7 +414,7 @@ class FormattedRow(object):
         ret = []
         for name, rows in tables:
             rows = list(rows)
-            if rows and (not hasattr(rows[0], '__iter__') or isinstance(rows[0], basestring)):
+            if rows and (not hasattr(rows[0], '__iter__') or isinstance(rows[0], six.string_types)):
                 # `rows` is actually just a single row, so wrap it
                 rows = [rows]
             ret.append(

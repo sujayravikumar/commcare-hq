@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from corehq.apps.app_manager import id_strings
 from corehq.apps.app_manager.models import ReportModule, ReportGraphConfig, \
     MobileSelectFilter
@@ -8,6 +9,7 @@ from corehq.apps.app_manager.suite_xml.xml_models import Locale, Text, Command, 
 from corehq.apps.reports_core.filters import DynamicChoiceListFilter, ChoiceListFilter
 from corehq.apps.userreports.exceptions import ReportConfigurationNotFoundError
 from corehq.util.quickcache import quickcache
+import six
 
 
 @quickcache(['report_module.unique_id'])
@@ -238,7 +240,7 @@ def _get_data_detail(config, domain):
                 default_val = "column[@id='{column_id}']"
                 xpath_function = default_val
                 for word, translations in transform['translations'].items():
-                    if isinstance(translations, basestring):
+                    if isinstance(translations, six.string_types):
                         # This is a flat mapping, not per-language translations
                         word_eval = "'{}'".format(translations)
                     else:

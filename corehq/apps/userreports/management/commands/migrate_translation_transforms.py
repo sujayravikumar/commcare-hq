@@ -1,9 +1,11 @@
+from __future__ import absolute_import
 from optparse import make_option
 from django.core.management.base import BaseCommand
 from corehq.apps.userreports.models import ReportConfiguration
 from corehq.dbaccessors.couchapps.all_docs import get_doc_ids_by_class
 from corehq.util.couch import iter_update, DocUpdate
 from corehq.util.log import with_progress_bar
+import six
 
 
 def reformat_translations(old_translations):
@@ -11,7 +13,7 @@ def reformat_translations(old_translations):
         return old_translations
     new_translations = {}
     for k, translations in old_translations.items():
-        if isinstance(translations, basestring):
+        if isinstance(translations, six.string_types):
             new_translations[k] = translations
         else:
             new_translations[k] = dict(translations)

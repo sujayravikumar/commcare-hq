@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from django.conf import settings
 from django.contrib.auth.forms import SetPasswordForm
 from crispy_forms.bootstrap import StrictButton
@@ -882,7 +883,7 @@ class CommtrackUserForm(forms.Form):
         from corehq.apps.locations.util import get_locations_from_ids
 
         value = self.cleaned_data.get('assigned_locations')
-        if not isinstance(value, basestring) or value.strip() == '':
+        if not isinstance(value, six.string_types) or value.strip() == '':
             return []
 
         location_ids = [location_id.strip() for location_id in value.split(',')]

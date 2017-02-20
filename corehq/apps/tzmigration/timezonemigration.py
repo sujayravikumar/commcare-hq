@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import collections
 import os
 from copy import deepcopy
@@ -19,6 +20,7 @@ from corehq.util.dates import iso_string_to_datetime
 from couchforms.dbaccessors import get_form_ids_by_type
 from couchforms.models import XFormInstance
 from dimagi.utils.couch.database import iter_docs
+import six
 
 
 def run_timezone_migration_for_domain(domain):
@@ -197,7 +199,7 @@ def prepare_case_json(planning_db):
 
 
 def is_datetime_string(string):
-    if not isinstance(string, basestring):
+    if not isinstance(string, six.string_types):
         return False
     try:
         iso_string_to_datetime(string, strict=True)

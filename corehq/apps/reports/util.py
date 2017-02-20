@@ -1,4 +1,5 @@
 # coding: utf-8
+from __future__ import absolute_import
 from collections import namedtuple
 from datetime import datetime, timedelta
 from importlib import import_module
@@ -32,6 +33,7 @@ from .analytics.esaccessors import (
     get_all_user_ids_submitted,
     get_username_in_last_form_user_id_submitted,
 )
+import six
 
 DEFAULT_CSS_LABEL_CLASS_REPORT_FILTER = 'col-xs-4 col-md-3 col-lg-2 control-label'
 DEFAULT_CSS_FIELD_CLASS_REPORT_FILTER = 'col-xs-8 col-md-8 col-lg-9'
@@ -162,7 +164,7 @@ def namedtupledict(name, fields):
     cls = namedtuple(name, fields)
 
     def __getitem__(self, item):
-        if isinstance(item, basestring):
+        if isinstance(item, six.string_types):
             warnings.warn(
                 "namedtuple fields should be accessed as attributes",
                 DeprecationWarning,

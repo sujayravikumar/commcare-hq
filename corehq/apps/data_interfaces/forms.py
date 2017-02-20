@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import json
 from corehq.apps.data_interfaces.models import AutomaticUpdateRuleCriteria, AutomaticUpdateAction
 from corehq.apps.style import crispy as hqcrispy
@@ -14,6 +15,7 @@ from django.utils.safestring import mark_safe
 from django.utils.translation import ugettext as _, ugettext_noop, ugettext_lazy
 from corehq.apps.casegroups.models import CommCareCaseGroup
 from dimagi.utils.django.fields import TrimmedCharField
+import six
 
 
 class AddCaseGroupForm(forms.Form):
@@ -153,7 +155,7 @@ class AddAutomaticCaseUpdateRuleForm(forms.Form):
     )
 
     def remove_quotes(self, value):
-        if isinstance(value, basestring) and len(value) >= 2:
+        if isinstance(value, six.string_types) and len(value) >= 2:
             for q in ("'", '"'):
                 if value.startswith(q) and value.endswith(q):
                     return value[1:-1]
@@ -335,7 +337,7 @@ class AddAutomaticCaseUpdateRuleForm(forms.Form):
 
         for obj in value:
             property_name = obj.get('property_name')
-            if not isinstance(property_name, basestring):
+            if not isinstance(property_name, six.string_types):
                 raise ValidationError(_("Please specify a property name."))
 
             property_name = property_name.strip()
@@ -349,7 +351,7 @@ class AddAutomaticCaseUpdateRuleForm(forms.Form):
             property_value = None
             if property_match_type != AutomaticUpdateRuleCriteria.MATCH_HAS_VALUE:
                 property_value = obj.get('property_value')
-                if not isinstance(property_value, basestring):
+                if not isinstance(property_value, six.string_types):
                     raise ValidationError(_("Please specify a property value."))
 
                 property_value = property_value.strip()

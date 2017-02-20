@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import json
 import logging
 
@@ -55,6 +56,7 @@ from .models import LocationType, SQLLocation, filter_for_archived
 from .forms import LocationForm, UsersAtLocationForm
 from .tree_utils import assert_no_cycles
 from .util import load_locs_json, location_hierarchy_config, dump_locations
+import six
 
 
 logger = logging.getLogger(__name__)
@@ -277,7 +279,7 @@ class LocationTypesView(BaseLocationView):
         sql_loc_types = {}
 
         def _is_fake_pk(pk):
-            return isinstance(pk, basestring) and pk.startswith("fake-pk-")
+            return isinstance(pk, six.string_types) and pk.startswith("fake-pk-")
 
         def mk_loctype(name, parent_type, administrative,
                        shares_cases, view_descendants, pk, code, **kwargs):

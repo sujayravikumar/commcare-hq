@@ -1,6 +1,8 @@
+from __future__ import absolute_import
 from corehq.apps.app_manager.management.commands.helpers import AppMigrationCommandBase
 from corehq.apps.app_manager.models import Application
 from optparse import make_option
+import six
 
 
 class Command(AppMigrationCommandBase):
@@ -62,7 +64,7 @@ class Command(AppMigrationCommandBase):
         should_save = False
         for media_attr in ('media_image', 'media_audio'):
             old_media = doc.get(media_attr, None)
-            if old_media and isinstance(old_media, basestring):
+            if old_media and isinstance(old_media, six.string_types):
                 doc[media_attr] = {'default': old_media}
                 should_save = True
 

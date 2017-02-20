@@ -1,8 +1,10 @@
+from __future__ import absolute_import
 from celery.task import task
 from celery.utils.log import get_task_logger
 from django.conf import settings
 from django.core.mail import send_mail, mail_admins
 from dimagi.utils.django.email import send_HTML_email
+import six
 
 logger = get_task_logger(__name__)
 
@@ -49,7 +51,7 @@ def send_html_email_async(self, subject, recipient, html_content,
                         file_attachments=file_attachments, bcc=bcc, ga_track=ga_track,
                         ga_tracking_info=ga_tracking_info)
     except Exception as e:
-        recipient = list(recipient) if not isinstance(recipient, basestring) else [recipient]
+        recipient = list(recipient) if not isinstance(recipient, six.string_types) else [recipient]
         logger.error(
             "Encountered error while sending email titled %(subject)s"
             "to %(recipients)s: %(error)s" % {

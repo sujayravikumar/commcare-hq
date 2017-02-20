@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from collections import namedtuple
 import cgi
 from django.db.models import Q, Count
@@ -48,6 +49,7 @@ from corehq.apps.sms.models import (
 from corehq.apps.sms.util import get_backend_name
 from corehq.apps.smsforms.models import SQLXFormsSession
 from corehq.apps.reminders.models import CaseReminderHandler
+import six
 
 
 class MessagesReport(ProjectReport, ProjectReportParametersMixin, GenericTabularReport, DatespanMixin):
@@ -659,7 +661,7 @@ class MessagingEventsReport(BaseMessagingEventReport):
     @memoized
     def phone_number_filter(self):
         value = PhoneNumberFilter.get_value(self.request, self.domain)
-        if isinstance(value, basestring):
+        if isinstance(value, six.string_types):
             return value.strip()
 
         return None
@@ -1121,7 +1123,7 @@ class PhoneNumberReport(BaseCommConnectLogReport):
     @memoized
     def phone_number_filter(self):
         value = self._filter['phone_number_filter']
-        if isinstance(value, basestring):
+        if isinstance(value, six.string_types):
             return apply_leniency(value.strip())
 
         return None

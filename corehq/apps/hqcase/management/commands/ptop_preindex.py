@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from optparse import make_option
 from gevent import monkey; monkey.patch_all()
 from corehq.pillows.utils import get_all_expected_es_indices
@@ -14,6 +15,7 @@ import gevent
 from django.core.management.base import BaseCommand
 from django.core.management import call_command
 from django.conf import settings
+import six
 
 
 def get_reindex_commands(alias_name):
@@ -56,7 +58,7 @@ def do_reindex(alias_name, reset):
     print "Starting pillow preindex %s" % alias_name
     reindex_commands = get_reindex_commands(alias_name)
     for reindex_command in reindex_commands:
-        if isinstance(reindex_command, basestring):
+        if isinstance(reindex_command, six.string_types):
             call_command(reindex_command, **{'noinput': True, 'bulk': True})
         elif isinstance(reindex_command, (tuple, list)):
             kwargs = {"reset": True} if reset else {}

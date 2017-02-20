@@ -1,4 +1,5 @@
 # coding=utf-8
+from __future__ import absolute_import
 from collections import defaultdict, OrderedDict
 from django.utils.encoding import force_text
 from django.utils.safestring import mark_safe
@@ -19,6 +20,7 @@ from corehq.util.workbook_json.excel import HeaderValueError, WorkbookJSONReader
 
 from django.contrib import messages
 from django.utils.translation import ugettext as _
+import six
 
 
 def get_unicode_dicts(iterable):
@@ -194,7 +196,7 @@ def make_modules_and_forms_row(row_type, sheet_name, languages, case_labels,
     assert isinstance(case_labels, list)
     assert isinstance(media_image, list)
     assert isinstance(media_audio, list)
-    assert isinstance(unique_id, basestring)
+    assert isinstance(unique_id, six.string_types)
 
     return [item if item is not None else ""
             for item in ([row_type, sheet_name] + languages + case_labels

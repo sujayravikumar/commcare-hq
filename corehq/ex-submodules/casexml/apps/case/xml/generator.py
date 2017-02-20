@@ -1,12 +1,14 @@
+from __future__ import absolute_import
 from casexml.apps.case.xml import V1, V2, V3, check_version, V2_NAMESPACE
 from xml.etree import ElementTree
 import logging
 from dimagi.utils.parsing import json_format_datetime, json_format_date
 from dateutil.parser import parse as parse_datetime
+import six
 
 
 def datetime_to_xml_string(datetime_string):
-    if isinstance(datetime_string, basestring):
+    if isinstance(datetime_string, six.string_types):
         return datetime_string
 
     return json_format_datetime(datetime_string)
@@ -27,7 +29,7 @@ def date_to_xml_string(date):
     if not date:
         return ''
 
-    if isinstance(date, basestring):
+    if isinstance(date, six.string_types):
         date = parse_datetime(date)
 
     return json_format_date(date)

@@ -8,6 +8,7 @@ from inspect import isfunction
 import logging
 from django.core.cache import caches as django_caches
 from corehq.util.soft_assert.api import soft_assert
+import six
 
 logger = logging.getLogger('quickcache')
 
@@ -111,7 +112,7 @@ class QuickCache(object):
         return hashlib.md5(value).hexdigest()[-length:]
 
     def _serialize_for_key(self, value):
-        if isinstance(value, basestring):
+        if isinstance(value, six.string_types):
             # Unicode and string values should generate the same key since users generally
             # intend them to mean the same thing. If a use case for differentiating
             # them presents itself add a 'lenient_strings=False' option to allow

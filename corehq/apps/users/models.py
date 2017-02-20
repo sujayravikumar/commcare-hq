@@ -52,6 +52,7 @@ from dimagi.utils.dates import force_to_datetime
 from xml.etree import ElementTree
 
 from couchdbkit.exceptions import ResourceConflict, NoResultFound, BadValueError
+import six
 
 COUCH_USER_AUTOCREATED_STATUS = 'autocreated'
 
@@ -953,7 +954,7 @@ class CouchUser(Document, DjangoUserMixin, IsMemberOfMixin, UnicodeMixIn, EulaMi
 
     def add_phone_number(self, phone_number, default=False, **kwargs):
         """ Don't add phone numbers if they already exist """
-        if not isinstance(phone_number, basestring):
+        if not isinstance(phone_number, six.string_types):
             phone_number = str(phone_number)
         self.phone_numbers = _add_to_list(self.phone_numbers, phone_number, default)
 
@@ -2077,7 +2078,7 @@ class WebUser(CouchUser, MultiMembershipMixin, CommCareMobileContactMixin):
 
     def set_location(self, domain, location_object_or_id):
         # set the primary location for user's domain_membership
-        if isinstance(location_object_or_id, basestring):
+        if isinstance(location_object_or_id, six.string_types):
             location_id = location_object_or_id
         else:
             location_id = location_object_or_id.location_id

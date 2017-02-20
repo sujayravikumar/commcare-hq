@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from collections import OrderedDict
 from datetime import datetime, timedelta
 import hashlib
@@ -25,6 +26,7 @@ from corehq.util.soft_assert import soft_assert
 from dimagi.utils.web import json_handler
 from corehq.apps.hqwebapp.models import MaintenanceAlert
 from corehq.apps.hqwebapp.exceptions import AlreadyRenderedException
+import six
 
 
 register = template.Library()
@@ -207,7 +209,7 @@ def pretty_doc_info(doc_info):
 
 
 def _toggle_enabled(module, request, toggle_or_toggle_name):
-    if isinstance(toggle_or_toggle_name, basestring):
+    if isinstance(toggle_or_toggle_name, six.string_types):
         toggle = getattr(module, toggle_or_toggle_name)
     else:
         toggle = toggle_or_toggle_name
@@ -616,7 +618,7 @@ def initial_page_data(parser, token):
 
         def render(self, context):
             resolved = value.resolve(context)
-            if isinstance(resolved, basestring):
+            if isinstance(resolved, six.string_types):
                 resolved = json.dumps(resolved)[1:-1]
             else:
                 resolved = JSON(resolved)

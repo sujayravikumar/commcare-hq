@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from corehq.form_processor.interfaces.dbaccessors import CaseAccessors
 from corehq.apps.app_manager.suite_xml.sections.entries import EntriesHelper
 from touchforms.formplayer.api import post_data
@@ -7,6 +8,7 @@ from django.core.urlresolvers import reverse
 from corehq.apps.users.models import CouchUser
 from corehq import toggles
 from django.conf import settings
+import six
 
 DELEGATION_STUB_CASE_TYPE = "cc_delegation_stub"
 
@@ -79,7 +81,7 @@ class CaseSessionDataHelper(BaseSessionDataHelper):
         super(CaseSessionDataHelper, self).__init__(domain, couch_user)
         self.form = form
         self.app = app
-        if case_id_or_case is None or isinstance(case_id_or_case, basestring):
+        if case_id_or_case is None or isinstance(case_id_or_case, six.string_types):
             self.case_id = case_id_or_case
             self._case = None
         else:

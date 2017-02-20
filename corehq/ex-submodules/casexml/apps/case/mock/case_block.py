@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import copy
 from datetime import datetime, date
 import numbers
@@ -6,6 +7,7 @@ from casexml.apps.case.xml import V2_NAMESPACE
 from dimagi.utils.parsing import json_format_datetime
 from collections import namedtuple
 from functools import partial
+import six
 
 # relationship = "child" for index to a parent case (default)
 # relationship = "extension" for index to a host case
@@ -159,7 +161,7 @@ class _DictToXML(object):
             return ''
         if isinstance(value, datetime):
             return unicode(json_format_datetime(value))
-        elif isinstance(value, (basestring, numbers.Number, date)):
+        elif isinstance(value, (six.string_types, numbers.Number, date)):
             return unicode(value)
         else:
             raise CaseBlockError("Can't transform to XML: {}; unexpected type {}.".format(value, type(value)))

@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from datetime import datetime
 import json
 import logging
@@ -15,10 +16,11 @@ from soil.exceptions import TaskFailedError
 from soil.heartbeat import get_file_heartbeat, get_cache_heartbeat, last_heartbeat
 from soil.tasks import demo_sleep
 from soil.util import get_download_context
+import six
 
 
 def _parse_date(string):
-    if isinstance(string, basestring):
+    if isinstance(string, six.string_types):
         return datetime.strptime(string, "%Y-%m-%d").date()
     else:
         return string

@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from collections import defaultdict, OrderedDict
 from functools import wraps
 import logging
@@ -23,6 +24,7 @@ from .xpath import CaseIDXPath, session_var, CaseTypeXpath, QualifiedScheduleFor
 from .exceptions import XFormException, CaseError, XFormValidationError, BindNotFound, XFormValidationFailed
 import collections
 import re
+import six
 
 
 VALID_VALUE_FORMS = ('image', 'audio', 'video', 'video-inline', 'markdown')
@@ -150,7 +152,7 @@ class WrappedAttribs(object):
 class WrappedNode(object):
 
     def __init__(self, xml, namespaces=namespaces):
-        if isinstance(xml, basestring):
+        if isinstance(xml, six.string_types):
             self.xml = parse_xml(xml) if xml else None
         else:
             self.xml = xml

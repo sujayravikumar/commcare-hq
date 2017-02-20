@@ -5,6 +5,7 @@ from corehq.apps.hqwebapp.tasks import send_mail_async, mail_admins_async
 from corehq.util.log import get_sanitized_request_repr
 from corehq.util.global_request import get_request
 from corehq.util.soft_assert.core import SoftAssert
+import six
 
 
 def _send_message(info, backend):
@@ -59,7 +60,7 @@ def soft_assert(to=None, notify_admins=False,
 
     """
 
-    if isinstance(to, basestring):
+    if isinstance(to, six.string_types):
         to = [to]
 
     if to is None:

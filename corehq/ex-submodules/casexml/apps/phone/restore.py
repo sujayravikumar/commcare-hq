@@ -56,6 +56,7 @@ from casexml.apps.phone.xml import get_sync_element, get_progress_element
 
 from wsgiref.util import FileWrapper
 from xml.etree import ElementTree
+import six
 
 
 logger = logging.getLogger(__name__)
@@ -136,7 +137,7 @@ class RestoreResponse(object):
 
     def append(self, xml_element):
         self.num_items += 1
-        if isinstance(xml_element, basestring):
+        if isinstance(xml_element, six.string_types):
             self.response_body.write(xml_element)
         else:
             self.response_body.write(xml_util.tostring(xml_element))

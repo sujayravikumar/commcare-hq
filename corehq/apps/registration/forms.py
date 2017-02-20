@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from captcha.fields import CaptchaField
 from django import forms
 from django.conf import settings
@@ -201,7 +202,7 @@ class RegisterWebUserForm(forms.Form):
 
     def clean(self):
         for field in self.cleaned_data:
-            if isinstance(self.cleaned_data[field], basestring):
+            if isinstance(self.cleaned_data[field], six.string_types):
                 self.cleaned_data[field] = self.cleaned_data[field].strip()
         return self.cleaned_data
 
@@ -237,7 +238,7 @@ class DomainRegistrationForm(forms.Form):
 
     def clean(self):
         for field in self.cleaned_data:
-            if isinstance(self.cleaned_data[field], basestring):
+            if isinstance(self.cleaned_data[field], six.string_types):
                 self.cleaned_data[field] = self.cleaned_data[field].strip()
         return self.cleaned_data
 
@@ -309,7 +310,7 @@ class WebUserInvitationForm(NoAutocompleteMixin, DomainRegistrationForm):
 
     def clean(self):
         for field in self.cleaned_data:
-            if isinstance(self.cleaned_data[field], basestring):
+            if isinstance(self.cleaned_data[field], six.string_types):
                 self.cleaned_data[field] = self.cleaned_data[field].strip()
         return self.cleaned_data
 
@@ -329,7 +330,7 @@ class _BaseForm(object):
 
     def clean(self):
         for field in self.cleaned_data:
-            if isinstance(self.cleaned_data[field], basestring):
+            if isinstance(self.cleaned_data[field], six.string_types):
                 self.cleaned_data[field] = self.cleaned_data[field].strip()
         return self.cleaned_data
 

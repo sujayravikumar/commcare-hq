@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import absolute_import
 from StringIO import StringIO
 import base64
 from datetime import datetime, timedelta, time
@@ -93,6 +94,7 @@ from couchdbkit.resource import ResourceNotFound
 from couchexport.models import Format
 from couchexport.export import export_raw
 from couchexport.shortcuts import export_response
+import six
 
 
 # Tuple of (description, days in the past)
@@ -1768,7 +1770,7 @@ def upload_sms_translations(request, domain):
                         msg_id = row["property"]
                         if msg_id in msg_ids:
                             val = row[lang]
-                            if not isinstance(val, basestring):
+                            if not isinstance(val, six.string_types):
                                 val = str(val)
                             val = val.strip()
                             result[lang][msg_id] = val

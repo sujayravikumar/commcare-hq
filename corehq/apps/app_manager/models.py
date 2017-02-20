@@ -22,6 +22,7 @@ When a build is starred, this is called "releasing" the build.  The parameter
 You might also run in to remote applications and applications copied to be
 published on the exchange, but those are quite infrequent.
 """
+from __future__ import absolute_import
 import calendar
 from distutils.version import LooseVersion
 from itertools import chain
@@ -143,6 +144,7 @@ from .exceptions import (
     XFormValidationFailed)
 from corehq.apps.reports.daterange import get_daterange_start_end_dates, get_simple_dateranges
 from jsonpath_rw import jsonpath, parse
+import six
 
 WORKFLOW_DEFAULT = 'default'  # go to the app main screen
 WORKFLOW_ROOT = 'root'  # go to the module select screen
@@ -1350,7 +1352,7 @@ class NavMenuItemMediaMixin(DocumentSchema):
         # ToDo - Remove after migration
         for media_attr in ('media_image', 'media_audio'):
             old_media = data.get(media_attr, None)
-            if old_media and isinstance(old_media, basestring):
+            if old_media and isinstance(old_media, six.string_types):
                 new_media = {'default': old_media}
                 data[media_attr] = new_media
 
@@ -4012,7 +4014,7 @@ class ReportAppConfig(DocumentSchema):
         # for backwards compatibility with apps that have localized or xpath descriptions
         old_description = doc.get('description')
         if old_description:
-            if isinstance(old_description, basestring) and not doc.get('xpath_description'):
+            if isinstance(old_description, six.string_types) and not doc.get('xpath_description'):
                 doc['xpath_description'] = old_description
             elif isinstance(old_description, dict) and not doc.get('localized_description'):
                 doc['localized_description'] = old_description
@@ -4272,7 +4274,7 @@ class LazyBlobDoc(BlobMixin):
         self = super(LazyBlobDoc, cls).wrap(data)
         if attachments:
             for name, attachment in attachments.items():
-                if isinstance(attachment, basestring):
+                if isinstance(attachment, six.string_types):
                     info = {"content": attachment}
                 else:
                     raise ValueError("Unknown attachment format: {!r}"
@@ -4642,7 +4644,7 @@ class ApplicationBase(VersionedDoc, SnapshotMixin,
             version, build_number = current_builds.TAG_MAP[data['commcare_tag']]
             data['build_spec'] = BuildSpec.from_string("%s/latest" % version).to_json()
             del data['commcare_tag']
-        if data.has_key("built_with") and isinstance(data['built_with'], basestring):
+        if data.has_key("built_with") and isinstance(data['built_with'], six.string_types):
             data['built_with'] = BuildSpec.from_string(data['built_with']).to_json()
 
         if 'native_input' in data:
@@ -6110,7 +6112,7 @@ class LinkedApplication(Application):
 
 
 def import_app(app_id_or_source, domain, source_properties=None, validate_source_domain=None):
-    if isinstance(app_id_or_source, basestring):
+    if isinstance(app_id_or_source, six.string_types):
         app_id = app_id_or_source
         source = get_app(None, app_id)
         src_dom = source['domain']
