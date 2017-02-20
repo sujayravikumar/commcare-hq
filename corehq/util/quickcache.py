@@ -109,7 +109,7 @@ class QuickCache(object):
 
     @staticmethod
     def _hash(value, length=32):
-        return hashlib.md5(value).hexdigest()[-length:]
+        return hashlib.md5(value.encode('utf-8')).hexdigest()[-length:]
 
     def _serialize_for_key(self, value):
         if isinstance(value, six.string_types):
