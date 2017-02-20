@@ -11,7 +11,7 @@ from collections import (
 )
 from datetime import datetime
 
-from StringIO import StringIO
+from six.moves import StringIO
 from django.conf import settings
 from django.db import models
 from jsonfield.fields import JSONField
