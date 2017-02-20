@@ -298,7 +298,7 @@ class IndicatorDocument(schema.Document):
         if not left and not right:
             return None
         elif not left or not right:
-            return left.keys() if left else right.keys()
+            return list(left.keys()) if left else list(right.keys())
 
         left_set, right_set = set(left.keys()), set(right.keys())
         intersect = right_set.intersection(left_set)
@@ -322,7 +322,7 @@ class IndicatorDocument(schema.Document):
 
         flat_keys = None
         try:
-            flat_keys = self._flat_fields.keys()
+            flat_keys = list(self._flat_fields.keys())
         except AttributeError:
             pass
 
@@ -354,7 +354,7 @@ class IndicatorDocument(schema.Document):
                 for name, value in key_columns.items():
                     if value is None:
                         key_columns[name] = default_null_value_placeholder(types[name])
-                all_columns = dict(key_columns.items() + columns.items())
+                all_columns = dict(list(key_columns.items()) + list(columns.items()))
 
                 try:
                     insert = self._table.insert().values(**all_columns)

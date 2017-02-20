@@ -135,7 +135,7 @@ class QuickCache(object):
                 ','.join(map(self._serialize_for_key, value)))
         elif isinstance(value, dict):
             return 'D' + self._hash(
-                ','.join(sorted(map(self._serialize_for_key, value.items())))
+                ','.join(sorted(map(self._serialize_for_key, list(value.items()))))
             )
         elif isinstance(value, set):
             return 'S' + self._hash(

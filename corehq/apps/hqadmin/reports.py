@@ -1040,7 +1040,7 @@ class AdminAppReport(AdminFacetedReport):
 
     @property
     def properties(self):
-        return filter(lambda p: p and p not in self.excluded_properties, Application.properties().keys())
+        return filter(lambda p: p and p not in self.excluded_properties, list(Application.properties().keys()))
 
     @property
     def es_facet_list(self):
@@ -1286,13 +1286,13 @@ class CommCareVersionReport(AdminFacetedReport):
             domain_name = domain['fields']['name']
             rows.update({domain_name: [domain_name] + [0] * len(versions)})
 
-        for data in get_data(rows.keys()):
+        for data in get_data(list(rows.keys())):
             row = rows.get(data.domain, None)
             if row and data.commcare_version in versions:
                 version_index = versions.index(data.commcare_version)
                 row[version_index + 1] = data.doc_count
 
-        return rows.values()
+        return list(rows.values())
 
 
 class AdminPhoneNumberReport(PhoneNumberReport):

@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from collections import defaultdict, namedtuple
 from datetime import datetime
 
@@ -22,6 +23,7 @@ from corehq.apps.es.cases import (
 from corehq.apps.hqcase.utils import SYSTEM_FORM_XMLNS
 from corehq.util.quickcache import quickcache
 from dimagi.utils.parsing import string_to_datetime
+import six
 
 PagedResult = namedtuple('PagedResult', 'total hits')
 
@@ -52,7 +54,7 @@ def get_last_submission_time_for_users(domain, user_ids, datespan):
 
     buckets_dict = aggregations.user_id.buckets_dict
     result = {}
-    for user_id, bucket in buckets_dict.iteritems():
+    for user_id, bucket in six.iteritems(buckets_dict):
         result[user_id] = convert_to_date(bucket.top_hits_last_form_submissions.hits[0]['form']['meta']['timeEnd'])
 
     return result
@@ -206,7 +208,7 @@ def get_last_form_submissions_by_user(domain, user_ids, app_id=None, xmlns=None)
         result[MISSING_KEY] = aggregations.missing_user_id.bucket.top_hits_last_form_submissions.hits
 
     buckets_dict = aggregations.user_id.buckets_dict
-    for user_id, bucket in buckets_dict.iteritems():
+    for user_id, bucket in six.iteritems(buckets_dict):
         result[user_id] = bucket.top_hits_last_form_submissions.hits
 
     return result
@@ -422,7 +424,7 @@ def get_form_duration_stats_by_user(
         result[MISSING_KEY] = aggregations.missing_user_id.bucket.duration_stats.result
 
     buckets_dict = aggregations.user_id.buckets_dict
-    for user_id, bucket in buckets_dict.iteritems():
+    for user_id, bucket in six.iteritems(buckets_dict):
         result[user_id] = bucket.duration_stats.result
     return result
 
@@ -507,7 +509,7 @@ def get_all_user_ids_submitted(domain, app_ids=None):
     if app_ids:
         query = query.app(app_ids)
 
-    return query.run().aggregations.user_id.buckets_dict.keys()
+    return list(query.run().aggregations.user_id.buckets_dict.keys())
 
 
 def get_username_in_last_form_user_id_submitted(domain, user_id):
@@ -587,5 +589,5 @@ def scroll_case_names(domain, case_ids):
 
 def _get_attachment_dicts_from_form(form):
     if 'external_blobs' in form:
-        return form['external_blobs'].values()
+        return list(form['external_blobs'].values())
     return []

@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from couchdbkit.exceptions import ResourceNotFound
 from datetime import datetime
 
@@ -35,6 +36,7 @@ from couchforms.dbaccessors import (
 from couchforms.models import XFormInstance, doc_types
 from dimagi.utils.couch.database import iter_docs
 from dimagi.utils.parsing import json_format_datetime
+import six
 
 
 class FormAccessorCouch(AbstractFormAccessor):
@@ -72,7 +74,7 @@ class FormAccessorCouch(AbstractFormAccessor):
         doc = XFormInstance.get_db().get(form_id, attachments=True)
         doc = doc_types()[doc['doc_type']].wrap(doc)
         if doc.external_blobs:
-            for name, meta in doc.external_blobs.iteritems():
+            for name, meta in six.iteritems(doc.external_blobs):
                 with doc.fetch_attachment(name, stream=True) as content:
                     doc.deferred_put_attachment(
                         content,

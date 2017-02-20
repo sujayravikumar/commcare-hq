@@ -39,7 +39,7 @@ class Command(BaseCommand):
         pillow = options.get('pillow', 'MISSING')
         if pillow not in REINDEX_FNS:
             raise CommandError('--pillow must be specified and must be one of:\n{}'
-                               .format(', '.join(REINDEX_FNS.keys())))
+                               .format(', '.join(list(REINDEX_FNS.keys()))))
         reindexer = REINDEX_FNS[pillow]()
         if not isinstance(reindexer.doc_provider, CouchDocumentProvider):
             raise CommandError("This command only works with couch pillows,"

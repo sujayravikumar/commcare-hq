@@ -111,7 +111,7 @@ def _create_new_xform(domain, instance_xml, attachments=None):
     # Maps all attachments to uniform format and adds form.xml to list before storing
     attachments = map(
         lambda a: Attachment(name=a[0], raw_content=a[1], content_type=a[1].content_type),
-        attachments.items()
+        list(attachments.items())
     )
     attachments.append(Attachment(name='form.xml', raw_content=instance_xml, content_type='text/xml'))
     interface.store_attachments(xform, attachments)

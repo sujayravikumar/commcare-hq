@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from lxml import etree
 from lxml.builder import E
 
@@ -92,6 +93,7 @@ from .reporting.reports import get_project_spaces, get_stats_data
 from .utils import get_celery_stats
 from corehq.apps.es.domains import DomainES
 from corehq.apps.es import filters
+import six
 
 @require_superuser
 def default(request):
@@ -230,7 +232,7 @@ class RecentCouchChangesView(BaseAdminSectionView):
 
         def _to_chart_data(data_dict):
             return [
-                {'label': l, 'value': v} for l, v in sorted(data_dict.items(), key=lambda tup: tup[1], reverse=True)
+                {'label': l, 'value': v} for l, v in sorted(list(data_dict.items()), key=lambda tup: tup[1], reverse=True)
             ][:20]
 
         return {
@@ -665,8 +667,8 @@ def _lookup_id_in_database(doc_id, db_name=None):
         dbs = [_get_db_from_db_name(db_name)]
         response['selected_db'] = db_name
     else:
-        couch_dbs = couch_config.all_dbs_by_slug.values()
-        sql_dbs = _SQL_DBS.values()
+        couch_dbs = list(couch_config.all_dbs_by_slug.values())
+        sql_dbs = list(_SQL_DBS.values())
         dbs = couch_dbs + sql_dbs
 
     db_results = []
@@ -737,7 +739,7 @@ def doc_in_es(request):
 
 @require_superuser
 def raw_couch(request):
-    get_params = dict(request.GET.iteritems())
+    get_params = dict(six.iteritems(request.GET))
     return HttpResponseRedirect(reverse("raw_doc", params=get_params))
 
 
@@ -756,8 +758,8 @@ def raw_doc(request):
             return HttpResponse(json.dumps({"status": "missing"}),
                                 content_type="application/json", status=404)
 
-    other_couch_dbs = sorted(filter(None, couch_config.all_dbs_by_slug.keys()))
-    context['all_databases'] = ['commcarehq'] + other_couch_dbs + _SQL_DBS.keys()
+    other_couch_dbs = sorted(filter(None, list(couch_config.all_dbs_by_slug.keys())))
+    context['all_databases'] = ['commcarehq'] + other_couch_dbs + list(_SQL_DBS.keys())
     context['use_code_mirror'] = request.GET.get('code_mirror', 'true').lower() == 'true'
     return render(request, "hqadmin/raw_couch.html", context)
 
@@ -997,7 +999,7 @@ class CallcenterUCRCheck(BaseAdminSectionView):
         domain_stats = get_call_center_data_source_stats(domains)
 
         context = {
-            'data': sorted(domain_stats.values(), key=lambda s: s.name),
+            'data': sorted(list(domain_stats.values()), key=lambda s: s.name),
             'domain': domain
         }
 

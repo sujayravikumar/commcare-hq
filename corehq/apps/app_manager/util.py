@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from collections import defaultdict, namedtuple, OrderedDict
 from copy import deepcopy
 import functools
@@ -37,6 +38,7 @@ from dimagi.utils.decorators.memoized import memoized
 from django.core.cache import cache
 import logging
 from dimagi.utils.make_uuid import random_hex
+import six
 
 logger = logging.getLogger(__name__)
 
@@ -604,14 +606,14 @@ def all_case_properties_by_domain(domain, include_parent_properties=True):
         property_map = get_case_properties(app, app.get_case_types(),
             defaults=('name',), include_parent_properties=include_parent_properties)
 
-        for case_type, properties in property_map.iteritems():
+        for case_type, properties in six.iteritems(property_map):
             if case_type in result:
                 result[case_type].extend(properties)
             else:
                 result[case_type] = properties
 
     cleaned_result = {}
-    for case_type, properties in result.iteritems():
+    for case_type, properties in six.iteritems(result):
         properties = list(set(properties))
         properties.sort()
         cleaned_result[case_type] = properties

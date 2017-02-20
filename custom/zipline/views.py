@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import json
 import re
 from corehq.apps.api.decorators import api_user_basic_auth
@@ -13,6 +14,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import View
 from django.utils.decorators import method_decorator
+import six
 
 
 ZIPLINE_PERMISSION = 'ZIPLINE'
@@ -245,7 +247,7 @@ class BaseZiplineStatusUpdateView(View, DomainViewMixin):
                 'package_id': dispatched_status.package_id,
                 'vehicle_id': dispatched_status.vehicle_id,
                 'products': [ProductQuantity(code, data.get('quantity'))
-                             for code, data in dispatched_status.products.iteritems()],
+                             for code, data in six.iteritems(dispatched_status.products)],
             }
         else:
             return {}

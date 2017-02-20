@@ -244,7 +244,7 @@ class RunWithMultipleConfigs(object):
 
 
 def call_with_settings(fn, settings_dict, args, kwargs):
-    keys = settings_dict.keys()
+    keys = list(settings_dict.keys())
     original_settings = {key: getattr(settings, key, None) for key in keys}
     try:
         # set settings to new values

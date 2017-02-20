@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import logging
 from lxml import etree as ET
 
@@ -9,6 +10,7 @@ from corehq.apps.app_manager.models import Application, PreloadAction, CaseRefer
 from corehq.apps.app_manager.util import save_xform
 from corehq.apps.app_manager.xform import XForm, SESSION_USERCASE_ID
 from corehq.toggles import NAMESPACE_DOMAIN, USER_PROPERTY_EASY_REFS
+import six
 
 
 logger = logging.getLogger('app_migration')
@@ -104,7 +106,7 @@ def migrate_preloads(app, form, preloads):
         hashtag = kwargs.pop("hashtag")
         xform.add_case_preloads(**kwargs)
         refs = {path: [hashtag + case_property]
-                for path, case_property in kwargs["preloads"].iteritems()}
+                for path, case_property in six.iteritems(kwargs["preloads"])}
         if form.case_references:
             form.case_references.load.update(refs)
         else:

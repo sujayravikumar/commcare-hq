@@ -45,7 +45,7 @@ class PerformanceMessageEditForm(forms.Form):
         self.fields.update(data_source_fields)
 
         self.helper = _get_default_form_helper()
-        form_layout = self.fields.keys()
+        form_layout = list(self.fields.keys())
         form_layout.append(
             hqcrispy.FormActions(
                 StrictButton(
@@ -126,7 +126,7 @@ class AdvancedPerformanceMessageEditForm(forms.Form):
         self.fields['recipient_id'] = GroupField(domain=domain, label=_('Recipient Group'))
 
         self.helper = _get_default_form_helper()
-        form_layout = self.fields.keys()
+        form_layout = list(self.fields.keys())
         form_layout.append(
             hqcrispy.FormActions(
                 StrictButton(

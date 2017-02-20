@@ -1,7 +1,9 @@
+from __future__ import absolute_import
 import re
 from collections import OrderedDict
 
 from corehq.apps.commtrack.sms import SMSError
+import six
 
 
 class EWSFormatter(object):
@@ -99,7 +101,7 @@ class EWSFormatter(object):
             return string
 
         result = ""
-        for product, soh_receipt_dict in product_quantity.iteritems():
+        for product, soh_receipt_dict in six.iteritems(product_quantity):
             soh = soh_receipt_dict.get('soh')
             if not soh:
                 continue

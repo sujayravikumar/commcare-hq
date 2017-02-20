@@ -1439,7 +1439,7 @@ class BaseScheduleCaseReminderForm(forms.Form):
     @classmethod
     def compute_initial(cls, reminder_handler, available_languages):
         initial = {}
-        fields = cls.__dict__['base_fields'].keys()
+        fields = list(cls.__dict__['base_fields'].keys())
         for field in fields:
             try:
                 current_val = getattr(reminder_handler, field, Ellipsis)
@@ -1846,7 +1846,7 @@ class RecordListWidget(Widget):
         data_dict = DotExpandedDict(raw)
         data_list = []
         if len(data_dict) > 0:
-            for key in sorted(data_dict[input_name].iterkeys()):
+            for key in sorted(six.iterkeys(data_dict[input_name])):
                 data_list.append(data_dict[input_name][key])
         
         return data_list

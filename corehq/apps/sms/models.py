@@ -2091,7 +2091,7 @@ class SQLMobileBackend(UUIDGeneratorMixin, models.Model):
         the rest untouched.
         """
         result = self.get_extra_fields()
-        for k, v in kwargs.iteritems():
+        for k, v in six.iteritems(kwargs):
             if k not in self.get_available_extra_fields():
                 raise Exception("Field %s is not an available extra field for %s"
                     % (k, self.__class__.__name__))
@@ -2236,7 +2236,7 @@ class BackendMap(object):
         """
         self.catchall_backend_id = catchall_backend_id
         self.backend_map_dict = backend_map
-        self.backend_map_tuples = backend_map.items()
+        self.backend_map_tuples = list(backend_map.items())
         # Sort by length of prefix descending
         self.backend_map_tuples.sort(key=lambda x: len(x[0]), reverse=True)
 

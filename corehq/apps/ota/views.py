@@ -109,7 +109,7 @@ def search(request, domain):
     except QueryMergeException as e:
         return _handle_query_merge_exception(request, e)
     try:
-        results = search_es.values()
+        results = list(search_es.values())
     except Exception as e:
         return _handle_es_exception(request, e, query_addition_debug_details)
 

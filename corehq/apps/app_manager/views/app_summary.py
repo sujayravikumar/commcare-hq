@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from copy import copy
 from StringIO import StringIO
 from collections import namedtuple
@@ -20,6 +21,7 @@ from corehq.apps.style.decorators import use_angular_js
 from couchexport.export import export_raw
 from couchexport.models import Format
 from couchexport.shortcuts import export_response
+import six
 
 
 class AppSummaryView(JSONResponseMixin, LoginAndDomainMixin, BasePageView, ApplicationViewMixin):
@@ -154,7 +156,7 @@ def _translate_name(names, language):
     try:
         return names[language]
     except KeyError:
-        first_name = names.iteritems().next()
+        first_name = six.iteritems(names)
         return u"{} [{}]".format(first_name[1], first_name[0])
 
 

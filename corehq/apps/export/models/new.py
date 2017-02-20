@@ -134,7 +134,7 @@ class ExportItem(DocumentSchema):
     label = StringProperty()
     tag = StringProperty()
     last_occurrences = DictProperty()
-    transform = StringProperty(choices=TRANSFORM_FUNCTIONS.keys())
+    transform = StringProperty(choices=list(TRANSFORM_FUNCTIONS.keys()))
 
     # True if this item was inferred from different actions in HQ (i.e. case upload)
     # False if the item was found in the application structure
@@ -203,7 +203,7 @@ class ExportColumn(DocumentSchema):
     help_text = StringProperty()
 
     # A transforms that deidentifies the value
-    deid_transform = StringProperty(choices=DEID_TRANSFORM_FUNCTIONS.keys())
+    deid_transform = StringProperty(choices=list(DEID_TRANSFORM_FUNCTIONS.keys()))
 
     def get_value(self, domain, doc_id, doc, base_path, transform_dates=False, row_index=None, split_column=False):
         """
@@ -1543,7 +1543,7 @@ class FormExportDataSchema(ExportDataSchema):
                 _add_to_group_schema(group_schema, path, u'case.{}'.format(case_attribute))
 
             # Add case updates
-            for case_property, case_path in subcase_action.case_properties.iteritems():
+            for case_property, case_path in six.iteritems(subcase_action.case_properties):
                 # This removes the repeat part of the path. For example, if inside
                 # a repeat group that has the following path:
                 #
@@ -1740,7 +1740,7 @@ class CaseExportDataSchema(ExportDataSchema):
         Generates the schema for the main Case tab on the export page
         Includes system export properties for the case.
         """
-        assert len(case_property_mapping.keys()) == 1
+        assert len(list(case_property_mapping.keys())) == 1
         schema = cls()
 
         group_schema = ExportGroupSchema(
@@ -1748,7 +1748,7 @@ class CaseExportDataSchema(ExportDataSchema):
             last_occurrences={app_id: app_version},
         )
 
-        for case_type, case_properties in case_property_mapping.iteritems():
+        for case_type, case_properties in six.iteritems(case_property_mapping):
 
             for prop in case_properties:
                 group_schema.items.append(ScalarItem(
@@ -1780,14 +1780,14 @@ class CaseExportDataSchema(ExportDataSchema):
     @classmethod
     def _generate_schema_for_case_history(cls, case_property_mapping, app_id, app_version):
         """Generates the schema for the Case History tab on the export page"""
-        assert len(case_property_mapping.keys()) == 1
+        assert len(list(case_property_mapping.keys())) == 1
         schema = cls()
 
         group_schema = ExportGroupSchema(
             path=CASE_HISTORY_TABLE,
             last_occurrences={app_id: app_version},
         )
-        unknown_case_properties = set(case_property_mapping[case_property_mapping.keys()[0]])
+        unknown_case_properties = set(case_property_mapping[list(case_property_mapping.keys())[0]])
 
         def _add_to_group_schema(group_schema, path_start, prop, app_id, app_version):
             group_schema.items.append(ScalarItem(
@@ -1900,7 +1900,7 @@ def _merge_lists(one, two, keyfn, resolvefn):
         merged.append(new_obj)
 
     # Get the rest of the objects in the second list
-    merged.extend(two_keys.values())
+    merged.extend(list(two_keys.values()))
     return merged
 
 
@@ -1917,13 +1917,13 @@ def _merge_dicts(one, two, resolvefn):
     # keys either in one or two, but not both
     merged = {
         key: one.get(key, two.get(key))
-        for key in one.viewkeys() ^ two.viewkeys()
+        for key in six.viewkeys(one) ^ six.viewkeys(two)
     }
 
     # merge keys that exist in both
     merged.update({
         key: resolvefn(one[key], two[key])
-        for key in one.viewkeys() & two.viewkeys()
+        for key in six.viewkeys(one) & six.viewkeys(two)
     })
     return merged
 
@@ -1977,7 +1977,7 @@ class SplitUserDefinedExportColumn(ExportColumn):
         row = []
         for option in self.user_defined_options:
             row.append(selected.pop(option, None))
-        row.append(" ".join(selected.keys()))
+        row.append(" ".join(list(selected.keys())))
         return row
 
     def get_headers(self, **kwargs):
@@ -2115,7 +2115,7 @@ class SplitExportColumn(ExportColumn):
         for option in self.item.options:
             row.append(selected.pop(option.value, EMPTY_VALUE))
         if not self.ignore_unspecified_options:
-            row.append(" ".join(selected.keys()))
+            row.append(" ".join(list(selected.keys())))
         return row
 
     def get_headers(self, split_column=False):

@@ -10,6 +10,7 @@ from datadog import api
 
 
 from corehq.util.datadog.const import ALERT_INFO
+import six
 
 datadog_metric_logger = logging.getLogger('datadog-metrics')
 
@@ -58,7 +59,7 @@ def create_datadog_event(title, text, alert_type=ALERT_INFO, tags=None, aggregat
 
 def log_counter(metric, details=None):
     details = details or {}
-    message = ' '.join(['{}={}'.format(key, value) for key, value in details.iteritems()])
+    message = ' '.join(['{}={}'.format(key, value) for key, value in six.iteritems(details)])
     datadog_metric_logger.info(
         message,
         extra={

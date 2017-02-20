@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from celery.schedules import crontab
 from celery.task import task, periodic_task
 from celery.utils.log import get_task_logger
@@ -16,6 +17,7 @@ from .interfaces import FormManagementMode, BulkFormManagementInterface
 from .dispatcher import EditDataInterfaceDispatcher
 from dimagi.utils.django.email import send_HTML_email
 from dimagi.utils.couch import CriticalSection
+import six
 
 
 logger = get_task_logger('data_interfaces')
@@ -77,7 +79,7 @@ def run_case_update_rules_for_domain(domain, now=None):
     all_rules = AutomaticUpdateRule.by_domain(domain)
     rules_by_case_type = AutomaticUpdateRule.organize_rules_by_case_type(all_rules)
 
-    for case_type, rules in rules_by_case_type.iteritems():
+    for case_type, rules in six.iteritems(rules_by_case_type):
         boundary_date = AutomaticUpdateRule.get_boundary_date(rules, now)
         case_ids = AutomaticUpdateRule.get_case_ids(domain, case_type, boundary_date)
 

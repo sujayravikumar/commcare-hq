@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from collections import defaultdict, namedtuple
 import datetime
 from urllib import urlencode
@@ -50,6 +51,7 @@ from dimagi.utils.decorators.memoized import memoized
 from dimagi.utils.parsing import json_format_date, string_to_utc_datetime
 from django.utils.translation import ugettext as _
 from django.utils.translation import ugettext_noop
+import six
 
 
 TOO_MUCH_DATA = ugettext_noop(
@@ -292,7 +294,7 @@ class CaseActivityReport(WorkerMonitoringCaseReportTableBase):
     @property
     @memoized
     def user_ids(self):
-        return self.users_by_id.keys()
+        return list(self.users_by_id.keys())
 
     @property
     @memoized
@@ -961,7 +963,7 @@ class FormCompletionTimeReport(WorkerMonitoringFormReportTableBase, DatespanMixi
     @property
     @memoized
     def selected_form_data(self):
-        forms = FormsByApplicationFilter.get_value(self.request, self.domain).values()
+        forms = list(FormsByApplicationFilter.get_value(self.request, self.domain).values())
         if len(forms) == 1 and forms[0]['xmlns']:
             return forms[0]
         non_fuzzy_forms = [form for form in forms if not form['is_fuzzy']]
@@ -1230,8 +1232,8 @@ class WorkerActivityTimes(WorkerMonitoringChartBase,
             mobile_user_and_group_slugs,
         )
         user_ids = map(lambda user: user.user_id, users_data.combined_users)
-        xmlnss = map(lambda form: form['xmlns'], self.all_relevant_forms.values())
-        app_ids = map(lambda form: form['app_id'], self.all_relevant_forms.values())
+        xmlnss = map(lambda form: form['xmlns'], list(self.all_relevant_forms.values()))
+        app_ids = map(lambda form: form['app_id'], list(self.all_relevant_forms.values()))
 
         paged_result = get_forms(
             self.domain,
@@ -1448,10 +1450,10 @@ class WorkerActivityReport(WorkerMonitoringCaseReportTableBase, DatespanMixin):
             ret = [util._report_user_dict(u) for u in list(CommCareUser.by_domain(self.domain))]
             return ret
         else:
-            all_users = flatten_list(self.users_by_group.values())
+            all_users = flatten_list(list(self.users_by_group.values()))
             all_users.extend([user for user in self.get_users_by_mobile_workers().values()])
             all_users.extend([user for user in self.get_admins_and_demo_users()])
-            return dict([(user['user_id'], user) for user in all_users]).values()
+            return list(dict([(user['user_id'], user) for user in all_users]).values())
 
     @property
     def user_ids(self):
@@ -1585,10 +1587,10 @@ class WorkerActivityReport(WorkerMonitoringCaseReportTableBase, DatespanMixin):
         rows = []
         active_users_by_group = {
             g: len(filter(lambda u: report_data.submissions_by_user.get(u['user_id']), users))
-            for g, users in self.users_by_group.iteritems()
+            for g, users in six.iteritems(self.users_by_group)
         }
 
-        for group, users in self.users_by_group.iteritems():
+        for group, users in six.iteritems(self.users_by_group):
             group_name, group_id = tuple(group.split('|'))
             if group_name == 'no_group':
                 continue

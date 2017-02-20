@@ -5,6 +5,7 @@ from celery import Celery
 from django.conf import settings
 from datetime import datetime
 from time import sleep, time
+import six
 
 
 class TaskInfo(object):
@@ -99,7 +100,7 @@ def revoke_tasks(task_names, interval=5):
             if not result:
                 continue
 
-            for worker, task_dicts in result.iteritems():
+            for worker, task_dicts in six.iteritems(result):
                 tasks.extend(_get_task_info_fcn(task_state)(task_dicts))
 
         for task in tasks:

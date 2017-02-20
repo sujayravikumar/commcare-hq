@@ -220,7 +220,7 @@ def create_form_for_test(domain, case_id=None, attachments=None, save=True, stat
     attachments = attachments or {}
     attachment_tuples = map(
         lambda a: Attachment(name=a[0], raw_content=a[1], content_type=a[1].content_type),
-        attachments.items()
+        list(attachments.items())
     )
     attachment_tuples.append(Attachment('form.xml', form_xml, 'text/xml'))
 

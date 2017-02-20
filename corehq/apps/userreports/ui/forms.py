@@ -261,7 +261,7 @@ class ConfigurableDataSourceFromAppForm(forms.Form):
         self.helper.layout = crispy.Layout(
             crispy.Fieldset(
                 _("Create Data Source from Application"),
-                *report_source_fields.keys()
+                *list(report_source_fields.keys())
             ),
             hqcrispy.FormActions(
                 twbscrispy.StrictButton(

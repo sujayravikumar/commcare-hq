@@ -108,7 +108,7 @@ def render_form(form, domain, options):
             url = "#"
 
         definition = get_default_definition(
-            sorted_case_update_keys(b.keys()),
+            sorted_case_update_keys(list(b.keys())),
             assume_phonetimes=(not form.metadata or
                                (form.metadata.deviceID != CLOUDCARE_DEVICE_ID)),
         )
@@ -126,7 +126,7 @@ def render_form(form, domain, options):
     if support_enabled:
         meta['last_sync_token'] = form.last_sync_token
 
-    definition = get_default_definition(sorted_form_metadata_keys(meta.keys()))
+    definition = get_default_definition(sorted_form_metadata_keys(list(meta.keys())))
     form_meta_data = _get_tables_as_columns(meta, definition)
     if getattr(form, 'auth_context', None):
         auth_context = AuthContext(form.auth_context)

@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import sqlalchemy
 from sqlagg.base import AliasColumn, QueryMeta, CustomQueryColumn, TableNotFoundException
 from sqlagg.columns import SimpleColumn
@@ -16,6 +17,7 @@ import urllib
 import re
 from django.utils import html
 from custom.utils.utils import clean_IN_filter_value
+import six
 
 
 def _get_grouping(prop_dict):
@@ -168,7 +170,7 @@ class CareSqlData(SqlData):
     def filters(self):
         filters = [EQ("domain", "domain"), EQ("ppt_year", "ppt_year"), AND([NOTEQ("case_status", "duplicate"),
                                                                             NOTEQ("case_status", "test")])]
-        for k, v in self.geography_config.iteritems():
+        for k, v in six.iteritems(self.geography_config):
             if k in self.config and self.config[k]:
                 filters.append(IN(k, get_INFilter_bindparams(k, self.config[k])))
         if 'value_chain' in self.config and self.config['value_chain']:
@@ -188,7 +190,7 @@ class CareSqlData(SqlData):
     def filter_values(self):
         filter_values = dict(**super(CareSqlData, self).filter_values)
 
-        for column_name in self.geography_config.keys() + ['domains', 'practices', 'schedule', 'cbt_name']:
+        for column_name in list(self.geography_config.keys()) + ['domains', 'practices', 'schedule', 'cbt_name']:
             clean_IN_filter_value(filter_values, column_name)
         return filter_values
 

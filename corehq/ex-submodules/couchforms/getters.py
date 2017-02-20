@@ -36,7 +36,7 @@ def get_instance_and_attachment(request):
     if request.META['CONTENT_TYPE'].startswith('multipart/form-data'):
         # ODK submission; of the form
         # $ curl --form 'xml_submission_file=@form.xml' $URL
-        if request.POST.keys():
+        if list(request.POST.keys()):
             raise MultimediaBug("Received a submission with POST.keys()")
 
         try:

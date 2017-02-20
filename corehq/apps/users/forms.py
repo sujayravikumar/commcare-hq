@@ -330,7 +330,7 @@ class UpdateMyAccountInfoForm(BaseUpdateUserForm, BaseUserInfoForm):
 
     @property
     def direct_properties(self):
-        result = self.fields.keys()
+        result = list(self.fields.keys())
         if not self.set_email_opt_out:
             result.remove('email_opt_out')
         return result

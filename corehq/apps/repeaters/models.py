@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from collections import namedtuple
 from datetime import datetime, timedelta
 import logging
@@ -45,6 +46,7 @@ from .const import (
 )
 from .exceptions import RequestConnectionError
 from .utils import get_all_repeater_types
+import six
 
 
 def simple_post_with_cached_timeout(data, url, expiry=60 * 60, force_send=False, *args, **kwargs):
@@ -128,7 +130,7 @@ class GeneratorCollection(object):
 
     def get_all_formats(self, for_domain=None):
         """returns all the formats added to this repeater collection"""
-        return [(name, format.label) for name, format in self.format_generator_map.iteritems()
+        return [(name, format.label) for name, format in six.iteritems(self.format_generator_map)
                 if not for_domain or format.generator_class.enabled_for_domain(for_domain)]
 
     def get_generator_by_format(self, format):

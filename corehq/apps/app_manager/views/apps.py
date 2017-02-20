@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import copy
 import json
 import os
@@ -77,6 +78,7 @@ from django_prbac.utils import has_privilege
 from corehq.apps.analytics.tasks import track_app_from_template_on_hubspot, identify
 from corehq.apps.analytics.utils import get_meta
 from corehq.util.view_utils import reverse as reverse_util
+import six
 
 
 @no_conflict_require_POST
@@ -168,7 +170,7 @@ def get_app_view_context(request, app):
 
     if toggles.CUSTOM_PROPERTIES.enabled(request.domain) and 'custom_properties' in app.profile:
         custom_properties_array = map(lambda p: {'key': p[0], 'value': p[1]},
-                                      app.profile.get('custom_properties').items())
+                                      list(app.profile.get('custom_properties').items()))
         context.update({'custom_properties': custom_properties_array})
 
     context.update({
@@ -810,7 +812,7 @@ def formdefs(request, domain, app_id):
             [
                 FormattedRow([
                     cell for (_, cell) in
-                    sorted(row.items(), key=lambda item: sheet['columns'].index(item[0]))
+                    sorted(list(row.items()), key=lambda item: sheet['columns'].index(item[0]))
                 ])
                 for row in sheet['rows']
             ]
@@ -860,7 +862,7 @@ def pull_master_app(request, domain, app_id):
             ['date_created', 'build_profiles', 'copy_history', 'copy_of', 'name', 'comment', 'doc_type']
         )
         master_json = latest_master_build.to_json()
-        for key, value in master_json.iteritems():
+        for key, value in six.iteritems(master_json):
             if key not in excluded_fields:
                 app[key] = value
         app['version'] = master_json['version']

@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from optparse import make_option
 
 from django.core.management.base import BaseCommand, CommandError
@@ -13,6 +14,7 @@ from corehq.apps.userreports.models import (
     StaticDataSourceConfiguration,
     StaticReportConfiguration,
 )
+import six
 
 types = [
     "feature_flags",
@@ -332,7 +334,7 @@ class Command(BaseCommand):
         attachments = {}
         attachemnt_stubs = None
         if isinstance(doc, BlobMixin) and doc.blobs:
-            attachemnt_stubs = {k: v.to_json() for k, v in doc.blobs.iteritems()}
+            attachemnt_stubs = {k: v.to_json() for k, v in six.iteritems(doc.blobs)}
             doc['external_blobs'] = {}
             if doc._attachments:
                 del doc['_attachments']

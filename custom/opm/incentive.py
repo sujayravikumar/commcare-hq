@@ -59,7 +59,7 @@ class Worker(object):
                 if row.growth_calculated_aww:
                     self.growth_monitoring_contributions[(row.case_id, row.child_index)] += 1
 
-            monitoring_count = len(self.growth_monitoring_contributions.keys())
+            monitoring_count = len(list(self.growth_monitoring_contributions.keys()))
         else:
             self.beneficiaries_registered = None
             self.children_registered = None

@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from corehq.apps.change_feed import topics
 from corehq.apps.change_feed.consumer.feed import change_meta_from_kafka_message
 from corehq.apps.change_feed.tests.utils import get_test_kafka_consumer
@@ -12,6 +13,7 @@ from datetime import datetime
 from dimagi.utils.parsing import json_format_datetime
 from django.test import TestCase
 from mock import patch
+import six
 
 
 @patch('corehq.apps.sms.change_publishers.do_publish')
@@ -104,7 +106,7 @@ class SqlSMSPillowTest(TestCase):
 
     def _to_json(self, sms_dict, sms):
         result = {'_id': sms.couch_id, 'id': sms.pk}
-        for k, v in sms_dict.iteritems():
+        for k, v in six.iteritems(sms_dict):
             value = json_format_datetime(v) if isinstance(v, datetime) else v
             result[k] = value
 

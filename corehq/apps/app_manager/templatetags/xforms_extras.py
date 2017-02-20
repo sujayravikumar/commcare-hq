@@ -1,7 +1,9 @@
+from __future__ import absolute_import
 from django import template
 from django.utils import html
 from django.utils.safestring import mark_safe
 from django.utils.translation import ugettext as _
+import six
 
 register = template.Library()
 
@@ -125,7 +127,7 @@ def _input_trans(template, name, langs=None, allow_blank=True):
                 options['placeholder'] = name[lang] if (allow_blank or name[lang] != '') else placeholder
                 options['lang'] = lang
             break
-    options = {key: html.escapejs(value) for (key, value) in options.iteritems()}
+    options = {key: html.escapejs(value) for (key, value) in six.iteritems(options)}
     return mark_safe(template % options)
 
 

@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import json
 from collections import Counter
 from couchdbkit.exceptions import ResourceNotFound
@@ -15,6 +16,7 @@ from corehq.apps.style.decorators import use_datatables
 from corehq.toggles import all_toggles, ALL_TAGS, NAMESPACE_USER, NAMESPACE_DOMAIN
 from toggle.models import Toggle
 from toggle.shortcuts import clear_toggle_cache, parse_toggle
+import six
 
 NOT_FOUND = "Not Found"
 
@@ -247,7 +249,7 @@ def _format_date(date):
 
 def _get_most_recently_used(last_used):
     """Returns the name and date of the most recently used toggle"""
-    last_used = {k: v for k, v in last_used.iteritems() if v != NOT_FOUND}
+    last_used = {k: v for k, v in six.iteritems(last_used) if v != NOT_FOUND}
     most_recently_used = sorted(last_used, key=last_used.get, reverse=True)
     return {
         'name': most_recently_used[0],

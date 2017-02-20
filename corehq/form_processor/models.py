@@ -1,4 +1,5 @@
 from __future__ import print_function
+from __future__ import absolute_import
 import json
 import logging
 import mimetypes
@@ -38,6 +39,7 @@ from dimagi.utils.couch.undo import DELETED_SUFFIX
 from dimagi.utils.decorators.memoized import memoized
 from .abstract_models import AbstractXFormInstance, AbstractCommCareCase, CaseAttachmentMixin, IsImageMixin
 from .exceptions import AttachmentNotFound, AccessRestricted
+import six
 
 XFormInstanceSQL_DB_TABLE = 'form_processor_xforminstancesql'
 XFormAttachmentSQL_DB_TABLE = 'form_processor_xformattachmentsql'
@@ -651,7 +653,7 @@ class CommCareCaseSQL(DisabledDbMixin, models.Model, RedisLockableMixIn,
         return self.deleted
 
     def dynamic_case_properties(self):
-        return OrderedDict(sorted(self.case_json.iteritems()))
+        return OrderedDict(sorted(six.iteritems(self.case_json)))
 
     def to_api_json(self, lite=False):
         from .serializers import CommCareCaseSQLAPISerializer

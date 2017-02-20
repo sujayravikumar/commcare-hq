@@ -98,13 +98,13 @@ class ElasticPillowTest(SimpleTestCase):
 
         # make sure it's there in the other index
         aliases = self.es.indices.get_aliases()
-        self.assertEqual([TEST_INDEX_INFO.alias], aliases[new_index]['aliases'].keys())
+        self.assertEqual([TEST_INDEX_INFO.alias], list(aliases[new_index]['aliases'].keys()))
 
         # assume alias and make sure it's removed (and added to the right index)
         assume_alias(self.es, self.index, TEST_INDEX_INFO.alias)
         aliases = self.es.indices.get_aliases()
         self.assertEqual(0, len(aliases[new_index]['aliases']))
-        self.assertEqual([TEST_INDEX_INFO.alias], aliases[self.index]['aliases'].keys())
+        self.assertEqual([TEST_INDEX_INFO.alias], list(aliases[self.index]['aliases'].keys()))
 
     def test_update_settings(self):
         initialize_index_and_mapping(self.es, TEST_INDEX_INFO)

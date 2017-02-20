@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from collections import defaultdict
 
 from django.conf import settings
@@ -26,6 +27,7 @@ from custom.ewsghana.utils import ProductsReportHelper, send_sms
 from custom.ewsghana.alerts.alerts import SOHAlerts
 from custom.ilsgateway.tanzania.reminders import SOH_HELP_MESSAGE
 from dimagi.utils.couch.database import iter_docs
+import six
 
 
 def get_transactions_by_product(transactions):
@@ -42,7 +44,7 @@ class SOHHandler(KeywordHandler):
     def get_valid_reports(self, data):
         filtered_transactions = []
         excluded_products = []
-        for product_id, transactions in get_transactions_by_product(data['transactions']).iteritems():
+        for product_id, transactions in six.iteritems(get_transactions_by_product(data['transactions'])):
             begin_soh = None
             end_soh = None
             receipt = 0

@@ -81,7 +81,7 @@ def auth_pages_path(page):
 
 
 def extend(d1, d2):
-    return dict(d1.items() + d2.items())
+    return dict(list(d1.items()) + list(d2.items()))
 
 urlpatterns =[
     url(r'^domain/select/$', select, name='domain_select'),

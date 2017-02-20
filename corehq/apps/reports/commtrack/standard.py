@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from corehq.apps.domain.models import Domain
 from corehq.apps.reports.analytics.esaccessors import get_wrapped_ledger_values
 from corehq.apps.reports.commtrack.data_sources import (
@@ -20,6 +21,7 @@ from corehq.apps.reports.commtrack.util import get_relevant_supply_point_ids, ge
     get_product_ids_for_program, get_consumption_helper_from_ledger_value
 from corehq.apps.reports.commtrack.const import STOCK_SECTION_TYPE
 from corehq.apps.reports.filters.commtrack import AdvancedColumns
+import six
 
 
 class CommtrackReportMixin(ProjectReport, ProjectReportParametersMixin, DatespanMixin):
@@ -435,13 +437,13 @@ class ReportingRatesReport(GenericTabularReport, CommtrackReportMixin):
                                        data=case_iter())
 
         status_counts = dict((loc_id, self.status_tally(statuses))
-                             for loc_id, statuses in status_by_agg_site.iteritems())
+                             for loc_id, statuses in six.iteritems(status_by_agg_site))
 
         master_tally = self.status_tally([site['reporting_status'] for site in statuses])
 
         locs = (SQLLocation.objects
                 .filter(is_archived=False,
-                        location_id__in=status_counts.keys())
+                        location_id__in=list(status_counts.keys()))
                 .order_by('name'))
 
         def fmt(pct):

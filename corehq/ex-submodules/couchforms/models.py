@@ -33,6 +33,7 @@ from couchforms import const
 from couchforms.const import ATTACHMENT_NAME
 from couchforms.jsonobject_extensions import GeoPointProperty
 from couchforms.signals import xform_archived, xform_unarchived
+import six
 
 
 def doc_types():
@@ -306,7 +307,7 @@ class XFormInstance(DeferredBlobMixin, SafeSaveDocument, UnicodeMixIn,
             return meta_json
 
         return {name: _meta_to_json(meta)
-            for name, meta in self.blobs.iteritems()
+            for name, meta in six.iteritems(self.blobs)
             if name != ATTACHMENT_NAME}
 
     def xml_md5(self):

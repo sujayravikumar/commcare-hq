@@ -90,9 +90,9 @@ def get_celery_stats():
 def parse_celery_pings(worker_responses):
     pings = {}
     for worker in worker_responses:
-        assert len(worker.keys()) == 1
+        assert len(list(worker.keys())) == 1
 
-        worker_fullname = worker.keys()[0]
+        worker_fullname = list(worker.keys())[0]
         pings[worker_fullname] = worker[worker_fullname].get('ok') == 'pong'
     return pings
 
@@ -105,12 +105,12 @@ def parse_celery_workers(celery_workers):
     expect_stopped = []
     expect_running = filter(
         lambda hostname: not hostname.endswith('_timestamp'),
-        celery_workers.keys(),
+        list(celery_workers.keys()),
     )
 
     timestamped_workers = filter(
         lambda hostname: hostname.endswith('_timestamp'),
-        celery_workers.keys(),
+        list(celery_workers.keys()),
     )
 
     def _strip_timestamp(hostname):

@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import datetime
 import io
 import logging
@@ -84,6 +85,7 @@ from corehq.toggles import HIPAA_COMPLIANCE_CHECKBOX
 from corehq.util.timezones.fields import TimeZoneField
 from corehq.util.timezones.forms import TimeZoneChoiceField
 from dimagi.utils.decorators.memoized import memoized
+import six
 
 # used to resize uploaded custom logos, aspect ratio is preserved
 LOGO_SIZE = (211, 32)
@@ -224,7 +226,7 @@ class SnapshotSettingsForm(forms.Form):
         required=True,
         help_text=ugettext_noop("e.g. MCH, HIV, etc.")
     )
-    license = ChoiceField(label=ugettext_noop("License"), required=True, choices=LICENSES.items(),
+    license = ChoiceField(label=ugettext_noop("License"), required=True, choices=list(LICENSES.items()),
                           widget=Select(attrs={'class': 'input-xxlarge'}))
     description = CharField(
         label=ugettext_noop("Long Description"), required=False, widget=forms.Textarea,
@@ -380,7 +382,7 @@ class SnapshotSettingsForm(forms.Form):
 
     def _get_apps_to_publish(self):
         app_ids = []
-        for d, val in self.data.iteritems():
+        for d, val in six.iteritems(self.data):
             d = d.split('-')
             if len(d) < 2:
                 continue
@@ -875,7 +877,7 @@ class DomainInternalForm(forms.Form, SubAreaMixin):
     )
     countries = forms.MultipleChoiceField(
         label="Countries",
-        choices=sorted(COUNTRIES.items(), key=lambda x: x[0]),
+        choices=sorted(list(COUNTRIES.items()), key=lambda x: x[0]),
         required=False,
     )
     commtrack_domain = ChoiceField(

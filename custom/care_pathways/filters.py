@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import datetime
 from django.utils.translation import ugettext_noop
 
@@ -9,6 +10,7 @@ from corehq.apps.users.models import CommCareUser
 from custom.care_pathways.sqldata import GeographySqlData
 from custom.care_pathways.utils import get_domain_configuration, ByTypeHierarchyRecord
 from dimagi.utils.decorators.memoized import memoized
+import six
 
 
 class CareBaseSingleOptionFilter(BaseSingleOptionFilter):
@@ -84,8 +86,8 @@ class GeographyFilter(CareBaseDrilldownOptionFilter):
         return hierarchy
 
     def get_labels(self):
-        return [(v['name'], v['prop']) for k, v in sorted(get_domain_configuration(
-            self.request.domain).geography_hierarchy.iteritems())]
+        return [(v['name'], v['prop']) for k, v in sorted(six.iteritems(get_domain_configuration(
+            self.request.domain).geography_hierarchy))]
 
     @classmethod
     def _get_label_value(cls, request, label):

@@ -66,6 +66,7 @@ models' attachments to the blob database:
 That's it, you're done!
 """
 from __future__ import print_function
+from __future__ import absolute_import
 import json
 import os
 import traceback
@@ -101,6 +102,7 @@ import casexml.apps.case.models as cases
 from corehq.apps.app_manager.models import Application, RemoteApp
 from couchexport.models import SavedBasicExport
 import corehq.form_processor.models as sql_xform
+import six
 
 MIGRATION_INSTRUCTIONS = """
 There are {total} documents that may have attachments, and they must be
@@ -229,7 +231,7 @@ class CouchAttachmentMigrator(BaseDocMigrator):
         obj = BlobHelper(doc, self.couchdb)
         try:
             with obj.atomic_blobs():
-                for name, data in list(attachments.iteritems()):
+                for name, data in list(six.iteritems(attachments)):
                     if name in external_blobs:
                         continue  # skip attachment already in blob db
                     obj.put_attachment(name=name, **data)
@@ -260,7 +262,7 @@ class BlobDbBackendMigrator(BaseDocMigrator):
         obj = BlobHelper(doc, self.couchdb)
         bucket = obj._blobdb_bucket()
         assert obj.external_blobs and obj.external_blobs == obj.blobs, doc
-        for name, meta in obj.blobs.iteritems():
+        for name, meta in six.iteritems(obj.blobs):
             self.total_blobs += 1
             try:
                 content = self.db.old_db.get(meta.id, bucket)
@@ -299,7 +301,7 @@ class BlobDbBackendExporter(BaseDocProcessor):
         bucket = obj._blobdb_bucket()
         assert obj.external_blobs and obj.external_blobs == obj.blobs, doc
         from_db = get_blob_db()
-        for name, meta in obj.blobs.iteritems():
+        for name, meta in six.iteritems(obj.blobs):
             self.total_blobs += 1
             try:
                 content = from_db.get(meta.id, bucket)

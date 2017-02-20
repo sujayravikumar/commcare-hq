@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import uuid
 from collections import namedtuple
 from xml.etree import ElementTree
@@ -22,6 +23,7 @@ import re
 
 from corehq.form_processor.interfaces.supply import SupplyInterface
 from corehq.form_processor.utils.general import should_use_sql_backend
+import six
 
 CaseLocationTuple = namedtuple('CaseLocationTuple', 'case location')
 
@@ -36,7 +38,7 @@ def all_sms_codes(domain):
     }
 
     sms_codes = zip(('action', 'product', 'command'), (actions, products, commands))
-    return dict(itertools.chain(*([(k.lower(), (type, v)) for k, v in codes.iteritems()] for type, codes in sms_codes)))
+    return dict(itertools.chain(*([(k.lower(), (type, v)) for k, v in six.iteritems(codes)] for type, codes in sms_codes)))
 
 
 def get_supply_point_and_location(domain, site_code):

@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from corehq.apps.app_manager import id_strings
 from corehq.apps.app_manager.suite_xml import xml_models as sx
 from corehq.apps.app_manager.suite_xml import const
@@ -12,6 +13,7 @@ from corehq.apps.app_manager.xpath import (
     UserCaseXPath)
 from corehq.apps.hqmedia.models import CommCareMultimedia
 import re
+import six
 
 CASE_PROPERTY_MAP = {
     # IMPORTANT: if you edit this you probably want to also edit
@@ -482,7 +484,7 @@ class Graph(FormattedDetailColumn):
                                     #       figure out why their unquoted colors
                                     #       aren't working.
                                     sx.ConfigurationItem(id=k, xpath_function=v)
-                                    for k, v in s.config.iteritems()
+                                    for k, v in six.iteritems(s.config)
                                 ] + [
                                     sx.ConfigurationItem(
                                         id=k,
@@ -494,7 +496,7 @@ class Graph(FormattedDetailColumn):
                                             k
                                         )
                                     )
-                                    for k, v in s.locale_specific_config.iteritems()
+                                    for k, v in six.iteritems(s.locale_specific_config)
                                 ]
                             )
                         )
@@ -505,7 +507,7 @@ class Graph(FormattedDetailColumn):
                         [
                             sx.ConfigurationItem(id=k, xpath_function=v)
                             for k, v
-                            in self.column.graph_configuration.config.iteritems()
+                            in six.iteritems(self.column.graph_configuration.config)
                         ] + [
                             sx.ConfigurationItem(
                                 id=k,
@@ -517,7 +519,7 @@ class Graph(FormattedDetailColumn):
                                 )
                             )
                             for k, v
-                            in self.column.graph_configuration.locale_specific_config.iteritems()
+                            in six.iteritems(self.column.graph_configuration.locale_specific_config)
                         ]
                     )
                 ),

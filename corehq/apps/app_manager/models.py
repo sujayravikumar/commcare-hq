@@ -390,10 +390,10 @@ class FormActions(DocumentSchema):
 
     def all_property_names(self):
         names = set()
-        names.update(self.update_case.update.keys())
-        names.update(self.case_preload.preload.values())
+        names.update(list(self.update_case.update.keys()))
+        names.update(list(self.case_preload.preload.values()))
         for subcase in self.subcases:
-            names.update(subcase.case_properties.keys())
+            names.update(list(subcase.case_properties.keys()))
         return names
 
 
@@ -519,7 +519,7 @@ class LoadUpdateAction(AdvancedAction):
 
     def get_property_names(self):
         names = super(LoadUpdateAction, self).get_property_names()
-        names.update(self.preload.values())
+        names.update(list(self.preload.values()))
         return names
 
     @property
@@ -1688,7 +1688,7 @@ class Form(IndexedFormBase, NavMenuItemMediaMixin):
             # for backward compatibility
             # preload only has one reference per question path
             preload = self.actions.load_from_form.preload
-            refs.load = {key: [value] for key, value in preload.iteritems()}
+            refs.load = {key: [value] for key, value in six.iteritems(preload)}
         return refs
 
     @case_references.setter
@@ -1708,7 +1708,7 @@ class Form(IndexedFormBase, NavMenuItemMediaMixin):
         for subcase in self.actions.subcases:
             if subcase.case_type == case_type:
                 case_properties.update(
-                    subcase.case_properties.keys()
+                    list(subcase.case_properties.keys())
                 )
                 if case_type != module_case_type and (
                         self.actions.open_case.is_active() or
@@ -1978,7 +1978,7 @@ class DetailColumn(IndexedSchema):
         if to_ret.format == 'enum-image':
             # interpolate icons-paths
             for item in to_ret.enum:
-                for lang, path in item.value.iteritems():
+                for lang, path in six.iteritems(item.value):
                     item.value[lang] = interpolate_media_path(path)
         return to_ret
 
@@ -2630,7 +2630,7 @@ class AdvancedForm(IndexedFormBase, NavMenuItemMediaMixin):
         load_actions = data.get('actions', {}).get('load_update_cases', [])
         for action in load_actions:
             preload = action['preload']
-            if preload and preload.values()[0].startswith('/'):
+            if preload and list(preload.values())[0].startswith('/'):
                 action['preload'] = {v: k for k, v in preload.items()}
 
         return super(AdvancedForm, cls).wrap(data)
@@ -2861,7 +2861,7 @@ class AdvancedForm(IndexedFormBase, NavMenuItemMediaMixin):
         for action in self.actions.get_all_actions():
             if action.case_type == case_type:
                 updates.update(format_key(*item)
-                               for item in action.case_properties.iteritems())
+                               for item in six.iteritems(action.case_properties))
         if self.schedule and self.schedule.enabled and self.source:
             xform = self.wrapped_xform()
             self.add_stuff_to_xform(xform)
@@ -2878,7 +2878,7 @@ class AdvancedForm(IndexedFormBase, NavMenuItemMediaMixin):
         for subcase in self.actions.get_subcase_actions():
             if subcase.case_type == case_type:
                 case_properties.update(
-                    subcase.case_properties.keys()
+                    list(subcase.case_properties.keys())
                 )
                 for case_index in subcase.case_indices:
                     parent = self.actions.get_action_from_tag(case_index.tag)
@@ -3339,7 +3339,7 @@ class AdvancedModule(ModuleBase):
             except KeyError:
                 self.get_or_create_schedule_phase(anchor)
 
-        deleted_phases_with_forms = [anchor for anchor, phase in old_phases.iteritems() if len(phase.forms)]
+        deleted_phases_with_forms = [anchor for anchor, phase in six.iteritems(old_phases) if len(phase.forms)]
         if deleted_phases_with_forms:
             raise ScheduleError(_("You can't delete phases with anchors "
                                   "{phase_anchors} because they have forms attached to them").format(
@@ -3384,7 +3384,7 @@ class CareplanForm(IndexedFormBase, NavMenuItemMediaMixin):
     def get_case_updates(self, case_type):
         if case_type == self.case_type:
             format_key = self.get_case_property_name_formatter()
-            return [format_key(*item) for item in self.case_updates().iteritems()]
+            return [format_key(*item) for item in six.iteritems(self.case_updates())]
         else:
             return []
 
@@ -3402,7 +3402,7 @@ class CareplanForm(IndexedFormBase, NavMenuItemMediaMixin):
                 parent_types.add((module_case_type, 'parent'))
             elif case_type == CAREPLAN_TASK:
                 parent_types.add((CAREPLAN_GOAL, 'goal'))
-            case_properties.update(self.case_updates().keys())
+            case_properties.update(list(self.case_updates().keys()))
 
         return parent_types, case_properties
 
@@ -5222,7 +5222,7 @@ class Application(ApplicationBase, TranslationMixin, HQMediaMixin):
     custom_base_url = StringProperty()
     cloudcare_enabled = BooleanProperty(default=False)
     translation_strategy = StringProperty(default='select-known',
-                                          choices=app_strings.CHOICES.keys())
+                                          choices=list(app_strings.CHOICES.keys()))
     commtrack_requisition_mode = StringProperty(choices=CT_REQUISITION_MODES)
     auto_gps_capture = BooleanProperty(default=False)
     date_created = DateTimeProperty()
@@ -5371,7 +5371,7 @@ class Application(ApplicationBase, TranslationMixin, HQMediaMixin):
         # access to .multimedia_map is slow
         prev_multimedia_map = previous_version.multimedia_map if previous_version else {}
 
-        for path, map_item in self.multimedia_map.iteritems():
+        for path, map_item in six.iteritems(self.multimedia_map):
             prev_map_item = prev_multimedia_map.get(path, None)
             if prev_map_item and prev_map_item.unique_id:
                 # Re-use the id so CommCare knows it's the same resource
@@ -5719,7 +5719,7 @@ class Application(ApplicationBase, TranslationMixin, HQMediaMixin):
             del copy_source['unique_id']
 
         if 'rename' in kwargs and kwargs['rename']:
-            for lang, name in copy_source['name'].iteritems():
+            for lang, name in six.iteritems(copy_source['name']):
                 with override(lang):
                     copy_source['name'][lang] = _('Copy of {name}').format(name=name)
 
@@ -5998,11 +5998,11 @@ class RemoteApp(ApplicationBase):
 
     def get_build_langs(self):
         if self.build_profiles:
-            if len(self.build_profiles.keys()) > 1:
+            if len(list(self.build_profiles.keys())) > 1:
                 raise AppEditingError('More than one app profile for a remote app')
             else:
                 # return first profile, generated as part of lazy migration
-                return self.build_profiles[self.build_profiles.keys()[0]].langs
+                return self.build_profiles[list(self.build_profiles.keys())[0]].langs
         else:
             return self.langs
 
@@ -6131,7 +6131,7 @@ def import_app(app_id_or_source, domain, source_properties=None, validate_source
     finally:
         source['_attachments'] = {}
     if source_properties is not None:
-        for key, value in source_properties.iteritems():
+        for key, value in six.iteritems(source_properties):
             source[key] = value
     cls = get_correct_app_class(source)
     # Allow the wrapper to update to the current default build_spec

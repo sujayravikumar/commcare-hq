@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import logging
 
 from collections import namedtuple
@@ -13,6 +14,7 @@ from corehq.util.quickcache import quickcache
 
 from django.db import IntegrityError
 from django.http.response import Http404
+import six
 
 
 logger = logging.getLogger(__name__)
@@ -101,10 +103,10 @@ class MALTTableGenerator(object):
         try:
             # try update
             unique_field_dict = {k: v
-                                 for (k, v) in malt_dict.iteritems()
+                                 for (k, v) in six.iteritems(malt_dict)
                                  if k in MALTRow.get_unique_fields()}
             prev_obj = MALTRow.objects.get(**unique_field_dict)
-            for k, v in malt_dict.iteritems():
+            for k, v in six.iteritems(malt_dict):
                 setattr(prev_obj, k, v)
             prev_obj.save()
         except MALTRow.DoesNotExist:

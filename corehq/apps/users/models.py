@@ -191,7 +191,7 @@ class UserRolePresets(object):
     @classmethod
     def get_permissions(cls, preset):
         preset_map = cls.get_preset_map()
-        if preset not in preset_map.keys():
+        if preset not in list(preset_map.keys()):
             return None
         return preset_map[preset]()
 
@@ -248,7 +248,7 @@ class UserRole(QuickCachedDocumentMixin, Document):
                 return name
             preset_match = filter(
                 lambda x: x[1]() == permissions,
-                UserRolePresets.get_preset_map().items()
+                list(UserRolePresets.get_preset_map().items())
             )
             if preset_match:
                 return preset_match[0][0]
@@ -324,7 +324,7 @@ class UserRole(QuickCachedDocumentMixin, Document):
 
     @classmethod
     def get_preset_permission_by_name(cls, name):
-        matches = {k for k, v in PERMISSIONS_PRESETS.iteritems() if v['name'] == name}
+        matches = {k for k, v in six.iteritems(PERMISSIONS_PRESETS) if v['name'] == name}
         return matches.pop() if matches else None
 
     @classmethod
@@ -333,7 +333,7 @@ class UserRole(QuickCachedDocumentMixin, Document):
 
     @classmethod
     def preset_permissions_names(cls):
-        return {details['name'] for role, details in PERMISSIONS_PRESETS.iteritems()}
+        return {details['name'] for role, details in six.iteritems(PERMISSIONS_PRESETS)}
 
 PERMISSIONS_PRESETS = {
     'edit-apps': {'name': 'App Editor', 'permissions': Permissions(edit_apps=True, view_reports=True)},

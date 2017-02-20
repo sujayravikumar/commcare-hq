@@ -115,7 +115,7 @@ class FlatLocationSerializer(object):
         root_node = Element('fixture', {'id': fixture_id, 'user_id': restore_user.user_id, 'indexed': 'true'})
         outer_node = Element('locations')
         root_node.append(outer_node)
-        for location in sorted(all_locations.by_id.values(), key=lambda l: l.site_code):
+        for location in sorted(list(all_locations.by_id.values()), key=lambda l: l.site_code):
             attrs = {
                 'type': location.location_type.code,
                 'id': location.location_id,

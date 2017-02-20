@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import json
 from django.http.response import HttpResponseServerError
 from corehq.apps.commtrack.exceptions import DuplicateProductCodeException
@@ -32,6 +33,7 @@ from corehq.apps.domain.decorators import (
     domain_admin_required,
     login_and_domain_required,
 )
+import six
 
 
 @require_POST
@@ -359,7 +361,7 @@ def download_products(request, domain):
         model_data = {}
         uncategorized_data = {}
 
-        for prop, val in product.product_data.iteritems():
+        for prop, val in six.iteritems(product.product_data):
             if prop in product_data_fields:
                 model_data['data: ' + prop] = encode_if_needed(val)
             else:
@@ -403,8 +405,8 @@ def download_products(request, domain):
 
         product_model, product_uncategorized = _parse_custom_properties(product)
 
-        model_data.update(product_model.keys())
-        uncategorized_data.update(product_uncategorized.keys())
+        model_data.update(list(product_model.keys()))
+        uncategorized_data.update(list(product_uncategorized.keys()))
 
         product_dict.update(product_model)
         product_dict.update(product_uncategorized)

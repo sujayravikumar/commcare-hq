@@ -203,7 +203,7 @@ class VaccinationClientList(ClientListBase):
         # this preloads the cases we'll need into memory to avoid excessive couch
         # queries to get related cases
         primary_cases = _get_related_cases(results)
-        secondary_cases = _get_related_cases(filter(lambda x: x['type'] == BIHAR_CHILD_CASE_TYPE, primary_cases.values()))
+        secondary_cases = _get_related_cases(filter(lambda x: x['type'] == BIHAR_CHILD_CASE_TYPE, list(primary_cases.values())))
 
         def _to_row(case):
             # this function uses closures so don't move it!

@@ -493,7 +493,7 @@ class ApplicationMediaReference(object):
             return raw_name
         if lang is None:
             lang = self.app_lang
-        return raw_name.get(lang, raw_name.values()[0])
+        return raw_name.get(lang, list(raw_name.values())[0])
 
     def get_module_name(self, lang=None):
         return self._get_name(self.module_name, lang=lang)
@@ -559,7 +559,7 @@ class HQMediaMixin(Document):
                     if column.format == 'enum-image':
                         for map_item in column.enum:
                             # iterate over icons of each lang
-                            icons = map_item.value.values()
+                            icons = list(map_item.value.values())
                             media.extend([ApplicationMediaReference(
                                 icon,
                                 media_class=CommCareImage,
@@ -697,7 +697,7 @@ class HQMediaMixin(Document):
             If not, then that item is removed from the multimedia map.
         """
         map_changed = False
-        paths = self.multimedia_map.keys() if self.multimedia_map else []
+        paths = list(self.multimedia_map.keys()) if self.multimedia_map else []
         permitted_paths = self.all_media_paths | self.logo_paths
         for path in paths:
             if path not in permitted_paths:

@@ -141,7 +141,7 @@ def validate_answer(event, text, v):
                     int_answer = int(answer)
                     assert int_answer >= 1 and int_answer <= max_index
                     final_answers[str(int_answer)] = ""
-            text = " ".join(final_answers.keys())
+            text = " ".join(list(final_answers.keys()))
             valid = True
         except Exception:
             error_msg = get_message(MSG_INVALID_CHOICE, v)

@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from datetime import datetime, timedelta
 from dateutil.parser import parse
 import hashlib
@@ -60,6 +61,7 @@ from .models import (
     UnsupportedScheduledReportError,
 )
 from .scheduled import get_scheduled_reports
+import six
 
 
 logging = get_task_logger(__name__)
@@ -435,7 +437,7 @@ def _extract_form_attachment_info(form, properties):
     attachments
     """
     def find_question_id(form, value):
-        for k, v in form.iteritems():
+        for k, v in six.iteritems(form):
             if isinstance(v, dict):
                 ret = find_question_id(v, value)
                 if ret:
@@ -459,7 +461,7 @@ def _extract_form_attachment_info(form, properties):
     # TODO make form.attachments always return objects that conform to a
     # uniform interface. XFormInstance attachment values are dicts, and
     # XFormInstanceSQL attachment values are XFormAttachmentSQL objects.
-    for attachment_name, attachment in form.attachments.iteritems():
+    for attachment_name, attachment in six.iteritems(form.attachments):
         if hasattr(attachment, 'content_type'):
             content_type = attachment.content_type
         else:

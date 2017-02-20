@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import json
 import logging
 from django.db.models import Q
@@ -27,6 +28,7 @@ from django.utils.translation import ugettext_lazy
 from .models import DeviceReportEntry
 from .utils import device_users_by_xform
 from urllib import urlencode
+import six
 
 logger = logging.getLogger(__name__)
 
@@ -184,7 +186,7 @@ class BaseDeviceLogReport(GetParamsMixin, DatespanMixin, PaginatedReportMixin):
 
     @property
     def ordering(self):
-        by, direction = self.get_sorting_block()[0].items()[0]
+        by, direction = list(self.get_sorting_block()[0].items())[0]
         return '-' + by if direction == 'desc' else by
 
     @property
@@ -300,7 +302,7 @@ class BaseDeviceLogReport(GetParamsMixin, DatespanMixin, PaginatedReportMixin):
         return logs
 
     def _filter_query_by_slug(self, slug):
-        return urlencode({k: v for (k, v) in self.request.GET.iteritems() if not k.startswith(slug)})
+        return urlencode({k: v for (k, v) in six.iteritems(self.request.GET) if not k.startswith(slug)})
 
 
 class DeviceLogDetailsReport(BaseDeviceLogReport, DeploymentsReport):

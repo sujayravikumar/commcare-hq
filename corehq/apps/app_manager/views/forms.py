@@ -165,7 +165,7 @@ def edit_advanced_form_actions(request, domain, app_id, module_id, form_id):
     actions = AdvancedFormActions.wrap(json_loads)
     form.actions = actions
     for action in actions.load_update_cases:
-        add_properties_to_data_dictionary(domain, action.case_type, action.case_properties.keys())
+        add_properties_to_data_dictionary(domain, action.case_type, list(action.case_properties.keys()))
     if advanced_actions_use_usercase(form.actions) and not is_usercase_in_use(domain):
         enable_usercase(domain)
     response_json = {}
@@ -182,7 +182,7 @@ def edit_form_actions(request, domain, app_id, module_id, form_id):
     form = module.get_form(form_id)
     old_load_from_form = form.actions.load_from_form
     form.actions = FormActions.wrap(json.loads(request.POST['actions']))
-    add_properties_to_data_dictionary(domain, module.case_type, form.actions.update_case.update.keys())
+    add_properties_to_data_dictionary(domain, module.case_type, list(form.actions.update_case.update.keys()))
     if old_load_from_form:
         form.actions.load_from_form = old_load_from_form
 
@@ -193,7 +193,7 @@ def edit_form_actions(request, domain, app_id, module_id, form_id):
     if actions_use_usercase(form.actions):
         if not is_usercase_in_use(domain):
             enable_usercase(domain)
-        add_properties_to_data_dictionary(domain, USERCASE_TYPE, form.actions.usercase_update.update.keys())
+        add_properties_to_data_dictionary(domain, USERCASE_TYPE, list(form.actions.usercase_update.update.keys()))
 
     response_json = {}
     app.save(response_json)

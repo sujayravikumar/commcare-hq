@@ -159,7 +159,7 @@ def _get_user_case_fields(commcare_user):
         'UserSave',
         commcare_user.domain,
         USERCASE_TYPE,
-        fields.keys(),
+        list(fields.keys()),
     )
     return fields
 

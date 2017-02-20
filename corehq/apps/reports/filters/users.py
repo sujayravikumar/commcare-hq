@@ -376,7 +376,7 @@ class ExpandedMobileWorkerFilter(BaseMultipleOptionFilter):
                 users_in_group = filter(lambda user: user['user_id'] in limit_user_ids, users_in_group)
             user_dict["%s|%s" % (group.name, group._id)] = users_in_group
 
-        users_in_groups = flatten_list(user_dict.values())
+        users_in_groups = flatten_list(list(user_dict.values()))
         users_by_group = user_dict
         combined_users = remove_dups(all_users + users_in_groups, "user_id")
 

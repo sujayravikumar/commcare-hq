@@ -44,7 +44,7 @@ def get_dynamic_element(key, val):
     if isinstance(val, dict):
         element.text = unicode(val.get('#text', ''))
         element.attrib = dict([(x[1:], unicode(val[x])) for x in \
-                               filter(lambda x: x and x.startswith("@"), val.keys())])
+                               filter(lambda x: x and x.startswith("@"), list(val.keys()))])
     else:
         # assume it's a string. Hopefully this is valid
         element.text = unicode(val)

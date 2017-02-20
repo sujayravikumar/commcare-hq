@@ -1304,7 +1304,7 @@ class InternalSubscriptionManagementView(BaseAdminProjectSettingsView):
             'is_form_editable': self.is_form_editable,
             'plan_name': Subscription.get_subscribed_plan_by_domain(self.domain)[0],
             'select_subscription_type_form': self.select_subscription_type_form,
-            'subscription_management_forms': self.slug_to_form.values(),
+            'subscription_management_forms': list(self.slug_to_form.values()),
             'today': datetime.date.today(),
         }
 
@@ -2103,7 +2103,7 @@ class ManageProjectMediaView(BaseAdminProjectSettingsView):
     def page_context(self):
         return {
             'media': self.project_media_data,
-            'licenses': LICENSES.items(),
+            'licenses': list(LICENSES.items()),
         }
 
     @retry_resource(3)
@@ -2451,7 +2451,7 @@ class AddRepeaterView(BaseAdminProjectSettingsView):
         except KeyError:
             raise Http404(
                 "No such repeater {}. Valid types: {}".format(
-                    self.repeater_type, get_all_repeater_types.keys()
+                    self.repeater_type, list(get_all_repeater_types.keys())
                 )
             )
 
@@ -2701,7 +2701,7 @@ def calculated_properties(request, domain):
     extra_arg = calc_tag[1] if len(calc_tag) > 1 else ''
     calc_tag = calc_tag[0]
 
-    if not calc_tag or calc_tag not in CALC_FNS.keys():
+    if not calc_tag or calc_tag not in list(CALC_FNS.keys()):
         data = {"error": 'This tag does not exist'}
     else:
         data = {"value": dom_calc(calc_tag, domain, extra_arg)}

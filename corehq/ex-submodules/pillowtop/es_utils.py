@@ -109,7 +109,7 @@ def assume_alias(es, index, alias):
     """
     if es.indices.exists_alias(None, alias):
         # this part removes the conflicting aliases
-        alias_indices = es.indices.get_alias(alias).keys()
+        alias_indices = list(es.indices.get_alias(alias).keys())
         for aliased_index in alias_indices:
             es.indices.delete_alias(aliased_index, alias)
     es.indices.put_alias(index, alias)

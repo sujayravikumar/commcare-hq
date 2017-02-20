@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from decimal import Decimal
 from django.conf import settings
 from django.utils.translation import ugettext_lazy as _
@@ -27,6 +28,7 @@ from corehq.apps.commtrack.exceptions import (
     NotAUserClassError)
 import re
 from corehq.form_processor.parsers.ledgers.helpers import StockTransactionHelper
+import six
 
 logger = logging.getLogger('commtrack.sms')
 
@@ -627,7 +629,7 @@ def send_confirmation(v, data):
     msg = 'received stock report for %s(%s) %s' % (
         static_loc.site_code,
         truncate(location_name, 20),
-        ' '.join(sorted(summarize_action(a, txs) for a, txs in tx_by_action.iteritems()))
+        ' '.join(sorted(summarize_action(a, txs) for a, txs in six.iteritems(tx_by_action)))
     )
 
     send_sms_to_verified_number(v, msg, metadata=metadata)

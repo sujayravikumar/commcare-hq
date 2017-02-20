@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from collections import defaultdict
 
 from corehq.blobs import Error as BlobError
@@ -9,6 +10,7 @@ from corehq.util.quickcache import quickcache
 from pillowtop.dao.django import DjangoDocumentStore
 from pillowtop.dao.exceptions import DocumentNotFoundError
 from pillowtop.dao.interface import ReadOnlyDocumentStore
+import six
 
 
 class ReadonlyFormDocumentStore(ReadOnlyDocumentStore):
@@ -89,7 +91,7 @@ class ReadonlyLedgerV2DocumentStore(ReadOnlyDocumentStore):
         for id_string in ids:
             case_id, section_id, entry_id = UniqueLedgerReference.from_id(id_string)
             case_id_map[(section_id, entry_id)].append(case_id)
-        for section_entry, case_ids in case_id_map.iteritems():
+        for section_entry, case_ids in six.iteritems(case_id_map):
             section_id, entry_id = section_entry
             results = self.ledger_accessors.get_ledger_values_for_cases(case_ids, section_id, entry_id)
             for ledger_value in results:

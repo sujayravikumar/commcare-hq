@@ -242,7 +242,7 @@ def secure_post(request, domain, app_id=None):
         decorated_view = authtype_map[determine_authtype(request)]
     except KeyError:
         return HttpResponseBadRequest(
-            'authtype must be one of: {0}'.format(','.join(authtype_map.keys()))
+            'authtype must be one of: {0}'.format(','.join(list(authtype_map.keys())))
         )
 
     return decorated_view(request, domain, app_id=app_id)

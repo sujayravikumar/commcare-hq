@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from collections import namedtuple
 
 from django.test import SimpleTestCase, TestCase
@@ -13,6 +14,7 @@ from corehq.apps.locations.bulk_management import (
     LocationTreeValidator,
     LocationCollection,
 )
+import six
 
 
 # These example types and trees mirror the information available in the upload files
@@ -503,7 +505,7 @@ class TestBulkManagement(TestCase):
             descendants[child] = get_descendants(child)
 
         # for each location assert that calculated and expected get_descendants are equal
-        for (l, desc) in descendants.iteritems():
+        for (l, desc) in six.iteritems(descendants):
             q = SQLLocation.objects.filter(site_code=l)
             loc = q[0] if q else None
 

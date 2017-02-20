@@ -120,7 +120,7 @@ def update_tables(request, domain, data_type_id, test_patch=None):
         if is_identifier_invalid(data_tag):
             validation_errors.append(data_tag)
         for field_name, options in fields_update['fields'].items():
-            method = options.keys()
+            method = list(options.keys())
             if 'update' in method:
                 field_name = options['update']
             if is_identifier_invalid(field_name) and 'remove' not in method:
@@ -165,7 +165,7 @@ def update_types(patches, domain, data_type_id, data_tag, is_global, transaction
             new_fixture_fields.append(old_field)
         if "remove" in patch:
             continue
-    new_fields = fields_patches.keys()
+    new_fields = list(fields_patches.keys())
     for new_field_name in new_fields:
         patch = fields_patches.pop(new_field_name)
         if "is_new" in patch:
@@ -232,8 +232,8 @@ def data_table(request, domain):
             "headers": DataTablesHeader(DataTablesColumn("No lookup Tables Uploaded")),
             "rows": []
         }
-    selected_sheet = sheets.values()[0]
-    selected_sheet_tag = sheets.keys()[0]
+    selected_sheet = list(sheets.values())[0]
+    selected_sheet_tag = list(sheets.keys())[0]
     data_table = {
         "headers": None,
         "rows": None,
@@ -382,7 +382,7 @@ class UploadFixtureAPIResponse(object):
 
     def __init__(self, status, message):
         assert status in self.response_codes, \
-            'status must be in {!r}: {}'.format(self.status.keys(), status)
+            'status must be in {!r}: {}'.format(list(self.status.keys()), status)
         self.status = status
         self.message = message
 

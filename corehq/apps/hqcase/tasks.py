@@ -59,7 +59,7 @@ def explode_cases(user_id, domain, factor, task=None):
         for index in case.indices:
             ref_id = index.referenced_id
             # if the parent hasn't been processed
-            if ref_id not in old_to_new.keys():
+            if ref_id not in list(old_to_new.keys()):
                 # append it to the backand break out
                 child_cases.append(case)
                 can_process = False

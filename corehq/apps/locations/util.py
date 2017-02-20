@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from corehq.apps.commtrack.dbaccessors import get_supply_point_ids_in_domain_by_location
 from corehq.apps.products.models import Product
 from corehq.apps.locations.models import Location, SQLLocation
@@ -11,6 +12,7 @@ from dimagi.utils.couch.loosechange import map_reduce
 from couchexport.writers import Excel2007ExportWriter
 from StringIO import StringIO
 from corehq.apps.consumption.shortcuts import get_loaded_default_monthly_consumption, build_consumption_dict
+import six
 
 
 def load_locs_json(domain, selected_loc_id=None, include_archived=False,
@@ -104,7 +106,7 @@ def parent_child(domain):
     child types
     """
     return map_reduce(lambda (k, v): [(p, k) for p in v],
-                      data=dict(location_hierarchy_config(domain)).iteritems())
+                      data=six.iteritems(dict(location_hierarchy_config(domain))))
 
 
 @quickcache(['domain'], timeout=60)
@@ -184,7 +186,7 @@ class LocationExporter(object):
             model_data, uncategorized_data = \
                 self.data_model.get_model_and_uncategorized(loc.metadata)
 
-            uncategorized_keys.update(uncategorized_data.keys())
+            uncategorized_keys.update(list(uncategorized_data.keys()))
 
             loc_dict = {
                 'location_id': loc.location_id,

@@ -82,7 +82,7 @@ class WorkflowHelper(PostProcessor):
         if module_command == id_strings.ROOT:
             datums_list = self.root_module_datums
         else:
-            datums_list = module_datums.values()  # [ [datums for f0], [datums for f1], ...]
+            datums_list = list(module_datums.values())  # [ [datums for f0], [datums for f1], ...]
 
         common_datums = commonprefix(datums_list)
         remaining_datums = form_datums[len(common_datums):]

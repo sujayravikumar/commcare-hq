@@ -5,6 +5,7 @@ This includes support for changing location types, changing locations' parents,
 deleting things, and so on.  See the spec doc for specifics:
 https://docs.google.com/document/d/1gZFPP8yXjPazaJDP9EmFORi88R-jSytH6TTgMxTGQSk/
 """
+from __future__ import absolute_import
 import copy
 from collections import Counter, defaultdict
 
@@ -18,6 +19,7 @@ from corehq.apps.domain.models import Domain
 from corehq.apps.locations.models import SQLLocation, LocationType
 from .tree_utils import BadParentError, CycleError, assert_no_cycles, expansion_validators
 from .const import LOCATION_SHEET_HEADERS, LOCATION_TYPE_SHEET_HEADERS, ROOT_LOCATION_TYPE
+import six
 
 
 class LocationExcelSheetError(Exception):
@@ -338,7 +340,7 @@ class LocationExcelValidator(object):
         # all listed types should have a corresponding locations sheet
         type_stubs = self._get_types(type_sheet_reader)
         expected_sheet_names = [lt.code for lt in type_stubs] + ['types']
-        actual_sheet_names = sheets_by_title.keys()
+        actual_sheet_names = list(sheets_by_title.keys())
         missing_sheet_names = set(expected_sheet_names) - set(actual_sheet_names)
         if missing_sheet_names:
             raise LocationExcelSheetError(
@@ -556,7 +558,7 @@ class LocationTreeValidator(object):
 
     @memoized
     def _check_unique_type_codes(self):
-        counts = Counter(lt.code for lt in self.all_listed_types).items()
+        counts = list(Counter(lt.code for lt in self.all_listed_types).items())
         return [
             _(u"Location type code '{}' is used {} times - they should be unique")
             .format(code, count)
@@ -565,7 +567,7 @@ class LocationTreeValidator(object):
 
     @memoized
     def _check_unique_location_codes(self):
-        counts = Counter(l.site_code for l in self.all_listed_locations).items()
+        counts = list(Counter(l.site_code for l in self.all_listed_locations).items())
         return [
             _(u"Location site_code '{}' is used {} times - they should be unique")
             .format(code, count)
@@ -574,7 +576,7 @@ class LocationTreeValidator(object):
 
     @memoized
     def _check_unique_location_ids(self):
-        counts = Counter(l.location_id for l in self.all_listed_locations if l.location_id).items()
+        counts = list(Counter(l.location_id for l in self.all_listed_locations if l.location_id).items())
         return [
             _(u"Location location_id '{}' is listed {} times - they should be listed once")
             .format(location_id, count)
@@ -712,7 +714,7 @@ class LocationTreeValidator(object):
             locs_by_parent[loc.parent_code].append(loc)
         errors = []
         for parent, siblings in locs_by_parent.items():
-            counts = Counter(l.name for l in siblings).items()
+            counts = list(Counter(l.name for l in siblings).items())
             for name, count in counts:
                 if count > 1:
                     errors.append(
@@ -733,7 +735,7 @@ class LocationTreeValidator(object):
             try:
                 location.db_object.full_clean(exclude=exclude_fields)
             except ValidationError as e:
-                for field, issues in e.message_dict.iteritems():
+                for field, issues in six.iteritems(e.message_dict):
                     for issue in issues:
                         errors.append(_(
                             u"Error with location in sheet '{}', at row {}. {}: {}").format(
