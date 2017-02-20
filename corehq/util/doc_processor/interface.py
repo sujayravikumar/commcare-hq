@@ -1,3 +1,4 @@
+from __future__ import print_function
 import weakref
 from abc import ABCMeta, abstractmethod
 from datetime import datetime
@@ -68,26 +69,26 @@ class BaseDocProcessor(six.with_metaclass(ABCMeta)):
 
 class ProcessorProgressLogger(object):
     def progress_starting(self, total, previously_visited):
-        print("Processing {} documents{}: ...".format(
+        print(("Processing {} documents{}: ...".format(
             total,
             " (~{} already processed)".format(previously_visited) if previously_visited else ""
-        ))
+        )))
 
     def document_skipped(self, doc_dict):
-        print("Skip: {doc_type} {_id}".format(**doc_dict))
+        print(("Skip: {doc_type} {_id}".format(**doc_dict)))
 
     def progress(self, processed, visited, total, time_elapsed, time_remaining):
-        print("Processed {}/{} of {} documents in {} ({} remaining)"
-              .format(processed, visited, total, time_elapsed, time_remaining))
+        print(("Processed {}/{} of {} documents in {} ({} remaining)"
+              .format(processed, visited, total, time_elapsed, time_remaining)))
 
     def progress_complete(self, processed, visited, total, previously_visited, filtered):
-        print("Processed {}/{} of {} documents ({} previously processed, {} filtered out).".format(
+        print(("Processed {}/{} of {} documents ({} previously processed, {} filtered out).".format(
             processed,
             visited,
             total,
             previously_visited,
             filtered
-        ))
+        )))
 
 
 class DocumentProvider(six.with_metaclass(ABCMeta)):
@@ -241,7 +242,7 @@ class DocumentProcessorController(object):
             self.session_visited - self.attempted
         )
         if self.skipped:
-            print(DOCS_SKIPPED_WARNING.format(self.skipped))
+            print((DOCS_SKIPPED_WARNING.format(self.skipped)))
 
 
 class BulkDocProcessorEventHandler(PaginationEventHandler):

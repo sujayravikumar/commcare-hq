@@ -1,3 +1,4 @@
+from __future__ import print_function
 from couchdbkit import ResourceNotFound
 
 from corehq.util.couch_helpers import MultiKeyViewArgsProvider
@@ -85,11 +86,11 @@ class CouchProcessorProgressLogger(ProcessorProgressLogger):
         self.doc_types = doc_type_tuples_to_list(doc_types)
 
     def progress_starting(self, total, previously_visited):
-        print("Processing {} documents{}: {}...".format(
+        print(("Processing {} documents{}: {}...".format(
             total,
             " (~{} already processed)".format(previously_visited) if previously_visited else "",
             ", ".join(sorted(self.doc_types))
-        ))
+        )))
 
 
 class CouchDocumentProvider(DocumentProvider):
