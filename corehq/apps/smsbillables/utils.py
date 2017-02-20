@@ -2,7 +2,6 @@ from __future__ import absolute_import
 import logging
 
 from django.conf import settings
-from django.utils.encoding import force_unicode
 
 from django_countries.data import COUNTRIES
 from phonenumbers import COUNTRY_CODE_TO_REGION_CODE
@@ -13,12 +12,19 @@ from corehq.apps.sms.models import SQLMobileBackend
 from corehq.apps.smsbillables.exceptions import RetryBillableTaskException
 from corehq.util.quickcache import quickcache
 
+import six
+
+if six.PY3:
+    from django.utils.encoding import force_text
+else:
+    from django.utils.encoding import force_unicode as force_text
+
 logger = logging.getLogger("smsbillables")
 
 
 def country_name_from_isd_code_or_empty(isd_code):
     cc = COUNTRY_CODE_TO_REGION_CODE.get(isd_code)
-    return force_unicode(COUNTRIES.get(cc[0])) if cc else ''
+    return force_text(COUNTRIES.get(cc[0])) if cc else ''
 
 
 def log_smsbillables_error(message):

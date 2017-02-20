@@ -13,13 +13,17 @@ from django.forms.widgets import (
     Widget,
 )
 from django.template.loader import render_to_string
-from django.utils.encoding import force_unicode
 from django.utils.html import conditional_escape
 from django.utils.safestring import mark_safe
 import json
 from django.utils.translation import ugettext_noop
 from dimagi.utils.dates import DateSpan
+import six
 
+if six.PY3:
+    from django.utils.encoding import force_text
+else:
+    from django.utils.encoding import force_unicode as force_text
 
 class BootstrapCheckboxInput(CheckboxInput):
 
@@ -37,7 +41,7 @@ class BootstrapCheckboxInput(CheckboxInput):
             final_attrs['checked'] = 'checked'
         if value not in ('', True, False, None):
             # Only add the 'value' attribute if a value is non-empty.
-            final_attrs['value'] = force_unicode(value)
+            final_attrs['value'] = force_text(value)
         return mark_safe(u'<label class="checkbox"><input%s /> %s</label>' %
                          (flatatt(final_attrs), self.inline_label))
 
@@ -49,7 +53,7 @@ class BootstrapRadioInput(RadioChoiceInput):
             label_for = ' for="%s_%s"' % (self.attrs['id'], self.index)
         else:
             label_for = ''
-        choice_label = conditional_escape(force_unicode(self.choice_label))
+        choice_label = conditional_escape(force_text(self.choice_label))
         return mark_safe(u'<label class="radio"%s>%s %s</label>' % (label_for, self.tag(), choice_label))
 
 
@@ -57,7 +61,7 @@ class BootstrapRadioFieldRenderer(RadioFieldRenderer):
 
     def render(self):
         return mark_safe(u'\n'.join([u'%s'
-                                      % force_unicode(w) for w in self]))
+                                      % force_text(w) for w in self]))
 
     def __iter__(self):
         for i, choice in enumerate(self.choices):
@@ -110,7 +114,7 @@ class BootstrapDisabledInput(Input):
         final_attrs = self.build_attrs(attrs, type=self.input_type, name=name)
         if value != '':
             # Only add the 'value' attribute if a value is non-empty.
-            final_attrs['value'] = force_unicode(self._format_value(value))
+            final_attrs['value'] = force_text(self._format_value(value))
         return mark_safe(u'<span class="uneditable-input %s">%s</span><input%s />' %
                          (attrs.get('class', ''), value, flatatt(final_attrs)))
 

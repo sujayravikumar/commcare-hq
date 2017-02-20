@@ -1,7 +1,12 @@
 import json
 from decimal import Decimal
-from django.utils.encoding import force_unicode
 from django.utils.functional import Promise
+import six
+
+if six.PY3:
+    from django.utils.encoding import force_text
+else:
+    from django.utils.encoding import force_unicode as force_text
 
 
 class DecimalEncoder(json.JSONEncoder):
@@ -19,5 +24,5 @@ class LazyEncoder(DecimalEncoder):
 
     def default(self, obj):
         if isinstance(obj, Promise):
-            return force_unicode(obj)
+            return force_text(obj)
         return super(LazyEncoder, self).default(obj)

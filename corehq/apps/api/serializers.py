@@ -4,7 +4,6 @@ from __future__ import absolute_import
 from io import BytesIO
 
 # Django & Tastypie imports
-from django.utils.encoding import force_unicode
 from tastypie.bundle import Bundle
 from tastypie.serializers import Serializer, get_type_string
 
@@ -12,6 +11,11 @@ from tastypie.serializers import Serializer, get_type_string
 import defusedxml.lxml as lxml
 from lxml.etree import Element
 import six
+
+if six.PY3:
+    from django.utils.encoding import force_text
+else:
+    from django.utils.encoding import force_unicode as force_text
 
 
 class CommCareCaseSerializer(Serializer):
@@ -90,7 +94,7 @@ class CommCareCaseSerializer(Serializer):
                 if isinstance(simple_data, six.text_type):
                     element.text = simple_data
                 else:
-                    element.text = force_unicode(simple_data)
+                    element.text = force_text(simple_data)
 
         return element
 
