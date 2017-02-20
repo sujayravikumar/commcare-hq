@@ -2,7 +2,7 @@ from __future__ import absolute_import
 import copy
 import logging
 from collections import namedtuple
-from urllib import unquote
+from six.moves.urllib.parse import unquote
 from elasticsearch import Elasticsearch
 from django.conf import settings
 from elasticsearch.exceptions import ElasticsearchException
