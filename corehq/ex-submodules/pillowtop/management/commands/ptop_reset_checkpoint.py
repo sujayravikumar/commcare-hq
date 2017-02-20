@@ -1,3 +1,4 @@
+from __future__ import print_function
 from optparse import make_option
 from django.core.management.base import BaseCommand
 import sys
@@ -24,14 +25,14 @@ class Command(BaseCommand):
 
         if not labels:
             pillow_names = [config.name for config in get_all_pillow_configs()]
-            print "\nNo pillow specified, options are:\n\t%s\n" % ('\n\t'.join(pillow_names))
+            print("\nNo pillow specified, options are:\n\t%s\n" % ('\n\t'.join(pillow_names)))
             sys.exit()
 
         pillow_name = labels[0]
         pillow_to_use = get_pillow_by_name(pillow_name)
         if not pillow_to_use:
-            print ""
-            print "\n\tPillow class [%s] not in configuration, what are you trying to do?\n" % pillow_name
+            print("")
+            print("\n\tPillow class [%s] not in configuration, what are you trying to do?\n" % pillow_name)
             sys.exit()
 
         if not options.get('interactive'):
@@ -45,10 +46,10 @@ Type 'yes' to continue, or 'no' to cancel: """ % pillow_name)
             confirm = 'yes'
 
         if confirm != 'yes':
-            print "Reset cancelled."
+            print("Reset cancelled.")
             return
 
-        print "Resetting checkpoint for %s" % pillow_to_use.checkpoint.checkpoint_id
-        print "\tOld checkpoint: %s" % pillow_to_use.get_checkpoint().sequence
+        print("Resetting checkpoint for %s" % pillow_to_use.checkpoint.checkpoint_id)
+        print("\tOld checkpoint: %s" % pillow_to_use.get_checkpoint().sequence)
         pillow_to_use.checkpoint.reset()
-        print "\n\tNew checkpoint reset to zero"
+        print("\n\tNew checkpoint reset to zero")

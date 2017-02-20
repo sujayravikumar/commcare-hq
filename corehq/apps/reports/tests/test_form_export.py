@@ -1,3 +1,4 @@
+from __future__ import print_function
 from StringIO import StringIO
 import json
 import datetime
@@ -116,7 +117,7 @@ class FormMultimediaExportTest(SimpleTestCase):
                 for name, meta in attachments.items()]
 
             for xform in (couch_xform, sql_xform):
-                print(type(xform).__name__)
+                print((type(xform).__name__))
                 form_info = _extract_form_attachment_info(xform, {"my_group-image_2", "image_1"})
                 attachments = {a['name']: a for a in form_info['attachments']}
                 self.assertTrue(image_1_name in attachments)

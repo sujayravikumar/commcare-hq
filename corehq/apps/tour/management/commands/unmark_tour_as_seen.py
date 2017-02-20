@@ -1,3 +1,4 @@
+from __future__ import print_function
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
 from corehq.apps.tour.models import GuidedTour
@@ -21,13 +22,13 @@ class Command(BaseCommand):
             if confirm == 'yes':
                 user = User.objects.filter(username=username).first()
                 query = GuidedTour.objects.filter(tour_slug=tour_slug, user=user)
-                print ("Found {} to delete".format(query.count()))
+                print(("Found {} to delete".format(query.count())))
                 query.all().delete()
                 print("Complete")
         else:
             confirm = raw_input(CONFIRM_ALL_USERS.format(tour_slug=tour_slug))
             if confirm == 'yes':
                 query = GuidedTour.objects.filter(tour_slug=tour_slug)
-                print ("Found {} to delete".format(query.count()))
+                print(("Found {} to delete".format(query.count())))
                 query.all().delete()
                 print("Complete")

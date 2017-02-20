@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+from __future__ import print_function
 import sys
 import os
 
@@ -41,10 +42,10 @@ def compare_stats(stats1, stats2):
     header_template, row_template = get_templates(col_widths)
     mem_cell_template = '{%:<7,.2%} ({numerator:.0f} / {denominator:.0f})'
     time_cell_template = '{%:<7,.2%} ({numerator:.2f} / {denominator:.2f})'
-    print(header_template.format('App', 'Mem diff %', 'Time diff %'))
+    print((header_template.format('App', 'Mem diff %', 'Time diff %')))
 
     def print_sep():
-        print(header_template.format(*['-' * (width - 1) for width in col_widths]))
+        print((header_template.format(*['-' * (width - 1) for width in col_widths])))
 
     print_sep()
 
@@ -68,18 +69,18 @@ def compare_stats(stats1, stats2):
     all_mem = get_all_diffs('mem')
     all_time = get_all_diffs('time')
     for slug, mem, time in zip(stats1.keys(), all_mem, all_time):
-        print(row_template.format(
+        print((row_template.format(
             slug,
             mem_cell_template.format(**mem),
             time_cell_template.format(**time)
-        ))
+        )))
 
     print_sep()
-    print(row_template.format(
+    print((row_template.format(
         'Average',
         mem_cell_template.format(**avg_dict(all_mem)),
         time_cell_template.format(**avg_dict(all_time)),
-    ))
+    )))
 
 
 if __name__ == '__main__':

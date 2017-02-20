@@ -1,3 +1,4 @@
+from __future__ import print_function
 from django.core.management import BaseCommand
 from corehq.apps.change_feed import topics
 from corehq.apps.change_feed.connection import get_kafka_client
@@ -17,4 +18,4 @@ def create_kafka_topics():
         else:
             client.ensure_topic_exists(topic, timeout=10)
             status = "created"
-        print("topic {}: {}".format(status, topic))
+        print(("topic {}: {}".format(status, topic)))

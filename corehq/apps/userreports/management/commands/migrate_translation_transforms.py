@@ -1,4 +1,5 @@
 from __future__ import absolute_import
+from __future__ import print_function
 from optparse import make_option
 from django.core.management.base import BaseCommand
 from corehq.apps.userreports.models import ReportConfiguration
@@ -44,10 +45,10 @@ class Command(BaseCommand):
             ids=with_progress_bar(report_ids),
             verbose=True,
         )
-        print "Found {} reports using the transform:".format(len(self.reports_using_transform))
-        print "\n".join(self.reports_using_transform)
-        print "Updated the following reports:"
-        print "\n".join(res.updated_ids)
+        print("Found {} reports using the transform:".format(len(self.reports_using_transform)))
+        print("\n".join(self.reports_using_transform))
+        print("Updated the following reports:")
+        print("\n".join(res.updated_ids))
 
     def migrate_report(self, report_config):
         rc = ReportConfiguration.wrap(report_config)

@@ -1,3 +1,4 @@
+from __future__ import print_function
 from pillowtop.run_pillowtop import start_pillows, start_pillow
 
 from optparse import make_option
@@ -45,12 +46,12 @@ class Command(NoArgsCommand):
         pillow_name = options['pillow_name']
         pillow_key = options['pillow_key']
         if list_all:
-            print "\nPillows registered in system:"
+            print("\nPillows registered in system:")
             for config in get_all_pillow_configs():
-                print u'{}: {}'.format(config.section, config.name)
+                print(u'{}: {}'.format(config.section, config.name))
 
-            print "\n\tRun with --pillow-name <name> to run a pillow"
-            print "\n\tRun with --pillow-key <key> to run a group of pillows together\n"
+            print("\n\tRun with --pillow-name <name> to run a pillow")
+            print("\n\tRun with --pillow-key <key> to run a group of pillows together\n")
             sys.exit()
 
         if run_all:
@@ -58,8 +59,8 @@ class Command(NoArgsCommand):
         elif not run_all and not pillow_name and pillow_key:
             # get pillows from key
             if pillow_key not in settings.PILLOWTOPS:
-                print "\n\tError, key %s is not in settings.PILLOWTOPS, legal keys are: %s" % \
-                      (pillow_key, settings.PILLOWTOPS.keys())
+                print("\n\tError, key %s is not in settings.PILLOWTOPS, legal keys are: %s" % \
+                      (pillow_key, settings.PILLOWTOPS.keys()))
                 sys.exit()
             else:
                 pillows_to_run = [get_pillow_config_from_setting(pillow_key, config)
@@ -71,10 +72,10 @@ class Command(NoArgsCommand):
             sys.exit()
         elif list_checkpoints:
             for pillow in get_all_pillow_instances():
-                print pillow.checkpoint.checkpoint_id
+                print(pillow.checkpoint.checkpoint_id)
             sys.exit()
         else:
-            print "\nNo command set, please see --help for runtime instructions"
+            print("\nNo command set, please see --help for runtime instructions")
             sys.exit()
 
         start_pillows(pillows=[pillow_config.get_instance() for pillow_config in pillows_to_run])

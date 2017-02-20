@@ -1,3 +1,4 @@
+from __future__ import print_function
 from django.conf import settings
 from django.core.management import CommandError
 from django.core.management.base import BaseCommand
@@ -18,16 +19,16 @@ class ReindexEventHandler(PaginationEventHandler):
 
     def page_start(self, total_emitted, *args, **kwargs):
         domain, doc_type = kwargs.get('startkey')[:2]
-        print (u'{} Fetching rows {}-{} from couch: domain="{}" doc_type="{}"'.format(
+        print((u'{} Fetching rows {}-{} from couch: domain="{}" doc_type="{}"'.format(
             self.log_prefix,
             total_emitted,
             total_emitted + kwargs['limit'] - 1,
             domain,
             doc_type
-        ))
+        )))
 
     def page_end(self, total_emitted, duration, *args, **kwargs):
-        print('{} View call took {}'.format(self.log_prefix, duration))
+        print(('{} View call took {}'.format(self.log_prefix, duration)))
 
 
 class Command(BaseCommand):

@@ -1,3 +1,4 @@
+from __future__ import print_function
 import logging
 import os
 import filecmp
@@ -67,12 +68,12 @@ class Command(BaseCommand):
 
         common = filecmp.dircmp(v1_dir, v2_dir).common_files
 
-        print("Computing {} diffs...".format(type_name))
+        print(("Computing {} diffs...".format(type_name)))
         for tracked_file in common:
             file_v1 = os.path.join(v1_dir, tracked_file)
             file_v2 = os.path.join(v2_dir, tracked_file)
             diff_file = os.path.join(diff_dir,
                                      get_diff_filename(tracked_file))
-            print(" >> Computing diff for {}".format(tracked_file))
+            print((" >> Computing diff for {}".format(tracked_file)))
             with open(diff_file, "w") as df:
                 df.writelines(get_diff(file_v1, file_v2))

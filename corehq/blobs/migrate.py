@@ -65,6 +65,7 @@ models' attachments to the blob database:
 
 That's it, you're done!
 """
+from __future__ import print_function
 import json
 import os
 import traceback
@@ -157,7 +158,7 @@ class BaseDocMigrator(BaseDocProcessor):
             self.filename = os.path.join(self.dirpath, "export.txt")
 
     def __enter__(self):
-        print("Migration log: {}".format(self.filename))
+        print(("Migration log: {}".format(self.filename)))
         self.backup_file = open(self.filename, 'wb')
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -273,7 +274,7 @@ class BlobDbBackendMigrator(BaseDocMigrator):
     def processing_complete(self, skipped):
         super(BlobDbBackendMigrator, self).processing_complete(skipped)
         if self.not_found:
-            print(PROCESSING_COMPLETE_MESSAGE.format(self.not_found, self.total_blobs))
+            print((PROCESSING_COMPLETE_MESSAGE.format(self.not_found, self.total_blobs)))
 
     def should_process(self, doc):
         return doc.get("external_blobs")
@@ -311,7 +312,7 @@ class BlobDbBackendExporter(BaseDocProcessor):
 
     def processing_complete(self, skipped):
         if self.not_found:
-            print(PROCESSING_COMPLETE_MESSAGE.format(self.not_found, self.total_blobs))
+            print((PROCESSING_COMPLETE_MESSAGE.format(self.not_found, self.total_blobs)))
 
     def should_process(self, doc):
         return doc.get("external_blobs")
@@ -338,11 +339,11 @@ class SqlObjectExporter(object):
 
     def processing_complete(self):
         if self.not_found:
-            print("{} {} objects processed, {} blobs not found".format(
+            print(("{} {} objects processed, {} blobs not found".format(
                 self.total_blobs, self.slug, self.not_found
-            ))
+            )))
         else:
-            print("{} {} objects processed".format(self.total_blobs, self.slug))
+            print(("{} {} objects processed".format(self.total_blobs, self.slug)))
 
 
 class SqlFormAttachmentExporter(SqlObjectExporter):
@@ -470,7 +471,7 @@ class SqlModelMigrator(Migrator):
                     for obj in queryset.iterator():
                         migrator.process_object(obj)
                         if migrator.total_blobs % chunk_size == 0:
-                            print("Processed {} {} objects".format(migrator.total_blobs, self.slug))
+                            print(("Processed {} {} objects".format(migrator.total_blobs, self.slug)))
 
         return migrator.total_blobs, 0
 

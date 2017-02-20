@@ -1,3 +1,4 @@
+from __future__ import print_function
 import codecs
 import os
 import re
@@ -25,7 +26,7 @@ class Command(BaseCommand):
                 content = fd.read()
                 if content is not None:
                     if BOWER_PATH in content:
-                        print("Updated less @imports in {}".format(less_file))
+                        print(("Updated less @imports in {}".format(less_file)))
                         content = content.replace(BOWER_PATH, '../..')
                     else:
                         p = re.search(B3_REGEX, content)
@@ -34,12 +35,12 @@ class Command(BaseCommand):
                             path_file = path_def.split('-')[-2]
                             new_path = settings.LESS_B3_PATHS.get(path_file)
                             if new_path is not None:
-                                print ("[CORRECTING] %(f_name)s path in %(less_file)s: "
+                                print(("[CORRECTING] %(f_name)s path in %(less_file)s: "
                                        "%(new_path)s" % {
                                            'f_name': path_file,
                                            'less_file': less_file,
                                            'new_path': new_path,
-                                       })
+                                       }))
                                 content = re.sub(B3_REGEX, new_path, content)
                             else:
                                 content = None
