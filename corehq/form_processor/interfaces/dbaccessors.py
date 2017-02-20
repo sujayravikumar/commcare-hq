@@ -2,7 +2,7 @@ from abc import ABCMeta, abstractmethod
 from collections import namedtuple
 
 import six
-from StringIO import StringIO
+from six.moves import StringIO
 
 from corehq.util.quickcache import quickcache
 from dimagi.utils.chunked import chunked
