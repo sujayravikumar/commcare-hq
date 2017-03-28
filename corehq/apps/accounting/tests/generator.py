@@ -9,6 +9,8 @@ import mock
 from django.conf import settings
 from django.core.management import call_command
 
+from nose.tools import nottest
+
 from dimagi.utils.data import generator as data_gen
 
 from corehq.apps.accounting.models import (
@@ -36,7 +38,8 @@ from six.moves import range
 
 
 @unit_testing_only
-def instantiate_accounting():
+@nottest
+def bootstrap_test_plans():
     call_command('cchq_software_plan_bootstrap', testing=True)
 
 

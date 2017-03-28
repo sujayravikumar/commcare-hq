@@ -16,7 +16,7 @@ class TestCreditStripePaymentHandler(TransactionTestCase):
 
     def setUp(self):
         super(TestCreditStripePaymentHandler, self).setUp()
-        generator.instantiate_accounting()
+        generator.bootstrap_test_plans()
         self.domain = Domain(name='test-domain')
         self.domain.save()
         self.payment_method = PaymentMethod()
