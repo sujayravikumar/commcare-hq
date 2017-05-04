@@ -11,7 +11,7 @@ from pillowtop.reindexer.change_providers.django_model import DjangoModelChangeP
 from pillowtop.reindexer.reindexer import ElasticPillowReindexer
 
 
-def get_sql_sms_pillow(pillow_id='SqlSMSPillow', params=None):
+def get_sql_sms_pillow(pillow_id='SqlSMSPillow', **kwargs):
     assert pillow_id == 'SqlSMSPillow', 'Pillow ID is not allowed to change'
     kafka_topics = [topics.SMS]
     checkpoint = get_checkpoint_for_elasticsearch_pillow(pillow_id, SMS_INDEX_INFO, kafka_topics)

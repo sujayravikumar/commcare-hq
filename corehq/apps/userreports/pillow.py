@@ -14,7 +14,7 @@ import six
 from corehq.apps.change_feed.consumer.feed import KafkaChangeFeed, KafkaCheckpointEventHandler
 from corehq.apps.hqwebapp.tasks import send_mail_async
 from corehq.apps.userreports.const import (
-    KAFKA_TOPICS, UCR_ES_BACKEND, UCR_SQL_BACKEND, UCR_LABORATORY_BACKEND
+    KAFKA_TOPICS, UCR_ES_BACKEND, UCR_SQL_BACKEND, UCR_LABORATORY_BACKEND, UCR_ES_PRIMARY
 )
 from corehq.apps.userreports.data_source_providers import DynamicDataSourceProvider, StaticDataSourceProvider
 from corehq.apps.userreports.exceptions import TableRebuildError, StaleRebuildError
@@ -156,8 +156,8 @@ class ConfigurableReportTableManagerMixin(object):
         ]
 
     def rebuild_tables_if_necessary(self):
-        sql_supported_backends = [UCR_SQL_BACKEND, UCR_LABORATORY_BACKEND]
-        es_supported_backends = [UCR_ES_BACKEND, UCR_LABORATORY_BACKEND]
+        sql_supported_backends = [UCR_SQL_BACKEND, UCR_LABORATORY_BACKEND, UCR_ES_PRIMARY]
+        es_supported_backends = [UCR_ES_BACKEND, UCR_LABORATORY_BACKEND, UCR_ES_PRIMARY]
         self._rebuild_sql_tables(self._tables_by_engine_id(sql_supported_backends))
         self._rebuild_es_tables(self._tables_by_engine_id(es_supported_backends))
 
@@ -202,8 +202,8 @@ class ConfigurableReportTableManagerMixin(object):
                             {reformatted_diffs}
                             """.format(
                                 table_id=sql_adapter.config.get_id,
-                                raw_diffs=pprint.pprint(raw_diffs, indent=2, width=40),
-                                reformatted_diffs=pprint.pprint(diffs, indent=2, width=40),
+                                raw_diffs=pprint.pformat(raw_diffs, indent=2, width=40),
+                                reformatted_diffs=pprint.pformat(diffs, indent=2, width=40),
                             )
 
                             send_mail_async(
@@ -341,15 +341,12 @@ def _get_topic_partitions(pillow_id, topics, num_processes):
     ]
 
 
-def get_kafka_ucr_pillow(pillow_id='kafka-ucr-main', params=None):
-    params = params or {}
-    ucr_division = params.get('ucr_division')
-    include_ucrs = params.get('include_ucrs')
-    exclude_ucrs = params.get('exclude_ucrs')
-
-    num_processes = params.get('num_processes', 1)
-    process_num = params.get('process_num', 0)
-    topics = params.get('topics', KAFKA_TOPICS)
+def get_kafka_ucr_pillow(pillow_id='kafka-ucr-main', ucr_division=None,
+                         include_ucrs=None, exclude_ucrs=None, topics=None,
+                         **kwargs):
+    num_processes = kwargs.get('num_processes', 1)
+    process_num = kwargs.get('process_num', 0)
+    topics = topics or KAFKA_TOPICS
     topics = [kafka_bytestring(t) for t in topics]
     topics = _get_topic_partitions(pillow_id, topics, num_processes)[process_num]
 
@@ -366,15 +363,12 @@ def get_kafka_ucr_pillow(pillow_id='kafka-ucr-main', params=None):
     )
 
 
-def get_kafka_ucr_static_pillow(pillow_id='kafka-ucr-static', params=None):
-    params = params or {}
-    ucr_division = params.get('ucr_division')
-    include_ucrs = params.get('include_ucrs')
-    exclude_ucrs = params.get('exclude_ucrs')
-
-    num_processes = params.get('num_processes', 1)
-    process_num = params.get('process_num', 0)
-    topics = params.get('topics', KAFKA_TOPICS)
+def get_kafka_ucr_static_pillow(pillow_id='kafka-ucr-static', ucr_division=None,
+                                include_ucrs=None, exclude_ucrs=None, topics=None,
+                                **kwargs):
+    num_processes = kwargs.get('num_processes', 1)
+    process_num = kwargs.get('process_num', 0)
+    topics = topics or KAFKA_TOPICS
     topics = [kafka_bytestring(t) for t in topics]
     topics = _get_topic_partitions(pillow_id, topics, num_processes)[process_num]
 

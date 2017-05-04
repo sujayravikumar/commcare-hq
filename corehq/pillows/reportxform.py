@@ -35,7 +35,7 @@ def transform_xform_for_report_forms_index(doc_dict):
     return doc_ret
 
 
-def get_report_xform_to_elasticsearch_pillow(pillow_id='ReportXFormToElasticsearchPillow', params=None):
+def get_report_xform_to_elasticsearch_pillow(pillow_id='ReportXFormToElasticsearchPillow', **kwargs):
     assert pillow_id == 'ReportXFormToElasticsearchPillow', 'Pillow ID is not allowed to change'
     kafka_topics = [topics.FORM, topics.FORM_SQL]
     checkpoint = get_checkpoint_for_elasticsearch_pillow(pillow_id, REPORT_XFORM_INDEX_INFO, kafka_topics)

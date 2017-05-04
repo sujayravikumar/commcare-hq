@@ -69,7 +69,7 @@ class CaseSearchPillowProcessor(ElasticProcessor):
             super(CaseSearchPillowProcessor, self).process_change(pillow_instance, change)
 
 
-def get_case_search_to_elasticsearch_pillow(pillow_id='CaseSearchToElasticsearchPillow', params=None):
+def get_case_search_to_elasticsearch_pillow(pillow_id='CaseSearchToElasticsearchPillow', **kwargs):
     assert pillow_id == 'CaseSearchToElasticsearchPillow', 'Pillow ID is not allowed to change'
     kafka_topics = [topics.CASE, topics.CASE_SQL]
     checkpoint = get_checkpoint_for_elasticsearch_pillow(pillow_id, CASE_SEARCH_INDEX_INFO, kafka_topics)
