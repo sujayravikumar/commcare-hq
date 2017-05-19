@@ -29,6 +29,9 @@ from django_prbac.utils import has_privilege
 from soil.exceptions import TaskFailedError
 from soil.util import get_download_context, expose_cached_download
 
+from custom.enikshay.user_setup import (ENikshayNewMobileWorkerForm,
+                                        ENikshayUserDataEditor,
+                                        ENikshayUpdateCommCareUserInfoForm)
 from corehq import privileges
 from corehq.apps.accounting.async_handlers import Select2BillingInfoHandler
 from corehq.apps.accounting.decorators import requires_privilege_with_fallback
@@ -81,7 +84,7 @@ from corehq.apps.users.util import can_add_extra_mobile_workers, format_username
 from corehq.apps.users.exceptions import InvalidMobileWorkerRequest
 from corehq.apps.users.views import BaseUserSettingsView, BaseEditUserView, get_domain_languages
 from corehq.const import USER_DATE_FORMAT, GOOGLE_PLAY_STORE_COMMCARE_URL
-from corehq.toggles import SUPPORT, ANONYMOUS_WEB_APPS_USAGE
+from corehq.toggles import SUPPORT, ANONYMOUS_WEB_APPS_USAGE, ENIKSHAY
 from corehq.util.workbook_json.excel import JSONReaderError, HeaderValueError, \
     WorksheetNotFound, WorkbookJSONReader, enforce_string_type, StringTypeRequiredError, \
     InvalidExcelFileException
@@ -93,6 +96,10 @@ BULK_MOBILE_HELP_SITE = ("https://confluence.dimagi.com/display/commcarepublic"
                          "ManageCommCareMobileWorkers-B.UseBulkUploadtocreatem"
                          "ultipleusersatonce")
 DEFAULT_USER_LIST_LIMIT = 10
+
+
+def _get_user_data_editor(domain):
+    return ENikshayUserDataEditor if ENIKSHAY.enabled(domain) else CustomDataEditor
 
 
 def _can_edit_workers_location(web_user, mobile_worker):
@@ -107,8 +114,13 @@ def _can_edit_workers_location(web_user, mobile_worker):
 @location_safe
 class EditCommCareUserView(BaseEditUserView):
     urlname = "edit_commcare_user"
-    user_update_form_class = UpdateCommCareUserInfoForm
     page_title = ugettext_noop("Edit Mobile Worker")
+
+    @property
+    def user_update_form_class(self):
+        if ENIKSHAY.enabled(self.domain):
+            return ENikshayUpdateCommCareUserInfoForm
+        return UpdateCommCareUserInfoForm
 
     @property
     def template_name(self):
@@ -135,7 +147,7 @@ class EditCommCareUserView(BaseEditUserView):
     @memoized
     def custom_data(self):
         is_custom_data_post = self.request.method == "POST" and self.request.POST['form_type'] == "update-user"
-        return CustomDataEditor(
+        return _get_user_data_editor(self.domain)(
             field_view=UserFieldsView,
             domain=self.domain,
             existing_custom_data=self.editable_user.user_data,
@@ -553,9 +565,11 @@ class MobileWorkerListView(JSONResponseMixin, BaseUserSettingsView):
     @property
     @memoized
     def new_mobile_worker_form(self):
+        form_class = (ENikshayNewMobileWorkerForm if ENIKSHAY.enabled(self.domain)
+                      else NewMobileWorkerForm)
         if self.request.method == "POST":
-            return NewMobileWorkerForm(self.request.project, self.couch_user, self.request.POST)
-        return NewMobileWorkerForm(self.request.project, self.couch_user)
+            return form_class(self.request.project, self.couch_user, self.request.POST)
+        return form_class(self.request.project, self.couch_user)
 
     @property
     @memoized
@@ -574,7 +588,7 @@ class MobileWorkerListView(JSONResponseMixin, BaseUserSettingsView):
     @property
     @memoized
     def custom_data(self):
-        return CustomDataEditor(
+        return _get_user_data_editor(self.domain)(
             field_view=UserFieldsView,
             domain=self.domain,
             post_dict=self.request.POST if self.request.method == "POST" else None,
@@ -896,7 +910,7 @@ class CreateCommCareUserModal(JsonRequestResponseMixin, DomainViewMixin, View):
     @property
     @memoized
     def custom_data(self):
-        return CustomDataEditor(
+        return _get_user_data_editor(self.domain)(
             field_view=UserFieldsView,
             domain=self.domain,
             post_dict=self.request.POST if self.request.method == "POST" else None,

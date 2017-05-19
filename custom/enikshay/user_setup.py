@@ -310,3 +310,45 @@ def connect_signals():
     clean_location.connect(clean_location_callback, dispatch_uid="clean_location_callback")
     clean_commcare_user.connect(clean_user_callback, dispatch_uid="clean_user_callback")
     commcare_user_post_save.connect(save_user_callback, dispatch_uid="save_user_callback")
+
+
+from corehq.apps.custom_data_fields import CustomDataEditor
+from corehq.apps.locations.forms import LocationFormSet
+from corehq.apps.users.forms import NewMobileWorkerForm, UpdateCommCareUserInfoForm
+
+
+class ENikshayNewMobileWorkerForm(NewMobileWorkerForm):
+    """Mobile worker list view create modal"""
+    def __init__(self, *args, **kwargs):
+        print "ENikshayNewMobileWorkerForm"
+        super(ENikshayNewMobileWorkerForm, self).__init__(*args, **kwargs)
+
+
+class ENikshayUpdateCommCareUserInfoForm(UpdateCommCareUserInfoForm):
+    """Edit user page"""
+    def __init__(self, *args, **kwargs):
+        print 'ENikshayUpdateCommCareUserInfoForm'
+        super(ENikshayUpdateCommCareUserInfoForm, self).__init__(*args, **kwargs)
+
+
+class ENikshayUserDataEditor(CustomDataEditor):
+    """Custom User Data (everywhere it turns up)"""
+    def __init__(self, *args, **kwargs):
+        print 'ENikshayUserDataEditor'
+        super(ENikshayUserDataEditor, self).__init__(*args, **kwargs)
+
+
+class ENikshayCommCareAccountForm(CommCareAccountForm):
+    """Modal to create user from location page"""
+    def __init__(self, *args, **kwargs):
+        print 'ENikshayCommCareAccountForm'
+        super(ENikshayCommCareAccountForm, self).__init__(*args, **kwargs)
+
+
+class ENikshayLocationFormSet(LocationFormSet):
+    """Location, custom data, and possibly location user and data forms"""
+    user_form_class = ENikshayNewMobileWorkerForm
+
+    def __init__(self, *args, **kwargs):
+        print 'ENikshayLocationFormSet'
+        super(ENikshayLocationFormSet, self).__init__(*args, **kwargs)
