@@ -441,7 +441,7 @@ class LocationFormSet(object):
         form = self._user_form_class(
             project=domain_obj,
             data=bound_data,
-            user=self.request_user,
+            request_user=self.request_user,
             prefix='location_user',
         )
 
