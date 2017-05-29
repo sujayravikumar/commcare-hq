@@ -45,11 +45,20 @@ def enikshay_task():
         updater.run()
 
 
-class EpisodeUpdater(object):
-    """This iterates over all open 'episode' cases and sets 'adherence' related properties
-    according to this spec https://docs.google.com/document/d/1FjSdLYOYUCRBuW3aSxvu3Z5kvcN6JKbpDFDToCgead8/edit
+class Timer:
+    def __enter__(self):
+        self.start = datetime.datetime.now()
+        return self
 
-    This is applicable to various enikshay domains. The domain can be specified in the initalization
+    def __exit__(self, *args):
+        self.end = datetime.datetime.now()
+        self.interval = (self.end - self.start).seconds
+
+
+class EpisodeUpdater(object):
+    """
+    This iterates over all open 'episode' cases and sets 'adherence' and 'voucher' related properties
+    This is applicable to various enikshay domains. The domain can be specified in __init__ method
     """
 
     def __init__(self, domain):
@@ -61,25 +70,40 @@ class EpisodeUpdater(object):
 
     def run(self):
         # iterate over all open 'episode' cases and set 'adherence' properties
-        for episode in self._get_open_episode_cases():
-            adherence_update = EpisodeAdherenceUpdate(episode, self)
-            voucher_update = EpisodeVoucherUpdate(self.domain, episode)
-            try:
-                update_json = adherence_update.update_json()['update']
-                update_json.update(voucher_update.update_json())
-                case_block = self._get_case_block(update_json, episode.case_id)
-                if case_block:
-                    submit_case_blocks(
-                        [ElementTree.tostring(case_block.as_xml())],
-                        self.domain
+        update_count = 0
+        noupdate_count = 0
+        error_count = 0
+        with Timer() as t:
+            for episode in self._get_open_episode_cases():
+                adherence_update = EpisodeAdherenceUpdate(episode, self)
+                voucher_update = EpisodeVoucherUpdate(self.domain, episode)
+                try:
+                    update_json = adherence_update.update_json()['update']
+                    update_json.update(voucher_update.update_json())
+                    case_block = self._get_case_block(update_json, episode.case_id)
+                    if case_block:
+                        submit_case_blocks(
+                            [ElementTree.tostring(case_block.as_xml())],
+                            self.domain
+                        )
+                        update_count += 1
+                    else:
+                        noupdate_count += 1
+                except Exception, e:
+                    error_count += 1
+                    logger.error(
+                        "Error calculating updates for episode case_id({}): {}".format(
+                            episode.case_id,
+                            e
+                        )
                     )
-            except Exception, e:
-                logger.error(
-                    "Error calculating updates for episode case_id({}): {}".format(
-                        episode.case_id,
-                        e
-                    )
-                )
+        logger.info(
+            "Summary of enikshay_task: domain: {domain}, duration (sec): {duration} "
+            "Cases Updated {updates}, cases errored {errors} and {noupdates} "
+            "cases didn't need update. ".format(
+                domain=self.domain, duration=t.interval, updates=update_count, errors=error_count,
+                noupdates=noupdate_count)
+        )
 
     @staticmethod
     def _get_case_block(update, episode_id):
@@ -105,13 +129,19 @@ class EpisodeUpdater(object):
     @memoized
     def get_doses_data(self):
         # return 'doses_per_week' by 'schedule_id' from the Fixture data
-        fixtures = FixtureDataItem.get_indexed_items(self.domain, DAILY_SCHEDULE_FIXTURE_NAME, SCHEDULE_ID_FIXTURE)
-        return dict((k, int(fixture['doses_per_week'])) for k, fixture in fixtures.items())
+        fixtures = FixtureDataItem.get_item_list(self.domain, DAILY_SCHEDULE_FIXTURE_NAME)
+        doses_per_week_by_schedule_id = {}
+        for f in fixtures:
+            schedule_id = f.fields[SCHEDULE_ID_FIXTURE].field_list[0].field_value
+            doses_per_week = int(f.fields["doses_per_week"].field_list[0].field_value)
+            doses_per_week_by_schedule_id[schedule_id] = doses_per_week
+        return doses_per_week_by_schedule_id
 
 
 class EpisodeAdherenceUpdate(object):
     """
     Class to capture adherence related calculations specific to an 'episode' case
+    per the spec https://docs.google.com/document/d/1FjSdLYOYUCRBuW3aSxvu3Z5kvcN6JKbpDFDToCgead8/edit
     """
     def __init__(self, episode_case, case_updater):
         """
@@ -154,7 +184,8 @@ class EpisodeAdherenceUpdate(object):
             self.episode.case_id
         )
 
-    def calculate_doses_taken_by_day(self, adherence_cases):
+    @staticmethod
+    def calculate_doses_taken_by_day(adherence_cases):
         """
         Args:
             adherence_cases: list of 'adherence' case dicts
@@ -225,7 +256,8 @@ class EpisodeAdherenceUpdate(object):
             )
             return None
 
-    def count_doses_taken(self, dose_taken_by_date, lte=None, gte=None):
+    @staticmethod
+    def count_doses_taken(dose_taken_by_date, lte=None, gte=None):
         """
         Args:
             dose_taken_by_date: result of self.calculate_doses_taken_by_day
@@ -318,7 +350,23 @@ class EpisodeAdherenceUpdate(object):
                         True,
                         "No fixture item found with schedule_id {}".format(adherence_schedule_id)
                     )
-        return {'update': update, 'debug_data': debug_data}
+        if self.check_if_needs_update(update):
+            return {'update': update, 'debug_data': debug_data}
+        else:
+            return {'update': None, 'debug_data': debug_data}
+
+    def check_if_needs_update(self, case_properties_expected):
+        """
+        Args:
+            case_properties_expected: dict of case property name to values
+
+        Returns:
+            True if any one of case_properties_expected is not set on self.episode case
+        """
+        return any([
+            self.get_property(k) != v
+            for (k, v) in case_properties_expected.iteritems()
+        ])
 
 
 class EpisodeVoucherUpdate(object):
