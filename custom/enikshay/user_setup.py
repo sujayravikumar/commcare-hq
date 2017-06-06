@@ -35,6 +35,7 @@ LOC_TYPES_TO_USER_TYPES = {
 
 
 def skip_custom_setup(domain, request_user):
+    return True  # We're gonna revisit this, turning off for now
     return not toggles.ENIKSHAY.enabled(domain) or request_user.is_domain_admin(domain)
 
 
@@ -347,6 +348,9 @@ class ENikshayUserLocationDataEditor(CustomDataEditor):
     @property
     @memoized
     def fields(self):
+        if not self.required_only:
+            return self.model.get_fields(required_only=False)
+
         # non-required fields are typically excluded from creation UIs
         fields_to_include = [field[0] for field in AGENCY_LOCATION_FIELDS]
         return [
@@ -381,15 +385,6 @@ class ENikshayUserLocationDataEditor(CustomDataEditor):
                 ],
             )
         return super(ENikshayUserLocationDataEditor, self)._make_field(field)
-
-    def init_form(self, post_dict=None):
-        form = super(ENikshayUserLocationDataEditor, self).init_form(post_dict)
-        fs = form.helper.layout[0]
-        assert isinstance(fs, crispy.Fieldset)
-        for i, field in enumerate(fs.fields):
-            if field == 'suborganization':
-                pass # TODO add in special logic to display on org, not loctype
-        return form
 
 
 def get_new_username_and_id(domain, attempts_remaining=3):

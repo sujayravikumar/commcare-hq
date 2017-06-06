@@ -199,27 +199,8 @@ class DataSourceConfiguration(UnicodeMixIn, CachedCouchDocumentMixin, Document):
     @property
     @memoized
     def named_filter_objects(self):
-        named_filter_specs = copy(self.named_filters)
-        named_filters = {}
-        while named_filter_specs:
-            number_generated = 0
-            for name, named_filter in named_filter_specs.items():
-                try:
-                    named_filters[name] = FilterFactory.from_spec(
-                        named_filter,
-                        FactoryContext(self.named_expression_objects, named_filters)
-                    )
-                    number_generated += 1
-                    del named_filter_specs[name]
-                except BadSpecError as spec_error:
-                    # maybe a nested name resolution issue, try again on the next pass
-                    pass
-            if number_generated == 0 and named_filter_specs:
-                # we unsuccessfully generated anything on this pass and there are still unresolved
-                # references. we have to fail.
-                assert spec_error is not None
-                raise spec_error
-        return named_filters
+        return {name: FilterFactory.from_spec(filter, FactoryContext(self.named_expression_objects, {}))
+                for name, filter in self.named_filters.items()}
 
     def get_factory_context(self):
         return FactoryContext(self.named_expression_objects, self.named_filter_objects)
@@ -742,7 +723,7 @@ class AsyncIndicator(models.Model):
     """
     doc_id = models.CharField(max_length=255, null=False, db_index=True, unique=True)
     doc_type = models.CharField(max_length=126, null=False)
-    domain = models.CharField(max_length=126, null=False)
+    domain = models.CharField(max_length=126, null=False, db_index=True)
     indicator_config_ids = ArrayField(
         models.CharField(max_length=126, null=True, blank=True),
         null=False
