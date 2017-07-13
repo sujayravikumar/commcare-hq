@@ -1,4 +1,5 @@
 from __future__ import print_function
+import logging
 import multiprocessing
 import os
 
@@ -12,6 +13,8 @@ from django.conf import settings
 from djcelery.loaders import DjangoLoader
 from datetime import datetime
 from time import sleep, time
+
+celery_task_logger = logging.getLogger('celery.task')
 
 
 def no_result_task(*args, **kwargs):
@@ -207,19 +210,31 @@ class LoadBasedAutoscaler(Autoscaler):
             # if we can't get the load average, let's just use normal autoscaling
             load_avgs = None
             normalized_load = 0
+            celery_task_logger.info("Couldn't get load average")
 
         if cur > procs and normalized_load < 0.90:
+            celery_task_logger.info("cur: {}, procs: {}, load: {}".format([cur, procs, normalized_load]))
             self.scale_up(cur - procs)
             return True
         elif procs > self.min_concurrency:
             if cur < procs:
+                celery_task_logger.info("cur: {}, procs: {}, load: {}".format([cur, procs, normalized_load]))
                 self.scale_down(min(procs - cur, procs - self.min_concurrency))
                 return True
             elif normalized_load > 0.90:
                 # if load is too high trying scaling down 1 worker at a time.
                 # if we're already at minimum concurrency let's just ride it out
+                celery_task_logger.info("cur: {}, procs: {}, load: {}".format([cur, procs, normalized_load]))
                 self.scale_down(1)
                 return True
+            else:
+                celery_task_logger.info(
+                    "above min currency cur: {}, procs: {}, load: {}".format([cur, procs, normalized_load])
+                )
+        else:
+            celery_task_logger.info(
+                "at min currency cur: {}, procs: {}, load: {}".format([cur, procs, normalized_load])
+            )
 
 
 class OffPeakLoadBasedAutoscaler(LoadBasedAutoscaler):
@@ -251,7 +266,8 @@ class OffPeakLoadBasedAutoscaler(LoadBasedAutoscaler):
             elif procs == self.min_concurrency:
                 return False
 
-        super(OffPeakLoadBasedAutoscaler, self)._maybe_scale(req)
+        celery_task_logger.info("falling back to parent class")
+        return super(OffPeakLoadBasedAutoscaler, self)._maybe_scale(req)
 
 
 class LoadBasedLoader(DjangoLoader):
