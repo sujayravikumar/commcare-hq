@@ -199,7 +199,7 @@ def get_running_workers(timeout=10):
 class LoadBasedAutoscaler(Autoscaler):
     def _maybe_scale(self, req=None):
         procs = self.processes
-        cur = min(self.qty, self.max_concurrency)
+        cur = self.max_concurrency
 
         available_cpus = multiprocessing.cpu_count()
         try:
@@ -217,13 +217,7 @@ class LoadBasedAutoscaler(Autoscaler):
             self.scale_up(cur - procs)
             return True
         elif procs > self.min_concurrency:
-            if cur < procs:
-                celery_task_logger.info(
-                    "normal down cur: {}, procs: {}, load: {}".format(cur, procs, normalized_load)
-                )
-                self.scale_down(min(procs - cur, procs - self.min_concurrency))
-                return True
-            elif normalized_load > 0.90:
+            if normalized_load > 0.90:
                 # if load is too high trying scaling down 1 worker at a time.
                 # if we're already at minimum concurrency let's just ride it out
                 celery_task_logger.info(
