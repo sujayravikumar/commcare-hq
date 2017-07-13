@@ -213,27 +213,31 @@ class LoadBasedAutoscaler(Autoscaler):
             celery_task_logger.info("Couldn't get load average")
 
         if cur > procs and normalized_load < 0.90:
-            celery_task_logger.info("cur: {}, procs: {}, load: {}".format([cur, procs, normalized_load]))
+            celery_task_logger.info("cur: {}, procs: {}, load: {}".format(cur, procs, normalized_load))
             self.scale_up(cur - procs)
             return True
         elif procs > self.min_concurrency:
             if cur < procs:
-                celery_task_logger.info("cur: {}, procs: {}, load: {}".format([cur, procs, normalized_load]))
+                celery_task_logger.info(
+                    "normal down cur: {}, procs: {}, load: {}".format(cur, procs, normalized_load)
+                )
                 self.scale_down(min(procs - cur, procs - self.min_concurrency))
                 return True
             elif normalized_load > 0.90:
                 # if load is too high trying scaling down 1 worker at a time.
                 # if we're already at minimum concurrency let's just ride it out
-                celery_task_logger.info("cur: {}, procs: {}, load: {}".format([cur, procs, normalized_load]))
+                celery_task_logger.info(
+                    "load down cur: {}, procs: {}, load: {}".format(cur, procs, normalized_load)
+                )
                 self.scale_down(1)
                 return True
             else:
                 celery_task_logger.info(
-                    "above min currency cur: {}, procs: {}, load: {}".format([cur, procs, normalized_load])
+                    "above min currency cur: {}, procs: {}, load: {}".format(cur, procs, normalized_load)
                 )
         else:
             celery_task_logger.info(
-                "at min currency cur: {}, procs: {}, load: {}".format([cur, procs, normalized_load])
+                "at min currency cur: {}, procs: {}, load: {}".format(cur, procs, normalized_load)
             )
 
 
