@@ -14,13 +14,14 @@ celery_task_logger = logging.getLogger('celery.task')
 
 
 @periodic_task(run_every=crontab(minute=0, hour=21), acks_late=True, queue='background_queue')
-def move_ucr_data_into_aggregation_tables(date=None):
+def move_ucr_data_into_aggregation_tables(date=None, intervals=3):
     date = date or datetime.utcnow().date()
-    now = datetime.utcnow().date()
+    monthly_date = date.replace(day=1)
+    now = datetime.utcnow().date().replace(day=1)
     if hasattr(settings, "ICDS_UCR_DATABASE_ALIAS") and settings.ICDS_UCR_DATABASE_ALIAS:
         with connections[settings.ICDS_UCR_DATABASE_ALIAS].cursor() as cursor:
 
-            path = os.path.join(os.path.dirname(__file__), 'sql_templates', 'create_functions.sql')
+            path = os.path.join(os.path.dirname(__file__), 'migrations', 'sql_templates', 'create_functions.sql')
             celery_task_logger.info("Starting icds reports create_functions")
             with open(path, "r") as sql_file:
                 sql_to_execute = sql_file.read()
@@ -37,12 +38,11 @@ def move_ucr_data_into_aggregation_tables(date=None):
             path = os.path.join(os.path.dirname(__file__), 'sql_templates', 'update_monthly_aggregate_tables.sql')
             with open(path, "r") as sql_file:
                 sql_to_execute = sql_file.read()
-                date_diff = relativedelta(now, date)
+                date_diff = relativedelta(now, monthly_date)
                 months = date_diff.years * 12 + date_diff.months
                 for interval in [
-                    "{} months".format(months),
-                    "{} months".format(months + 1),
-                    "{} months".format(months + 2)
+                    "{} months".format(months + x)
+                    for x in range(intervals)
                 ]:
                     celery_task_logger.info(
                         "Starting icds reports {} update_monthly_aggregate_tables".format(interval)
