@@ -1,0 +1,13 @@
+state_id,district_id,block_id,supervisor_id,awc_id,month,beneficiary_type,caste,disabled,minority,resident,thr_eligible,rations_21_plus_distributed,aggregation_level
+d982a6fb4cca0824fbde59db18d3800f,d982a6fb4cca0824fbde59db18d30e29,d982a6fb4cca0824fbde59db18d17dd1,All,All,2017-04-01,pregnant,All,All,All,All,435,0,3
+d982a6fb4cca0824fbde59db18d3800f,d982a6fb4cca0824fbde59db18d30e29,d982a6fb4cca0824fbde59db18d184a2,All,All,2017-04-01,lactating,All,All,All,All,628,35,3
+d982a6fb4cca0824fbde59db18d3800f,d982a6fb4cca0824fbde59db18d30e29,d982a6fb4cca0824fbde59db18d184a2,All,All,2017-04-01,other,All,All,All,All,0,0,3
+d982a6fb4cca0824fbde59db18d3800f,d982a6fb4cca0824fbde59db18d30e29,d982a6fb4cca0824fbde59db18d184a2,All,All,2017-04-01,child,All,All,All,All,863,78,3
+d982a6fb4cca0824fbde59db18d3800f,d982a6fb4cca0824fbde59db18d30e29,d982a6fb4cca0824fbde59db18d17c1e,All,All,2017-04-01,other,All,All,All,All,0,0,3
+d982a6fb4cca0824fbde59db18d3800f,d982a6fb4cca0824fbde59db18d30e29,d982a6fb4cca0824fbde59db18d17c1e,All,All,2017-04-01,child,All,All,All,All,1165,0,3
+d982a6fb4cca0824fbde59db18d3800f,d982a6fb4cca0824fbde59db18d30e29,d982a6fb4cca0824fbde59db18d17c1e,All,All,2017-04-01,lactating,All,All,All,All,327,0,3
+d982a6fb4cca0824fbde59db18d3800f,d982a6fb4cca0824fbde59db18d30e29,d982a6fb4cca0824fbde59db18d17dd1,All,All,2017-04-01,lactating,All,All,All,All,649,1,3
+d982a6fb4cca0824fbde59db18d3800f,d982a6fb4cca0824fbde59db18d30e29,d982a6fb4cca0824fbde59db18d184a2,All,All,2017-04-01,pregnant,All,All,All,All,423,38,3
+d982a6fb4cca0824fbde59db18d3800f,d982a6fb4cca0824fbde59db18d30e29,d982a6fb4cca0824fbde59db18d17dd1,All,All,2017-04-01,child,All,All,All,All,1328,0,3
+d982a6fb4cca0824fbde59db18d3800f,d982a6fb4cca0824fbde59db18d30e29,d982a6fb4cca0824fbde59db18d17dd1,All,All,2017-04-01,other,All,All,All,All,0,0,3
+d982a6fb4cca0824fbde59db18d3800f,d982a6fb4cca0824fbde59db18d30e29,d982a6fb4cca0824fbde59db18d17c1e,All,All,2017-04-01,pregnant,All,All,All,All,244,0,3

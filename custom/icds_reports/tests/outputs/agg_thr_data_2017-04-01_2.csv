@@ -1,0 +1,5 @@
+state_id,district_id,block_id,supervisor_id,awc_id,month,beneficiary_type,caste,disabled,minority,resident,thr_eligible,rations_21_plus_distributed,aggregation_level
+d982a6fb4cca0824fbde59db18d3800f,d982a6fb4cca0824fbde59db18d30e29,All,All,All,2017-04-01,other,All,All,All,All,0,0,2
+d982a6fb4cca0824fbde59db18d3800f,d982a6fb4cca0824fbde59db18d30e29,All,All,All,2017-04-01,child,All,All,All,All,3356,78,2
+d982a6fb4cca0824fbde59db18d3800f,d982a6fb4cca0824fbde59db18d30e29,All,All,All,2017-04-01,lactating,All,All,All,All,1604,36,2
+d982a6fb4cca0824fbde59db18d3800f,d982a6fb4cca0824fbde59db18d30e29,All,All,All,2017-04-01,pregnant,All,All,All,All,1102,38,2
