@@ -147,15 +147,7 @@ class AggregationScriptTest(TransactionTestCase):
             with open(os.path.join(path, file_name)) as f:
                 table_name = FILE_NAME_TO_TABLE_MAPPING[file_name[:-4]]
                 table = metadata.tables[table_name]
-                csv_data = [row for row in csv.DictReader(f) if 'doc_id' not in row or row['doc_id']]
-                for row in csv_data:
-                    for key, value in six.iteritems(row):
-                        if value == '':
-                            row[key] = None
                 postgres_copy.copy_from(f, table, engine, format='csv', null='', header=True)
-
-                with engine.begin() as connection:
-                    connection.execute(table.insert().values(csv_data))
 
     @classmethod
     def setUpClass(cls):
