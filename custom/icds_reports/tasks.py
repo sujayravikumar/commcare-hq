@@ -17,7 +17,7 @@ celery_task_logger = logging.getLogger('celery.task')
 def move_ucr_data_into_aggregation_tables(date=None, intervals=3):
     date = date or datetime.utcnow().date()
     monthly_date = date.replace(day=1)
-    now = datetime.utcnow().date().replace(day=1)
+    now = datetime.utcnow().date()
     if hasattr(settings, "ICDS_UCR_DATABASE_ALIAS") and settings.ICDS_UCR_DATABASE_ALIAS:
         with connections[settings.ICDS_UCR_DATABASE_ALIAS].cursor() as cursor:
 

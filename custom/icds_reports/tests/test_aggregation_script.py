@@ -3,6 +3,7 @@ import os
 import re
 from decimal import Decimal
 
+import mock
 import six
 import sqlalchemy
 from datetime import datetime, date, time
@@ -10,15 +11,17 @@ from django.db import connections
 from django.test.testcases import TransactionTestCase
 import postgres_copy
 
+from corehq.apps.userreports.models import StaticDataSourceConfiguration
+from corehq.apps.userreports.tasks import rebuild_indicators
 from corehq.sql_db.connections import connection_manager
 from custom.icds_reports.tasks import move_ucr_data_into_aggregation_tables
 
 FILE_NAME_TO_TABLE_MAPPING = {
     'awc_mgmt': 'config_report_icds-cas_static-awc_mgt_forms_ad1b11f0',
     'ccs_cases': 'config_report_icds-cas_static-ccs_record_cases_cedcca39',
-    'ccs_monthly': 'config_report_icds-cas_static-ccs_record_cases_monthly_33021c88',
+    'ccs_monthly': 'config_report_icds-cas_static-ccs_record_cases_monthly_d0e2e49e',
     'child_cases': 'config_report_icds-cas_static-child_health_cases_a46c129f',
-    'child_monthly': 'config_report_icds-cas_static-child_cases_monthly_tabl_d4032f37',
+    'child_monthly': 'config_report_icds-cas_static-child_cases_monthly_tabl_551fd064',
     'daily_feeding': 'config_report_icds-cas_static-daily_feeding_forms_85b1167f',
     'household_cases': 'household_cases',
     'infrastructure': 'config_report_icds-cas_static-infrastructure_form_05fe0f1a',
@@ -35,7 +38,7 @@ OUTPUT_PATH = os.path.join(os.path.dirname(__file__), 'outputs')
 class AggregationScriptTest(TransactionTestCase):
 
     def _load_csv(self, path):
-        with open(path) as f:
+        with open(path, mode='rb') as f:
             csv_data = list(csv.reader(f))
             headers = csv_data[0]
             for row_count, row in enumerate(csv_data):
@@ -69,7 +72,8 @@ class AggregationScriptTest(TransactionTestCase):
 
     def _load_data_from_db(self, table_name):
         engine = connection_manager.get_session_helper('default').engine
-        metadata = sqlalchemy.MetaData(bind=engine, reflect=True)
+        metadata = sqlalchemy.MetaData(bind=engine)
+        metadata.reflect(bind=engine)
         table = metadata.tables[table_name]
         columns = [
             column.name
@@ -87,7 +91,7 @@ class AggregationScriptTest(TransactionTestCase):
                         row[idx] = str(value)
                     elif isinstance(value, (float, Decimal)):
                         row[idx] = self._convert_decimal_to_string(row[idx])
-                    elif isinstance(value, basestring):
+                    elif isinstance(value, six.string_types):
                         row[idx] = value.encode('utf-8')
                     elif value is None:
                         row[idx] = 'None'
@@ -106,8 +110,8 @@ class AggregationScriptTest(TransactionTestCase):
             differences = []
 
             for key in dict1.keys():
-                value1 = dict1[key]
-                value2 = dict2[key]
+                value1 = dict1[key].replace('\r\n', '\n')
+                value2 = dict2[key].replace('\r\n', '\n')
                 if value1 != value2:
                     differences.append(key)
 
@@ -115,7 +119,7 @@ class AggregationScriptTest(TransactionTestCase):
                 messages.append("""
                     Actual and expected row {} are not the same
                     Actual:   {}
-                    Expected: {} 
+                    Expected: {}
                 """.format(
                     idx + 1,
                     ', '.join(['{}: {}'.format(difference, dict1[difference]) for difference in differences]),
@@ -141,7 +145,8 @@ class AggregationScriptTest(TransactionTestCase):
     @classmethod
     def setUpTestData(cls):
         engine = connection_manager.get_session_helper('default').engine
-        metadata = sqlalchemy.MetaData(bind=engine, reflect=True)
+        metadata = sqlalchemy.MetaData(bind=engine)
+        metadata.reflect(bind=engine)
         path = os.path.join(os.path.dirname(__file__), 'fixtures')
         for file_name in os.listdir(path):
             with open(os.path.join(path, file_name)) as f:
@@ -152,6 +157,17 @@ class AggregationScriptTest(TransactionTestCase):
     @classmethod
     def setUpClass(cls):
         super(AggregationScriptTest, cls).setUpClass()
+        _call_center_domain_mock = mock.patch(
+            'corehq.apps.callcenter.data_source.call_center_data_source_configuration_provider'
+        )
+        _call_center_domain_mock.start()
+        tables = StaticDataSourceConfiguration.by_domain('icds-cas')
+
+        for table in tables:
+            if table.table_id == 'static-child_health_cases':
+                continue
+            rebuild_indicators(table._id)
+
         connection = connections['default']
         with connection.cursor() as cursor:
             path = os.path.join(os.path.dirname(__file__), 'sql_templates', 'generate_tables.sql')
@@ -163,6 +179,7 @@ class AggregationScriptTest(TransactionTestCase):
                     cursor.execute(sql)
         cls.setUpTestData()
         move_ucr_data_into_aggregation_tables(datetime(2017, 5, 28), intervals=2)
+        _call_center_domain_mock.stop()
 
     def test_awc_location(self):
         self._load_and_compare_data(
@@ -191,7 +208,7 @@ class AggregationScriptTest(TransactionTestCase):
             os.path.join(OUTPUT_PATH, 'ccs_record_monthly_2017-05-01.csv'),
             sort_key=lambda x: (x['awc_id'], x['case_id'])
         )
-        
+
     def test_daily_attendance_2017_04_01(self):
         self._load_and_compare_data(
             'daily_attendance_2017-04-01',
@@ -294,7 +311,7 @@ class AggregationScriptTest(TransactionTestCase):
             os.path.join(OUTPUT_PATH, 'agg_awc_2017-05-01_5.csv'),
             lambda x: (x['state_id'], x['district_id'], x['block_id'], x['supervisor_id'], x['awc_id'])
         )
-        
+
     def test_agg_child_health_2017_04_01_1(self):
         self._load_and_compare_data(
             'agg_child_health_2017-04-01_1',
@@ -354,7 +371,7 @@ class AggregationScriptTest(TransactionTestCase):
             'agg_child_health_2017-05-01_5',
             os.path.join(OUTPUT_PATH, 'agg_child_health_2017-05-01_5.csv')
         )
-        
+
     def test_agg_thr_data_2017_04_01_1(self):
         self._load_and_compare_data(
             'agg_thr_data_2017-04-01_1',
@@ -414,7 +431,7 @@ class AggregationScriptTest(TransactionTestCase):
             'agg_thr_data_2017-05-01_5',
             os.path.join(OUTPUT_PATH, 'agg_thr_data_2017-05-01_5.csv')
         )
-        
+
     def test_agg_ccs_record_2017_04_01_1(self):
         self._load_and_compare_data(
             'agg_ccs_record_2017-04-01_1',
