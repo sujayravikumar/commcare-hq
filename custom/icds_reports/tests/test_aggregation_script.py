@@ -1,18 +1,18 @@
 import csv
+from datetime import datetime, date, time
+from decimal import Decimal
 import os
 import re
-from decimal import Decimal
 
 import mock
 import six
 import sqlalchemy
-from datetime import datetime, date, time
 from django.db import connections
-from django.test.testcases import TransactionTestCase
+from django.test.testcases import TransactionTestCase, override_settings
 import postgres_copy
 
 from corehq.apps.userreports.models import StaticDataSourceConfiguration
-from corehq.apps.userreports.tasks import rebuild_indicators
+from corehq.apps.userreports.util import get_indicator_adapter
 from corehq.sql_db.connections import connection_manager
 from custom.icds_reports.tasks import move_ucr_data_into_aggregation_tables
 
@@ -35,6 +35,7 @@ FILE_NAME_TO_TABLE_MAPPING = {
 OUTPUT_PATH = os.path.join(os.path.dirname(__file__), 'outputs')
 
 
+@override_settings(SERVER_ENVIRONMENT='icds')
 class AggregationScriptTest(TransactionTestCase):
 
     def _load_csv(self, path):
@@ -161,12 +162,11 @@ class AggregationScriptTest(TransactionTestCase):
             'corehq.apps.callcenter.data_source.call_center_data_source_configuration_provider'
         )
         _call_center_domain_mock.start()
-        tables = StaticDataSourceConfiguration.by_domain('icds-cas')
+        configs = StaticDataSourceConfiguration.by_domain('icds-cas')
+        cls.adapters = [get_indicator_adapter(config) for config in configs]
 
-        for table in tables:
-            if table.table_id == 'static-child_health_cases':
-                continue
-            rebuild_indicators(table._id)
+        for adapter in cls.adapters:
+            adapter.rebuild_table()
 
         connection = connections['default']
         with connection.cursor() as cursor:
@@ -180,6 +180,17 @@ class AggregationScriptTest(TransactionTestCase):
         cls.setUpTestData()
         move_ucr_data_into_aggregation_tables(datetime(2017, 5, 28), intervals=2)
         _call_center_domain_mock.stop()
+
+    @classmethod
+    def tearDownClass(cls):
+        for adapter in cls.adapters:
+            if adapter.config.table_id == 'static-child_health_cases':
+                # hack because this is in a migration
+                continue
+            adapter.drop_table()
+
+        # this should also drop ucr_table_name_mapping
+        super(AggregationScriptTest, cls).tearDownClass()
 
     def test_awc_location(self):
         self._load_and_compare_data(
