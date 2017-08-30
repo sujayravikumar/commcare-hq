@@ -2,6 +2,7 @@ import csv
 import datetime
 import decimal
 from mock import MagicMock
+from collections import defaultdict
 
 from django.core.management.base import BaseCommand
 
@@ -69,6 +70,7 @@ class Command(BaseCommand):
         self.domain = domain
         self.accessor = CaseAccessors(domain)
         self.commit = options['commit']
+        self.bad_payloads = 0
 
         with open(filename) as f:
             reader = csv.reader(f)
@@ -118,6 +120,7 @@ class Command(BaseCommand):
         self.log_unmodified_vouchers(voucher_ids_to_update)
         self.update_vouchers(voucher_updates)
         self.reconcile_repeat_records(voucher_updates)
+        print "Couldn't generate paylaods for {} vouchers".format(self.bad_payloads)
 
     @property
     @memoized
@@ -139,11 +142,18 @@ class Command(BaseCommand):
             writer.writerow(headers)
             writer.writerows(rows)
 
+    def _get_api_payload(self, voucher):
+        try:
+            return VoucherPayload.create_voucher_payload(voucher)
+        except Exception:
+            self.bad_payloads += 1
+            return defaultdict(str)
+
     def log_voucher_updates(self, voucher_updates):
         headers = ['ReadableID'] + self.voucher_api_properties + self.voucher_update_properties
 
         def make_row(voucher_update):
-            api_payload = VoucherPayload.create_voucher_payload(voucher_update._voucher)
+            api_payload = self._get_api_payload(voucher_update._voucher)
             return [voucher_update._voucher.get_case_property(VOUCHER_ID)] + [
                 api_payload[prop] for prop in self.voucher_api_properties
             ] + [
@@ -164,7 +174,7 @@ class Command(BaseCommand):
         headers = ['ReadableID', 'URL', 'state', 'voucher_approval_status'] + self.voucher_api_properties
 
         def make_row(voucher):
-            api_payload = VoucherPayload.create_voucher_payload(voucher)
+            api_payload = self._get_api_payload(voucher)
             return [
                 voucher.get_case_property(VOUCHER_ID),
                 'https://enikshay.in/a/enikshay/reports/case_data/{}'.format(voucher.case_id),
