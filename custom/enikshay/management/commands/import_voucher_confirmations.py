@@ -1,5 +1,6 @@
 import csv
 import datetime
+import decimal
 from mock import MagicMock
 
 from django.core.management.base import BaseCommand
@@ -90,17 +91,22 @@ class Command(BaseCommand):
         unrecognized_vouchers = []
         voucher_ids_to_update = set()
 
-        for row in rows:
+        print "Parsing rows from spreadsheet"
+        for row in with_progress_bar(rows):
             voucher_id = row[headers.index(self.voucher_id_header)]
             voucher = self.all_vouchers_in_domain.get(voucher_id)
             if voucher:
                 voucher_ids_to_update.add(voucher_id)
+                raw_amount = row[headers.index('amount')]
                 voucher_updates.append(VoucherUpdate(
                     voucher=voucher,  # This property isn't defined on the model
                     id=voucher.case_id,
+                    amount=decimal.Decimal(raw_amount) if raw_amount else raw_amount,
+                    paymentDate=datetime.datetime.now(),
                     **{
                         prop: row[headers.index(prop)]
                         for prop in self.voucher_update_properties
+                        if prop not in ('amount', 'paymentDate')
                     }
                 ))
             else:
