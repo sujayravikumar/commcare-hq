@@ -120,7 +120,7 @@ class Command(BaseCommand):
         self.log_unmodified_vouchers(voucher_ids_to_update)
         self.update_vouchers(voucher_updates)
         self.reconcile_repeat_records(voucher_updates)
-        print "Couldn't generate paylaods for {} vouchers".format(self.bad_payloads)
+        print "Couldn't generate payloads for {} vouchers".format(self.bad_payloads)
 
     @property
     @memoized
@@ -160,11 +160,13 @@ class Command(BaseCommand):
                 voucher_update[prop] for prop in self.voucher_update_properties
             ]
 
-        rows = map(make_row, voucher_updates)
+        print "logging voucher updates"
+        rows = map(make_row, with_progress_bar(voucher_updates))
         self.write_csv('updates', headers, rows)
 
     def log_unrecognized_vouchers(self, headers, unrecognized_vouchers):
-        self.write_csv('unrecognized', headers, unrecognized_vouchers)
+        print "logging unrecognized vouchers"
+        self.write_csv('unrecognized', headers, with_progress_bar(unrecognized_vouchers))
 
     def log_unmodified_vouchers(self, voucher_ids_to_update):
         unmodified_vouchers = [
@@ -184,7 +186,8 @@ class Command(BaseCommand):
                 api_payload[prop] for prop in self.voucher_api_properties
             ]
 
-        rows = map(make_row, unmodified_vouchers)
+        print "logging unmodified vouchers"
+        rows = map(make_row, with_progress_bar(unmodified_vouchers))
         self.write_csv('updates', headers, rows)
 
     def update_vouchers(self, voucher_updates):
