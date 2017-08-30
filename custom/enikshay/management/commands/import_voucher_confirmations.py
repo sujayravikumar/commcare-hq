@@ -98,8 +98,7 @@ class Command(BaseCommand):
             if voucher:
                 voucher_ids_to_update.add(voucher_id)
                 raw_amount = row[headers.index('amount')]
-                voucher_updates.append(VoucherUpdate(
-                    voucher=voucher,  # This property isn't defined on the model
+                update = VoucherUpdate(
                     id=voucher.case_id,
                     amount=decimal.Decimal(raw_amount) if raw_amount else raw_amount,
                     paymentDate=datetime.datetime.now(),
@@ -108,7 +107,9 @@ class Command(BaseCommand):
                         for prop in self.voucher_update_properties
                         if prop not in ('amount', 'paymentDate')
                     }
-                ))
+                )
+                update._voucher = voucher
+                voucher_updates.append(update)
             else:
                 unrecognized_vouchers.append(row)
 
@@ -142,8 +143,8 @@ class Command(BaseCommand):
         headers = ['ReadableID'] + self.voucher_api_properties + self.voucher_update_properties
 
         def make_row(voucher_update):
-            api_payload = VoucherPayload.create_voucher_payload(voucher_update.voucher)
-            return [voucher_update.voucher.get_case_property(VOUCHER_ID)] + [
+            api_payload = VoucherPayload.create_voucher_payload(voucher_update._voucher)
+            return [voucher_update._voucher.get_case_property(VOUCHER_ID)] + [
                 api_payload[prop] for prop in self.voucher_api_properties
             ] + [
                 voucher_update[prop] for prop in self.voucher_update_properties
