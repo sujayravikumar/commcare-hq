@@ -17,7 +17,16 @@ from corehq.util.couch import IterDB
 from corehq.util.log import with_progress_bar
 
 from custom.enikshay.case_utils import CASE_TYPE_VOUCHER
-from custom.enikshay.const import VOUCHER_ID
+from custom.enikshay.const import (
+    VOUCHER_ID,
+    AMOUNT_APPROVED,
+    DATE_FULFILLED,
+    DATE_APPROVED,
+    FULFILLED_BY_ID,
+    FULFILLED_BY_LOCATION_ID,
+    INVESTIGATION_TYPE,
+    VOUCHER_TYPE,
+)
 from custom.enikshay.integrations.bets.repeater_generators import VoucherPayload
 from custom.enikshay.integrations.bets.views import VoucherUpdate
 
@@ -100,7 +109,7 @@ class Command(BaseCommand):
             voucher = self.all_vouchers_in_domain.get(voucher_id)
             if not voucher:
                 unrecognized_vouchers.append(row)
-            elif not self._is_approved(voucher):
+            elif self._missing_key_properties(voucher) or not self._is_approved(voucher):
                 unapproved_vouchers.append((row, voucher))
             else:
                 voucher_ids_to_update.add(voucher_id)
@@ -138,10 +147,18 @@ class Command(BaseCommand):
     @staticmethod
     def _is_approved(voucher):
         return (
-            voucher.get_case_property('state') in (
-                'approved', 'paid', 'rejected', 'expired', 'cancelled', 'canceled')
+            voucher.get_case_property('state') in ('approved', 'paid',)
             or voucher.get_case_property('voucher_approval_status') in ('approved', 'partially_approved')
         )
+
+    @staticmethod
+    def _missing_key_properties(voucher):
+        return not all(voucher.get_case_property(prop) for prop in [
+            DATE_FULFILLED,
+            DATE_APPROVED,
+            FULFILLED_BY_ID,
+            FULFILLED_BY_LOCATION_ID,
+        ])
 
     def write_csv(self, filename, headers, rows):
         filename = "voucher_confirmations-{}.csv".format(filename)
@@ -156,7 +173,7 @@ class Command(BaseCommand):
             return VoucherPayload.create_voucher_payload(voucher)
         except Exception:
             self.bad_payloads += 1
-            return defaultdict(str)
+            return defaultdict(lambda: "PAYLOAD_ERROR")
 
     def log_voucher_updates(self, voucher_updates):
         headers = ['ReadableID'] + self.voucher_api_properties + self.voucher_update_properties
@@ -179,15 +196,28 @@ class Command(BaseCommand):
 
     def log_unapproved_vouchers(self, headers, unapproved_vouchers):
         print "logging unapproved vouchers"
+        props = [
+            'state',
+            'voucher_approval_status',
+            AMOUNT_APPROVED,
+            DATE_FULFILLED,
+            DATE_APPROVED,
+            FULFILLED_BY_ID,
+            FULFILLED_BY_LOCATION_ID,
+            INVESTIGATION_TYPE,
+            VOUCHER_TYPE,
+        ]
+        headers = ['voucher_case_id', 'URL'] + props + headers
         rows = [
-            row + [
-                voucher.get_case_property('state'),
-                voucher.get_case_property('voucher_approval_status'),
+            [
                 voucher.case_id,
-            ]
+                'https://enikshay.in/a/enikshay/reports/case_data/{}'.format(voucher.case_id),
+            ] + [
+                voucher.get_case_property(prop) for prop in props
+            ] + row
             for row, voucher in unapproved_vouchers
         ]
-        self.write_csv('unapproved', headers + ['state', 'voucher_approval_status', 'voucher_case_id'], rows)
+        self.write_csv('unapproved_or_incomplete', headers, rows)
 
     def log_unmodified_vouchers(self, voucher_ids_to_update):
         unmodified_vouchers = [
