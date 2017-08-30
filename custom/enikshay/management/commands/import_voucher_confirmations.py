@@ -35,7 +35,6 @@ class Command(BaseCommand):
         'checkNumber',
         'bankName',
         'eventType',
-        'case_type',
     ]
 
     voucher_api_properties = [
