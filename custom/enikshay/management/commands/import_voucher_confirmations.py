@@ -89,15 +89,20 @@ class Command(BaseCommand):
         for header in headers:
             print header
 
-        voucher_updates = []
         unrecognized_vouchers = []
+        unapproved_vouchers = []
         voucher_ids_to_update = set()
+        voucher_updates = []
 
         print "Parsing rows from spreadsheet"
         for row in with_progress_bar(rows):
             voucher_id = row[headers.index(self.voucher_id_header)]
             voucher = self.all_vouchers_in_domain.get(voucher_id)
-            if voucher:
+            if not voucher:
+                unrecognized_vouchers.append(row)
+            elif not self._is_approved(voucher):
+                unapproved_vouchers.append((row, voucher))
+            else:
                 voucher_ids_to_update.add(voucher_id)
                 raw_amount = row[headers.index('amount')]
                 update = VoucherUpdate(
@@ -112,11 +117,10 @@ class Command(BaseCommand):
                 )
                 update._voucher = voucher
                 voucher_updates.append(update)
-            else:
-                unrecognized_vouchers.append(row)
 
         self.log_voucher_updates(voucher_updates)
         self.log_unrecognized_vouchers(headers, unrecognized_vouchers)
+        self.log_unapproved_vouchers(headers, unapproved_vouchers)
         self.log_unmodified_vouchers(voucher_ids_to_update)
         self.update_vouchers(voucher_updates)
         self.reconcile_repeat_records(voucher_updates)
@@ -129,14 +133,19 @@ class Command(BaseCommand):
         return {
             voucher.get_case_property(VOUCHER_ID): voucher
             for voucher in self.accessor.iter_cases(voucher_ids)
-            if voucher.get_case_property('state') in (
+        }
+
+    @staticmethod
+    def _is_approved(voucher):
+        return (
+            voucher.get_case_property('state') in (
                 'approved', 'paid', 'rejected', 'expired', 'cancelled', 'canceled')
             or voucher.get_case_property('voucher_approval_status') in ('approved', 'partially_approved')
-        }
+        )
 
     def write_csv(self, filename, headers, rows):
         filename = "voucher_confirmations-{}.csv".format(filename)
-        print "writing {}".format(filename)
+        print "writing {} rows to {}".format(len(rows), filename)
         with open(filename, 'w') as f:
             writer = csv.writer(f)
             writer.writerow(headers)
@@ -166,12 +175,24 @@ class Command(BaseCommand):
 
     def log_unrecognized_vouchers(self, headers, unrecognized_vouchers):
         print "logging unrecognized vouchers"
-        self.write_csv('unrecognized', headers, with_progress_bar(unrecognized_vouchers))
+        self.write_csv('unrecognized', headers, unrecognized_vouchers)
+
+    def log_unapproved_vouchers(self, headers, unapproved_vouchers):
+        print "logging unapproved vouchers"
+        rows = [
+            row + [
+                voucher.get_case_property('state'),
+                voucher.get_case_property('voucher_approval_status'),
+                voucher.case_id,
+            ]
+            for row, voucher in unapproved_vouchers
+        ]
+        self.write_csv('unapproved', headers + ['state', 'voucher_approval_status', 'voucher_case_id'], rows)
 
     def log_unmodified_vouchers(self, voucher_ids_to_update):
         unmodified_vouchers = [
             voucher for voucher_id, voucher in self.all_vouchers_in_domain.items()
-            if voucher_id not in voucher_ids_to_update
+            if voucher_id not in voucher_ids_to_update and self._is_approved(voucher)
         ]
         headers = ['ReadableID', 'URL', 'state', 'voucher_approval_status'] + self.voucher_api_properties
 
