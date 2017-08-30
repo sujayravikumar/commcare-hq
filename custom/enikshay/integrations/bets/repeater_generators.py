@@ -20,6 +20,7 @@ from custom.enikshay.const import (
     FULFILLED_BY_ID,
     FULFILLED_BY_LOCATION_ID,
     AMOUNT_APPROVED,
+    VOUCHER_TYPE,
     TREATMENT_OUTCOME,
     TREATMENT_OUTCOME_DATE,
     PRESCRIPTION_TOTAL_DAYS_THRESHOLD,
@@ -289,7 +290,7 @@ class VoucherPayload(BETSPayload):
         event_id = {
             "prescription": CHEMIST_VOUCHER_EVENT,
             "test": LAB_VOUCHER_EVENT,
-        }[voucher_case_properties['voucher_type']]
+        }[voucher_case_properties[VOUCHER_TYPE]]
 
         location = cls._get_location(
             fulfilled_by_location_id,
@@ -299,8 +300,7 @@ class VoucherPayload(BETSPayload):
         )
 
         person_case = get_person_case_from_voucher(voucher_case.domain, voucher_case.case_id)
-        agency_user = CommCareUser.get_by_user_id(
-            voucher_case.get_case_property('voucher_fulfilled_by_id'))
+        agency_user = CommCareUser.get_by_user_id(fulfilled_by_id)
 
         approver_id = voucher_case.get_case_property('voucher_approved_by_id')
         if not approver_id:

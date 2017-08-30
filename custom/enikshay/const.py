@@ -99,8 +99,10 @@ VALID_ADHERENCE_SOURCES = (
 CASE_VERSION = 'case_version'
 
 # Voucher Case Properties
+DATE_APPROVED = "date_approved"
 DATE_FULFILLED = "date_fulfilled"
 VOUCHER_ID = "voucher_id"
+VOUCHER_TYPE = "voucher_type"
 FULFILLED_BY_ID = "voucher_fulfilled_by_id"
 FULFILLED_BY_LOCATION_ID = "voucher_fulfilled_by_location_id"
 AMOUNT_APPROVED = "amount_approved"
