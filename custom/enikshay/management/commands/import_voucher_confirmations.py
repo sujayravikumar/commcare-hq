@@ -131,7 +131,7 @@ class Command(BaseCommand):
             len(rows),
             len(set(r[headers.index(self.voucher_id_header)] for r in rows)),
         )
-        print "{} unrecognized\n{} unapproved or incomplete\n{}to update".format(
+        print "{} unrecognized\n{} unapproved or incomplete\n{} to update".format(
             len(unrecognized_vouchers),
             len(unapproved_vouchers),
             len(voucher_updates),
@@ -249,7 +249,7 @@ class Command(BaseCommand):
 
         print "logging unmodified vouchers"
         rows = map(make_row, with_progress_bar(unmodified_vouchers))
-        self.write_csv('updates', headers, rows)
+        self.write_csv('unmodified', headers, rows)
 
     def update_vouchers(self, voucher_updates):
         print "updating voucher cases"
