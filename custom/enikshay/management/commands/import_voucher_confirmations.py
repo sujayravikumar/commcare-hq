@@ -127,6 +127,16 @@ class Command(BaseCommand):
                 update._voucher = voucher
                 voucher_updates.append(update)
 
+        print "{} total rows, {} unique voucher ids".format(
+            len(rows),
+            len(set(r[headers.index(self.voucher_id_header)] for r in rows)),
+        )
+        print "{} unrecognized\n{} unapproved or incomplete\n{}to update".format(
+            len(unrecognized_vouchers),
+            len(unapproved_vouchers),
+            len(voucher_updates),
+        )
+
         self.log_voucher_updates(voucher_updates)
         self.log_unrecognized_vouchers(headers, unrecognized_vouchers)
         self.log_unapproved_vouchers(headers, unapproved_vouchers)
