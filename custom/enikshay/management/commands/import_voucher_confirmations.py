@@ -67,6 +67,7 @@ class Command(BaseCommand):
         'status',
         'failureDescription',
         'amount',
+        'Beneficiary ID',
         'bankName',
         'paymentMode',
         'checkNumber',
@@ -187,6 +188,21 @@ class Command(BaseCommand):
 
     @staticmethod
     def get_voucher_from_list(possible_vouchers, voucher_dict):
+        """Compare the voucher_dict to the possible vouchers and see if there's a clear match"""
+        amount_fields = ['amount_approved', 'amount_eligible_for_redeemer', 'amount_fulfilled',
+                         'amount_initial', 'amount_redeemed_per_chemist']
+
+        def properties_match(voucher):
+            get_value = voucher.get_case_property
+            return (
+                voucher_dict["Amount"] in [get_value(field) for field in amount_fields]
+                and voucher_dict["Event Occur Date (Voucher Validation date)"] == get_value("date_fulfilled")
+                # and voucher.get_case_property("state") in ["fulfilled", "approved"]
+            )
+
+        possible_vouchers = filter(properties_match, possible_vouchers)
+        if len(possible_vouchers) == 1:
+            return possible_vouchers[0]
         return None
 
     def make_voucher_update(self, voucher, voucher_dict):
@@ -195,9 +211,9 @@ class Command(BaseCommand):
         update = VoucherUpdate(
             id=voucher.case_id,
             **{
-                k: v for k, v in voucher_dict
+                k: v for k, v in voucher_dict.items()
                 if k in self.voucher_update_properties
-                and k not in ('id', 'EventID',)
+                and k not in ('id', 'EventID', 'Beneficiary ID')
             }
         )
         update._voucher = voucher
@@ -253,6 +269,7 @@ class Command(BaseCommand):
                 api_payload[prop] for prop in self.voucher_api_properties
             ] + [
                 voucher_update[prop] for prop in self.voucher_update_properties
+                if prop not in ['EventID', 'Beneficiary ID']
             ]
 
         print "logging voucher updates"
