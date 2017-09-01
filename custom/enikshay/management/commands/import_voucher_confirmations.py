@@ -4,7 +4,7 @@ import decimal
 import math
 from mock import MagicMock
 from collections import defaultdict, Counter
-from dateutil import parser as date_parser
+from dateutil.parser import parse
 
 from django.core.management.base import BaseCommand
 
@@ -146,10 +146,10 @@ class Command(BaseCommand):
             voucher = voucher_dict['voucher_case']
             if not voucher:
                 voucher_dict['confirmation status'] = "UNIDENTIFIABLE"
-            elif self._missing_key_properties(voucher):
-                voucher_dict['confirmation status'] = "MISSING PROPERTIES"
             elif not self._is_approved(voucher):
                 voucher_dict['confirmation status'] = voucher.get_case_property('state')
+            elif self._missing_key_properties(voucher):
+                voucher_dict['confirmation status'] = "MISSING PROPERTIES"
             else:
                 voucher_dict['confirmation status'] = "ALL CHECKS SUCCESSFUL"
                 voucher_updates.append(self.make_voucher_update(voucher, voucher_dict))
@@ -211,9 +211,10 @@ class Command(BaseCommand):
                     if amount - 1 < float(get_value(field)) < amount + 1:
                         amount_matches = True
 
+            spreadsheet_date = voucher_dict["Event Occur Date (Voucher Validation date)"]
             return (
                 amount_matches
-                and voucher_dict["Event Occur Date (Voucher Validation date)"] == get_value("date_fulfilled")
+                and parse(spreadsheet_date) == parse(get_value("date_fulfilled") or '2021-01-01 01:01')
                 and voucher.get_case_property("state") in ["fulfilled", "approved", "paid"]
             )
 
@@ -266,7 +267,7 @@ class Command(BaseCommand):
 
     def make_voucher_update(self, voucher, voucher_dict):
         voucher_dict['amount'] = int(math.ceil(float(voucher_dict['amount'])))
-        voucher_dict['paymentDate'] = date_parser.parse(voucher_dict['paymentDate'] or '2017-09-01')
+        voucher_dict['paymentDate'] = parse(voucher_dict['paymentDate'] or '2017-09-01')
         update = VoucherUpdate(
             id=voucher.case_id,
             **{
