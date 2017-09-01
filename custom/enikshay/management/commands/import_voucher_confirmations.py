@@ -3,6 +3,7 @@ import datetime
 import decimal
 from mock import MagicMock
 from collections import defaultdict, Counter
+from dateutil import parser as date_parser
 
 from django.core.management.base import BaseCommand
 
@@ -116,16 +117,16 @@ class Command(BaseCommand):
                 case_id_to_confirmation_status[voucher.case_id] = "unapproved"
             else:
                 voucher_ids_to_update.add(voucher_id)
-                raw_amount = row[headers.index('amount')]
+                props = {
+                    prop: row[headers.index(prop)]
+                    for prop in self.voucher_update_properties
+                }
+                raw_amount = props['amount']
+                props['amount'] = decimal.Decimal(raw_amount) if raw_amount else raw_amount,
+                props['paymentDate'] = date_parser.parse(props['paymentDate'] or '2017-09-01')
                 update = VoucherUpdate(
                     id=voucher.case_id,
-                    amount=decimal.Decimal(raw_amount) if raw_amount else raw_amount,
-                    paymentDate=datetime.datetime.now(),
-                    **{
-                        prop: row[headers.index(prop)]
-                        for prop in self.voucher_update_properties
-                        if prop not in ('amount', 'paymentDate')
-                    }
+                    **props
                 )
                 update._voucher = voucher
                 voucher_updates.append(update)
