@@ -37,17 +37,41 @@ class Command(BaseCommand):
     help = """
     import payment confirmations of vouchers paid offline
     """
-    voucher_id_header = 'id'
+    voucher_dump_properties = [
+        "Voucher ID (visible)",
+        "Voucher ID (GUUID)",
+        "Event Occur Date (Voucher Validation date)",
+        "Event ID",
+        "Beneficiary ID (visible)",
+        "BenficiaryUUID",
+        "BeneficiaryType",
+        "Location (GUID)",
+        "Amount",
+        "DTOLocation",
+        "DTOLocation (GUID)",
+        "InvestigationType",
+        "PersonId",
+        "PersonId (GUID)",
+        "AgencyId",
+        "AgencyId (GUID)",
+        "EnikshayApprover",
+        "EnikshayRole",
+        "EnikshayApprovalDate",
+        "Succeeded",
+    ]
+
     voucher_update_properties = [
+        'id',
+        'eventType',
+        'EventID',
         'status',
-        'amount',
-        'paymentDate',
-        'comments',
         'failureDescription',
+        'amount',
+        'bankName',
         'paymentMode',
         'checkNumber',
-        'bankName',
-        'eventType',
+        'comments',
+        'paymentDate',
     ]
 
     voucher_api_properties = [
@@ -82,83 +106,112 @@ class Command(BaseCommand):
         self.accessor = CaseAccessors(domain)
         self.commit = options['commit']
         self.bad_payloads = 0
+        unidentifiable_vouchers = 0
 
-        with open(filename) as f:
-            reader = csv.reader(f)
-            headers = reader.next()
-            missing_headers = set(self.voucher_update_properties) - set(headers)
-            if missing_headers:
-                print "Missing the following headers:"
-                for header in missing_headers:
-                    print " ", header
-                print "\nAborting."
-                return
-
-            rows = list(reader)
-
-        print "Received info on {} vouchers.  Headers are:".format(len(rows))
-        for header in headers:
-            print header
-
-        unrecognized_vouchers = []
-        unapproved_vouchers = []
-        voucher_ids_to_update = set()
+        dump_confirmations = []  # The row-by-row upload confirmation
         voucher_updates = []
 
-        case_id_to_confirmation_status = defaultdict(lambda: "not_applicable")
-
-        print "Parsing rows from spreadsheet"
-        for row in with_progress_bar(rows):
-            voucher_id = row[headers.index(self.voucher_id_header)]
-            voucher = self.all_vouchers_in_domain.get(voucher_id)
-            if not voucher:
-                unrecognized_vouchers.append(row)
-            elif self._missing_key_properties(voucher) or not self._is_approved(voucher):
-                unapproved_vouchers.append((row, voucher))
-                case_id_to_confirmation_status[voucher.case_id] = "unapproved"
+        for voucher_dict in self.get_voucher_dicts_from_dump_and_update():
+            voucher_id = voucher_dict['id']
+            possible_vouchers = self.vouchers_by_readable_id[voucher_id]
+            voucher_dict['number possible vouchers'] = len(possible_vouchers)
+            if len(possible_vouchers) == 0:
+                voucher = None
+                unidentifiable_vouchers += 1
+                voucher_dict['voucher case_id'] = "NO MATCHES"
+                voucher_dict['voucher found'] = "no"
+            elif len(possible_vouchers) == 1:
+                voucher = possible_vouchers[0]
+                voucher_dict['voucher case_id'] = voucher.case_id,
+                voucher_dict['voucher found'] = "yes"
             else:
-                voucher_ids_to_update.add(voucher_id)
-                props = {
-                    prop: row[headers.index(prop)]
-                    for prop in self.voucher_update_properties
-                }
-                props['amount'] = int(math.ceil(float(props['amount'])))
-                props['paymentDate'] = date_parser.parse(props['paymentDate'] or '2017-09-01')
-                update = VoucherUpdate(
-                    id=voucher.case_id,
-                    **props
-                )
-                update._voucher = voucher
-                voucher_updates.append(update)
-                case_id_to_confirmation_status[voucher.case_id] = "to_update"
+                voucher = self.get_voucher_from_list(possible_vouchers, voucher_dict)
+                if voucher:
+                    voucher_dict['voucher case_id'] = voucher.case_id,
+                    voucher_dict['voucher found'] = "yes"
+                else:
+                    unidentifiable_vouchers += 1
+                    voucher_dict['voucher case_id'] = ' '.join(v.case_id for v in possible_vouchers),
+                    voucher_dict['voucher found'] = "no"
+            dump_confirmations.append(voucher_dict)
 
-        print "{} total rows, {} unique voucher ids".format(
-            len(rows),
-            len(set(r[headers.index(self.voucher_id_header)] for r in rows)),
-        )
-        print "{} unrecognized\n{} unapproved or incomplete\n{} to update".format(
-            len(unrecognized_vouchers),
-            len(unapproved_vouchers),
-            len(voucher_updates),
-        )
+            if not voucher:
+                voucher_dict['confirmation status'] = "UNIDENTIFIABLE"
+            elif self._missing_key_properties(voucher):
+                voucher_dict['confirmation status'] = "UNIDENTIFIABLE"
+            elif not self._is_approved(voucher):
+                voucher_dict['confirmation status'] = voucher.get_case_property('state')
+            else:
+                voucher_dict['confirmation status'] = "ALL CHECKS SUCCESSFUL"
+                voucher_updates.append(self.make_voucher_update(voucher, voucher_dict))
+
+        print 'Found {} unidentifiable_vouchers'.format(unidentifiable_vouchers)
+
+        # TODO
+        # print "{} unrecognized\n{} unapproved or incomplete\n{} to update".format()
 
         self.log_voucher_updates(voucher_updates)
-        self.log_unrecognized_vouchers(headers, unrecognized_vouchers)
-        self.log_unapproved_vouchers(headers, unapproved_vouchers)
-        self.log_unmodified_vouchers(voucher_ids_to_update)
-        self.log_all_vouchers_in_domain(case_id_to_confirmation_status)
+        # self.log_all_vouchers_in_domain(case_id_to_confirmation_status)
         self.update_vouchers(voucher_updates)
         self.reconcile_repeat_records(voucher_updates)
         print "Couldn't generate payloads for {} vouchers".format(self.bad_payloads)
 
+    def get_voucher_dicts_from_dump_and_update(self):
+        """open the two files, join the rows together and return a list of dicts"""
+        with open('voucher-export.csv') as dump_file:
+            with open('voucher-confirmations.csv') as update_file:
+
+                dump = csv.reader(dump_file)
+                dump_headers = next(dump)
+                if dump_headers != self.voucher_dump_properties:
+                    raise AssertionError("Dump doesn't line up")
+
+                update = csv.reader(update_file)
+                update_headers = next(update)
+                if update_headers != self.voucher_update_properties:
+                    raise AssertionError("Update doesn't line up")
+
+                all_headers = dump_headers + update_headers
+                if len(all_headers) != len(set(all_headers)):
+                    raise AssertionError("There should be no duplicate headers")
+
+                print "\nCombining spreadsheets and looking up vouchers"
+                for dump_row, update_row in with_progress_bar(zip(dump, update)):
+                    voucher = dict(
+                        zip(dump_headers, dump_row) + zip(update_headers, update_row))
+                    if voucher['Voucher ID (visible)'] != voucher['id']:
+                        raise AssertionError("The spreadsheets don't line up! '{}' != '{}'".format(
+                            voucher['Voucher ID (visible)'], voucher['id']
+                        ))
+                    yield voucher
+
+    @staticmethod
+    def get_voucher_from_list(possible_vouchers, voucher_dict):
+        return None
+
+    def make_voucher_update(self, voucher, voucher_dict):
+        voucher_dict['amount'] = int(math.ceil(float(voucher_dict['amount'])))
+        voucher_dict['paymentDate'] = date_parser.parse(voucher_dict['paymentDate'] or '2017-09-01')
+        update = VoucherUpdate(
+            id=voucher.case_id,
+            **{
+                k: v for k, v in voucher_dict
+                if k in self.voucher_update_properties
+                and k not in ('id', 'EventID',)
+            }
+        )
+        update._voucher = voucher
+        return update
+
     @property
     @memoized
-    def all_vouchers_in_domain(self):
+    def vouchers_by_readable_id(self):
+        """returns a list of vouchers for each readable id"""
+        vouchers = defaultdict(list)
         voucher_ids = self.accessor.get_case_ids_in_domain(CASE_TYPE_VOUCHER)
-        return {
-            voucher.get_case_property(VOUCHER_ID): voucher
-            for voucher in self.accessor.iter_cases(voucher_ids)
-        }
+        for voucher in self.accessor.iter_cases(voucher_ids):
+            vouchers[voucher.get_case_property(VOUCHER_ID)].append(voucher)
+        return vouchers
 
     @staticmethod
     def _is_approved(voucher):
@@ -206,76 +259,25 @@ class Command(BaseCommand):
         rows = map(make_row, with_progress_bar(voucher_updates))
         self.write_csv('updates', headers, rows)
 
-    def log_unrecognized_vouchers(self, headers, unrecognized_vouchers):
-        print "logging unrecognized vouchers"
-        self.write_csv('unrecognized', headers, unrecognized_vouchers)
-
-    def log_unapproved_vouchers(self, headers, unapproved_vouchers):
-        print "logging unapproved vouchers"
-        props = [
-            'state',
-            'voucher_approval_status',
-            AMOUNT_APPROVED,
-            DATE_FULFILLED,
-            DATE_APPROVED,
-            FULFILLED_BY_ID,
-            FULFILLED_BY_LOCATION_ID,
-            INVESTIGATION_TYPE,
-            VOUCHER_TYPE,
-        ]
-        headers = ['voucher_case_id', 'URL'] + props + headers
-        rows = [
-            [
-                voucher.case_id,
-                'https://enikshay.in/a/enikshay/reports/case_data/{}'.format(voucher.case_id),
-            ] + [
-                voucher.get_case_property(prop) for prop in props
-            ] + row
-            for row, voucher in unapproved_vouchers
-        ]
-        self.write_csv('unapproved_or_incomplete', headers, rows)
-
-    def log_unmodified_vouchers(self, voucher_ids_to_update):
-        unmodified_vouchers = [
-            voucher for voucher_id, voucher in self.all_vouchers_in_domain.items()
-            if voucher_id not in voucher_ids_to_update and self._is_approved(voucher)
-        ]
-        headers = ['ReadableID', 'URL', 'state', 'voucher_approval_status'] + self.voucher_api_properties
-
-        def make_row(voucher):
-            api_payload = self._get_api_payload(voucher)
-            return [
-                voucher.get_case_property(VOUCHER_ID),
-                'https://enikshay.in/a/enikshay/reports/case_data/{}'.format(voucher.case_id),
-                voucher.get_case_property('state'),
-                voucher.get_case_property('voucher_approval_status'),
-            ] + [
-                api_payload[prop] for prop in self.voucher_api_properties
-            ]
-
-        print "logging unmodified vouchers"
-        rows = map(make_row, with_progress_bar(unmodified_vouchers))
-        self.write_csv('unmodified', headers, rows)
-
-    def log_all_vouchers_in_domain(self, case_id_to_confirmation_status):
-        voucher_ids = self.accessor.get_case_ids_in_domain(CASE_TYPE_VOUCHER)
-        vouchers = list(self.accessor.iter_cases(voucher_ids))
-        voucher_id_counts = Counter(v.get_case_property(VOUCHER_ID) for v in vouchers)
-        headers = [
-            "ReadableID",
-            "URL",
-            "state",
-            "PaymentConfirmationStatus",
-            "# Vouchers with ID",
-        ]
-        rows = [[
-            voucher.get_case_property(VOUCHER_ID),
-            'https://enikshay.in/a/enikshay/reports/case_data/{}'.format(voucher.case_id),
-            voucher.get_case_property('state'),
-            case_id_to_confirmation_status[voucher.case_id],
-            voucher_id_counts[voucher.get_case_property(VOUCHER_ID)],
-        ] for voucher in vouchers]
-        self.write_csv('all_vouchers', headers, rows)
+    # def log_all_vouchers_in_domain(self, case_id_to_confirmation_status):
+    #     voucher_ids = self.accessor.get_case_ids_in_domain(CASE_TYPE_VOUCHER)
+    #     vouchers = list(self.accessor.iter_cases(voucher_ids))
+    #     voucher_id_counts = Counter(v.get_case_property(VOUCHER_ID) for v in vouchers)
+    #     headers = [
+    #         "ReadableID",
+    #         "URL",
+    #         "state",
+    #         "PaymentConfirmationStatus",
+    #         "# Vouchers with ID",
+    #     ]
+    #     rows = [[
+    #         voucher.get_case_property(VOUCHER_ID),
+    #         'https://enikshay.in/a/enikshay/reports/case_data/{}'.format(voucher.case_id),
+    #         voucher.get_case_property('state'),
+    #         case_id_to_confirmation_status[voucher.case_id],
+    #         voucher_id_counts[voucher.get_case_property(VOUCHER_ID)],
+    #     ] for voucher in vouchers]
+    #     self.write_csv('all_vouchers', headers, rows)
 
     def update_vouchers(self, voucher_updates):
         print "updating voucher cases"
