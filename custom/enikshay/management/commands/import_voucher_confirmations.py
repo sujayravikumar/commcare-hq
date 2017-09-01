@@ -147,7 +147,7 @@ class Command(BaseCommand):
             if not voucher:
                 voucher_dict['confirmation status'] = "UNIDENTIFIABLE"
             elif self._missing_key_properties(voucher):
-                voucher_dict['confirmation status'] = "UNIDENTIFIABLE"
+                voucher_dict['confirmation status'] = "MISSING PROPERTIES"
             elif not self._is_approved(voucher):
                 voucher_dict['confirmation status'] = voucher.get_case_property('state')
             else:
