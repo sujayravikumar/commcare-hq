@@ -2,7 +2,7 @@ import csv
 import datetime
 import decimal
 from mock import MagicMock
-from collections import defaultdict
+from collections import defaultdict, Counter
 
 from django.core.management.base import BaseCommand
 
@@ -103,6 +103,8 @@ class Command(BaseCommand):
         voucher_ids_to_update = set()
         voucher_updates = []
 
+        case_id_to_confirmation_status = defaultdict(lambda: "not_applicable")
+
         print "Parsing rows from spreadsheet"
         for row in with_progress_bar(rows):
             voucher_id = row[headers.index(self.voucher_id_header)]
@@ -111,6 +113,7 @@ class Command(BaseCommand):
                 unrecognized_vouchers.append(row)
             elif self._missing_key_properties(voucher) or not self._is_approved(voucher):
                 unapproved_vouchers.append((row, voucher))
+                case_id_to_confirmation_status[voucher.case_id] = "unapproved"
             else:
                 voucher_ids_to_update.add(voucher_id)
                 raw_amount = row[headers.index('amount')]
@@ -126,6 +129,7 @@ class Command(BaseCommand):
                 )
                 update._voucher = voucher
                 voucher_updates.append(update)
+                case_id_to_confirmation_status[voucher.case_id] = "to_update"
 
         print "{} total rows, {} unique voucher ids".format(
             len(rows),
@@ -141,6 +145,7 @@ class Command(BaseCommand):
         self.log_unrecognized_vouchers(headers, unrecognized_vouchers)
         self.log_unapproved_vouchers(headers, unapproved_vouchers)
         self.log_unmodified_vouchers(voucher_ids_to_update)
+        self.log_all_vouchers_in_domain(case_id_to_confirmation_status)
         self.update_vouchers(voucher_updates)
         self.reconcile_repeat_records(voucher_updates)
         print "Couldn't generate payloads for {} vouchers".format(self.bad_payloads)
@@ -250,6 +255,26 @@ class Command(BaseCommand):
         print "logging unmodified vouchers"
         rows = map(make_row, with_progress_bar(unmodified_vouchers))
         self.write_csv('unmodified', headers, rows)
+
+    def log_all_vouchers_in_domain(self, case_id_to_confirmation_status):
+        voucher_ids = self.accessor.get_case_ids_in_domain(CASE_TYPE_VOUCHER)
+        vouchers = list(self.accessor.iter_cases(voucher_ids))
+        voucher_id_counts = Counter(v.get_case_property(VOUCHER_ID) for v in vouchers)
+        headers = [
+            "ReadableID",
+            "URL",
+            "state",
+            "PaymentConfirmationStatus",
+            "# Vouchers with ID",
+        ]
+        rows = [[
+            voucher.get_case_property(VOUCHER_ID),
+            'https://enikshay.in/a/enikshay/reports/case_data/{}'.format(voucher.case_id),
+            voucher.get_case_property('state'),
+            case_id_to_confirmation_status[voucher.case_id],
+            voucher_id_counts[voucher.get_case_property(VOUCHER_ID)],
+        ] for voucher in vouchers]
+        self.write_csv('all_vouchers', headers, rows)
 
     def update_vouchers(self, voucher_updates):
         print "updating voucher cases"
