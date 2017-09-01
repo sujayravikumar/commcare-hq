@@ -18,7 +18,7 @@ from corehq.motech.repeaters.dbaccessors import iter_repeat_records_by_domain, g
 from corehq.util.couch import IterDB
 from corehq.util.log import with_progress_bar
 
-from custom.enikshay.case_utils import CASE_TYPE_VOUCHER
+from custom.enikshay.case_utils import CASE_TYPE_VOUCHER, get_person_case_from_voucher
 from custom.enikshay.const import (
     VOUCHER_ID,
     AMOUNT_APPROVED,
@@ -123,16 +123,16 @@ class Command(BaseCommand):
                 voucher_dict['voucher found'] = "no"
             elif len(possible_vouchers) == 1:
                 voucher = possible_vouchers[0]
-                voucher_dict['voucher case_id'] = voucher.case_id,
+                voucher_dict['voucher case_id'] = voucher.case_id
                 voucher_dict['voucher found'] = "yes"
             else:
                 voucher = self.get_voucher_from_list(possible_vouchers, voucher_dict)
                 if voucher:
-                    voucher_dict['voucher case_id'] = voucher.case_id,
+                    voucher_dict['voucher case_id'] = voucher.case_id
                     voucher_dict['voucher found'] = "yes"
                 else:
                     unidentifiable_vouchers += 1
-                    voucher_dict['voucher case_id'] = ' '.join(v.case_id for v in possible_vouchers),
+                    voucher_dict['voucher case_id'] = ' '.join(v.case_id for v in possible_vouchers)
                     voucher_dict['voucher found'] = "no"
 
             if not voucher:
@@ -188,8 +188,7 @@ class Command(BaseCommand):
                         ))
                     yield voucher
 
-    @staticmethod
-    def get_voucher_from_list(possible_vouchers, voucher_dict):
+    def get_voucher_from_list(self, possible_vouchers, voucher_dict):
         """Compare the voucher_dict to the possible vouchers and see if there's a clear match"""
         amount_fields = ['amount_approved', 'amount_eligible_for_redeemer', 'amount_fulfilled',
                          'amount_initial', 'amount_redeemed_per_chemist']
@@ -202,7 +201,14 @@ class Command(BaseCommand):
                 and voucher.get_case_property("state") in ["fulfilled", "approved", "paid"]
             )
 
+        def person_matches(voucher):
+            person = get_person_case_from_voucher(self.domain, voucher.case_id)
+            return person.get_case_property('person_id') == voucher_dict['PersonId']
+
         possible_vouchers = filter(properties_match, possible_vouchers)
+        if len(possible_vouchers) != 1:
+            # This will be slower, do only if necessary
+            possible_vouchers = filter(person_matches, possible_vouchers)
         if len(possible_vouchers) == 1:
             return possible_vouchers[0]
         return None
@@ -280,7 +286,7 @@ class Command(BaseCommand):
 
     def log_dump_confirmations(self, voucher_dicts):
         headers = [
-            'number possible vouchers'
+            'number possible vouchers',
             'voucher case_id',
             'voucher found',
             'confirmation status',
