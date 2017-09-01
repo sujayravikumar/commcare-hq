@@ -152,8 +152,8 @@ class Command(BaseCommand):
         # TODO
         # print "{} unrecognized\n{} unapproved or incomplete\n{} to update".format()
 
-        self.log_voucher_updates(voucher_updates)
         self.log_dump_confirmations(voucher_dicts)
+        self.log_voucher_updates(voucher_updates)
         # self.log_all_vouchers_in_domain(case_id_to_confirmation_status)
         self.update_vouchers(voucher_updates)
         self.reconcile_repeat_records(voucher_updates)
@@ -282,14 +282,14 @@ class Command(BaseCommand):
         headers = [
             'number possible vouchers'
             'voucher case_id',
-            'voucher_found',
+            'voucher found',
             'confirmation status',
         ] + self.voucher_update_properties + self.voucher_dump_properties
         rows = [
             [
                 voucher_dict['number possible vouchers'],
                 voucher_dict['voucher case_id'],
-                voucher_dict['voucher_found'],
+                voucher_dict['voucher found'],
                 voucher_dict['confirmation status'],
             ] + [
                 voucher_dict[prop] for prop in self.voucher_update_properties + self.voucher_dump_properties
