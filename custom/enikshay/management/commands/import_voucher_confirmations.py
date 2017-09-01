@@ -109,7 +109,7 @@ class Command(BaseCommand):
         self.bad_payloads = 0
         unidentifiable_vouchers = 0
 
-        dump_confirmations = []  # The row-by-row upload confirmation
+        voucher_dicts = []  # The row-by-row upload confirmation
         voucher_updates = []
 
         for voucher_dict in self.get_voucher_dicts_from_dump_and_update():
@@ -134,7 +134,6 @@ class Command(BaseCommand):
                     unidentifiable_vouchers += 1
                     voucher_dict['voucher case_id'] = ' '.join(v.case_id for v in possible_vouchers),
                     voucher_dict['voucher found'] = "no"
-            dump_confirmations.append(voucher_dict)
 
             if not voucher:
                 voucher_dict['confirmation status'] = "UNIDENTIFIABLE"
@@ -146,12 +145,15 @@ class Command(BaseCommand):
                 voucher_dict['confirmation status'] = "ALL CHECKS SUCCESSFUL"
                 voucher_updates.append(self.make_voucher_update(voucher, voucher_dict))
 
+            voucher_dicts.append(voucher_dict)
+
         print 'Found {} unidentifiable_vouchers'.format(unidentifiable_vouchers)
 
         # TODO
         # print "{} unrecognized\n{} unapproved or incomplete\n{} to update".format()
 
         self.log_voucher_updates(voucher_updates)
+        self.log_dump_confirmations(voucher_dicts)
         # self.log_all_vouchers_in_domain(case_id_to_confirmation_status)
         self.update_vouchers(voucher_updates)
         self.reconcile_repeat_records(voucher_updates)
@@ -275,6 +277,26 @@ class Command(BaseCommand):
         print "logging voucher updates"
         rows = map(make_row, with_progress_bar(voucher_updates))
         self.write_csv('updates', headers, rows)
+
+    def log_dump_confirmations(self, voucher_dicts):
+        headers = [
+            'number possible vouchers'
+            'voucher case_id',
+            'voucher_found',
+            'confirmation status',
+        ] + self.voucher_update_properties + self.voucher_dump_properties
+        rows = [
+            [
+                voucher_dict['number possible vouchers'],
+                voucher_dict['voucher case_id'],
+                voucher_dict['voucher_found'],
+                voucher_dict['confirmation status'],
+            ] + [
+                voucher_dict[prop] for prop in self.voucher_update_properties + self.voucher_dump_properties
+            ]
+            for voucher_dict in voucher_dicts
+        ]
+        self.write_csv('confirmations', headers, rows)
 
     # def log_all_vouchers_in_domain(self, case_id_to_confirmation_status):
     #     voucher_ids = self.accessor.get_case_ids_in_domain(CASE_TYPE_VOUCHER)
