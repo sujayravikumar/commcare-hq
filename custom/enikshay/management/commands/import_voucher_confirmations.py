@@ -199,7 +199,7 @@ class Command(BaseCommand):
             return (
                 voucher_dict["Amount"] in [get_value(field) for field in amount_fields]
                 and voucher_dict["Event Occur Date (Voucher Validation date)"] == get_value("date_fulfilled")
-                # and voucher.get_case_property("state") in ["fulfilled", "approved"]
+                and voucher.get_case_property("state") in ["fulfilled", "approved", "paid"]
             )
 
         possible_vouchers = filter(properties_match, possible_vouchers)
