@@ -107,34 +107,43 @@ class Command(BaseCommand):
         self.accessor = CaseAccessors(domain)
         self.commit = options['commit']
         self.bad_payloads = 0
-        unidentifiable_vouchers = 0
-
+        self.resolved_by_inspection = 0
+        self.resolved_by_duplicate_count = 0
         voucher_dicts = []  # The row-by-row upload confirmation
         voucher_updates = []
+        unidentifiable_vouchers = []
 
         for voucher_dict in self.get_voucher_dicts_from_dump_and_update():
             voucher_id = voucher_dict['id']
             possible_vouchers = self.vouchers_by_readable_id[voucher_id]
+            voucher_dict['possible_vouchers'] = possible_vouchers
             voucher_dict['number possible vouchers'] = len(possible_vouchers)
             if len(possible_vouchers) == 0:
-                voucher = None
-                unidentifiable_vouchers += 1
+                voucher_dict['voucher_case'] = None
+                unidentifiable_vouchers.append(voucher_dict)
                 voucher_dict['voucher case_id'] = "NO MATCHES"
                 voucher_dict['voucher found'] = "no"
             elif len(possible_vouchers) == 1:
-                voucher = possible_vouchers[0]
-                voucher_dict['voucher case_id'] = voucher.case_id
+                voucher_dict['voucher_case'] = possible_vouchers[0]
+                voucher_dict['voucher case_id'] = possible_vouchers[0].case_id
                 voucher_dict['voucher found'] = "yes"
             else:
                 voucher = self.get_voucher_from_list(possible_vouchers, voucher_dict)
+                voucher_dict['voucher_case'] = voucher
                 if voucher:
                     voucher_dict['voucher case_id'] = voucher.case_id
                     voucher_dict['voucher found'] = "yes"
                 else:
-                    unidentifiable_vouchers += 1
+                    unidentifiable_vouchers.append(voucher_dict)
                     voucher_dict['voucher case_id'] = ' '.join(v.case_id for v in possible_vouchers)
                     voucher_dict['voucher found'] = "no"
 
+            voucher_dicts.append(voucher_dict)
+
+        voucher_dicts = list(self.resolve_duplicate_vouchers(voucher_dicts))
+
+        for voucher_dict in voucher_dicts:
+            voucher = voucher_dict['voucher_case']
             if not voucher:
                 voucher_dict['confirmation status'] = "UNIDENTIFIABLE"
             elif self._missing_key_properties(voucher):
@@ -145,14 +154,13 @@ class Command(BaseCommand):
                 voucher_dict['confirmation status'] = "ALL CHECKS SUCCESSFUL"
                 voucher_updates.append(self.make_voucher_update(voucher, voucher_dict))
 
-            voucher_dicts.append(voucher_dict)
-
-        print 'Found {} unidentifiable_vouchers'.format(unidentifiable_vouchers)
-
-        # TODO
-        # print "{} unrecognized\n{} unapproved or incomplete\n{} to update".format()
+        print "{} ambiguous vouchers resolved by property matching".format(self.resolved_by_inspection)
+        print "{} ambiguous vouchers had all duplicates in payment anyways".format(self.resolved_by_duplicate_count)
+        print 'Found {} unidentifiable_vouchers'.format(len(unidentifiable_vouchers))
 
         self.log_dump_confirmations(voucher_dicts)
+        return  # Just saving time until we need this
+
         self.log_voucher_updates(voucher_updates)
         # self.log_all_vouchers_in_domain(case_id_to_confirmation_status)
         self.update_vouchers(voucher_updates)
@@ -196,7 +204,10 @@ class Command(BaseCommand):
         def properties_match(voucher):
             get_value = voucher.get_case_property
             return (
-                voucher_dict["Amount"] in [get_value(field) for field in amount_fields]
+                (voucher_dict["Amount"] in
+                 [get_value(field) for field in amount_fields]
+                 + [int(math.ceil(float(get_value(field)))) for field in amount_fields
+                    if get_value(field)])
                 and voucher_dict["Event Occur Date (Voucher Validation date)"] == get_value("date_fulfilled")
                 and voucher.get_case_property("state") in ["fulfilled", "approved", "paid"]
             )
@@ -210,8 +221,43 @@ class Command(BaseCommand):
             # This will be slower, do only if necessary
             possible_vouchers = filter(person_matches, possible_vouchers)
         if len(possible_vouchers) == 1:
+            self.resolved_by_inspection += 1
             return possible_vouchers[0]
         return None
+
+    def resolve_duplicate_vouchers(self, voucher_dicts):
+        def get_hashable(voucher_dict):
+            return tuple([
+                voucher_dict['number possible vouchers'],
+                voucher_dict['voucher case_id'],
+            ] + [
+                voucher_dict[prop] for prop in self.voucher_update_properties + self.voucher_dump_properties
+            ])
+
+        dicts_by_hash = defaultdict(list)
+        for voucher_dict in voucher_dicts:
+            if voucher_dict['voucher found'] == "yes":
+                yield voucher_dict
+            else:
+                dicts_by_hash[hash(get_hashable(voucher_dict))].append(voucher_dict)
+
+        print "{} unidentifiable vouchers".format(len(dicts_by_hash))
+
+        for matching_rows in dicts_by_hash.values():
+            if len(matching_rows) == 1:
+                yield matching_rows[0]  # no duplicates, we're out of luck
+            elif len(matching_rows) == len(matching_rows[0]['possible_vouchers']):
+                # there are n matching rows and n possible vouchers, so it doesn't matter!
+                for voucher, voucher_dict in zip(matching_rows[0]['possible_vouchers'], matching_rows):
+                    self.resolved_by_duplicate_count += 1
+                    voucher_dict['voucher_case'] = voucher
+                    voucher_dict['voucher case_id'] = voucher.case_id
+                    voucher_dict['voucher found'] = "yes"
+                    yield voucher_dict
+            else:
+                # there are a differing number of duplicates and matches, we're out of luck
+                for voucher_dict in matching_rows:
+                    yield voucher_dict
 
     def make_voucher_update(self, voucher, voucher_dict):
         voucher_dict['amount'] = int(math.ceil(float(voucher_dict['amount'])))
