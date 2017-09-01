@@ -203,11 +203,16 @@ class Command(BaseCommand):
 
         def properties_match(voucher):
             get_value = voucher.get_case_property
+
+            amount_matches = False
+            amount = float(voucher_dict["Amount"])
+            for field in amount_fields:
+                if get_value(field):
+                    if amount - 1 < float(get_value(field)) < amount + 1:
+                        amount_matches = True
+
             return (
-                (voucher_dict["Amount"] in
-                 [get_value(field) for field in amount_fields]
-                 + [int(math.ceil(float(get_value(field)))) for field in amount_fields
-                    if get_value(field)])
+                amount_matches
                 and voucher_dict["Event Occur Date (Voucher Validation date)"] == get_value("date_fulfilled")
                 and voucher.get_case_property("state") in ["fulfilled", "approved", "paid"]
             )
