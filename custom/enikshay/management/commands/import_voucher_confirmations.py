@@ -1,6 +1,7 @@
 import csv
 import datetime
 import decimal
+import math
 from mock import MagicMock
 from collections import defaultdict, Counter
 from dateutil import parser as date_parser
@@ -121,8 +122,7 @@ class Command(BaseCommand):
                     prop: row[headers.index(prop)]
                     for prop in self.voucher_update_properties
                 }
-                raw_amount = props['amount']
-                props['amount'] = decimal.Decimal(raw_amount) if raw_amount else raw_amount,
+                props['amount'] = int(math.ceil(float(props['amount'])))
                 props['paymentDate'] = date_parser.parse(props['paymentDate'] or '2017-09-01')
                 update = VoucherUpdate(
                     id=voucher.case_id,
