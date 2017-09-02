@@ -12,6 +12,7 @@ from dimagi.utils.chunked import chunked
 from dimagi.utils.decorators.memoized import memoized
 
 from corehq.apps.hqcase.utils import bulk_update_cases
+from corehq.apps.users.models import CommCareUser
 from corehq.form_processor.interfaces.dbaccessors import CaseAccessors
 from corehq.motech.repeaters.models import RepeatRecord, RepeatRecordAttempt
 from corehq.motech.repeaters.dbaccessors import iter_repeat_records_by_domain, get_repeat_record_count
@@ -39,7 +40,7 @@ class Command(BaseCommand):
     """
     voucher_dump_properties = [
         "Voucher ID (visible)",
-        "Voucher ID (GUUID)",
+        "Voucher ID (GUUID)",  # Don't get excited - these UUID fields aren't populated
         "Event Occur Date (Voucher Validation date)",
         "Event ID",
         "Beneficiary ID (visible)",
@@ -47,7 +48,7 @@ class Command(BaseCommand):
         "BeneficiaryType",
         "Location (GUID)",
         "Amount",
-        "DTOLocation",
+        "DTOLocation",  # Readable name - "Alert-India", "MJK", etc
         "DTOLocation (GUID)",
         "InvestigationType",
         "PersonId",
@@ -141,6 +142,8 @@ class Command(BaseCommand):
             voucher_dicts.append(voucher_dict)
 
         voucher_dicts = list(self.resolve_duplicate_vouchers(voucher_dicts))
+
+        voucher_dicts = self.approve_fulfilled_vouchers(voucher_dicts)
 
         for voucher_dict in voucher_dicts:
             voucher = voucher_dict['voucher_case']
@@ -254,6 +257,7 @@ class Command(BaseCommand):
                 yield matching_rows[0]  # no duplicates, we're out of luck
             elif len(matching_rows) == len(matching_rows[0]['possible_vouchers']):
                 # there are n matching rows and n possible vouchers, so it doesn't matter!
+                # Just assign vouchers to rows arbitrarily
                 for voucher, voucher_dict in zip(matching_rows[0]['possible_vouchers'], matching_rows):
                     self.resolved_by_duplicate_count += 1
                     voucher_dict['voucher_case'] = voucher
@@ -298,11 +302,11 @@ class Command(BaseCommand):
 
     @staticmethod
     def _missing_key_properties(voucher):
-        return not all(voucher.get_case_property(prop) for prop in [
-            DATE_FULFILLED,
-            DATE_APPROVED,
-            FULFILLED_BY_ID,
-            FULFILLED_BY_LOCATION_ID,
+        return not all([
+            voucher.get_case_property(DATE_FULFILLED),
+            voucher.get_case_property(DATE_APPROVED),
+            voucher.get_case_property(FULFILLED_BY_ID),
+            voucher.get_case_property(FULFILLED_BY_LOCATION_ID),
         ])
 
     def write_csv(self, filename, headers, rows):
@@ -375,6 +379,47 @@ class Command(BaseCommand):
     #         voucher_id_counts[voucher.get_case_property(VOUCHER_ID)],
     #     ] for voucher in vouchers]
     #     self.write_csv('all_vouchers', headers, rows)
+
+    @property
+    @memoized
+    def users_by_dto(self):
+        return {
+            # Looks like all "fulfilled" rows have one of these two DTOs
+            # at any rate, we don't have approver info beyond them, so fail hard if needed
+            'MJK': CommCareUser.get_by_username('ckk4@enikshay.commcarehq.org'),
+            'Alert-India': CommCareUser.get_by_username('ckje@enikshay.commcarehq.org'),
+        }
+
+    def approve_fulfilled_vouchers(self, voucher_dicts):
+        output_dicts = []
+        voucher_approvals = []
+        for voucher_dict in voucher_dicts:
+            voucher = voucher_dict['voucher_case']
+            if voucher and voucher.get_case_property('state') == 'fulfilled':
+                voucher_dict['marked_as_approved'] = True
+                approver = self.users_by_dto[voucher_dict['DTOLocation']]
+                date = parse(voucher_dict['paymentDate'] or '2017-09-01').date().isoformat()
+                props_to_update = {
+                    'state': 'approved',
+                    'amount_approved': voucher_dict['amount'],
+                    'voucher_approved_by_id': approver.user_id,
+                    'voucher_approved_by_name': approver.full_name,
+                    'owner_id': '-',
+                    'date_approved': date,
+                }
+                voucher_approvals.append((voucher.case_id, props_to_update, False))
+
+                # Manually update the existing voucher object
+                voucher.case_json.update(props_to_update)
+
+            output_dicts.append(voucher_dict)
+
+        print "\nApproving {} vouchers".format(len(voucher_approvals))
+        for chunk in chunked(with_progress_bar(voucher_approvals), 100):
+            if self.commit:
+                bulk_update_cases(self.domain, chunk)
+
+        return output_dicts
 
     def update_vouchers(self, voucher_updates):
         print "updating voucher cases"
