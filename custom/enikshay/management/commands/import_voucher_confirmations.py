@@ -112,7 +112,6 @@ class Command(BaseCommand):
         self.resolved_by_inspection = 0
         self.resolved_by_duplicate_count = 0
         voucher_dicts = []  # The row-by-row upload confirmation
-        voucher_updates = []
         unidentifiable_vouchers = []
 
         for voucher_dict in self.get_voucher_dicts_from_dump_and_update():
@@ -146,6 +145,7 @@ class Command(BaseCommand):
 
         voucher_dicts = self.approve_fulfilled_vouchers(voucher_dicts)
 
+        voucher_updates = []
         for voucher_dict in voucher_dicts:
             voucher = voucher_dict['voucher_case']
             if not voucher:
@@ -325,15 +325,16 @@ class Command(BaseCommand):
             return defaultdict(lambda: "PAYLOAD_ERROR")
 
     def log_voucher_updates(self, voucher_updates):
-        headers = ['ReadableID'] + self.voucher_api_properties + self.voucher_update_properties
+        update_props = [prop for prop in self.voucher_update_properties
+                        if prop not in ['EventID', 'Beneficiary ID']]
+        headers = ['ReadableID'] + self.voucher_api_properties + update_props
 
         def make_row(voucher_update):
             api_payload = self._get_api_payload(voucher_update._voucher)
             return [voucher_update._voucher.get_case_property(VOUCHER_ID)] + [
                 api_payload[prop] for prop in self.voucher_api_properties
             ] + [
-                voucher_update[prop] for prop in self.voucher_update_properties
-                if prop not in ['EventID', 'Beneficiary ID']
+                voucher_update[prop] for prop in update_props
             ]
 
         print "logging voucher updates"
@@ -416,6 +417,20 @@ class Command(BaseCommand):
                 voucher_approvals.append((voucher.case_id, props_to_update, False))
 
                 # Manually update the existing voucher object
+                voucher.case_json.update(props_to_update)
+
+            elif voucher and voucher.case_id == '6469109c-8a23-4856-867e-9b74fad39674':
+                # For some reason this single case is missing these properties,
+                # Just add them in hardcoded
+                props_to_update = {
+                    'amount_fulfilled': '100',
+                    'amount_approved': '100',
+                }
+                voucher_dict.update({
+                    'amount': '100',
+                    'Amount': '100',
+                })
+                voucher_approvals.append((voucher.case_id, props_to_update, False))
                 voucher.case_json.update(props_to_update)
 
             output_dicts.append(voucher_dict)
