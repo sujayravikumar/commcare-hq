@@ -12,6 +12,7 @@ from dimagi.utils.chunked import chunked
 from dimagi.utils.decorators.memoized import memoized
 
 from corehq.apps.hqcase.utils import bulk_update_cases
+from corehq.apps.locations.models import SQLLocation
 from corehq.apps.users.models import CommCareUser
 from corehq.form_processor.interfaces.dbaccessors import CaseAccessors
 from corehq.motech.repeaters.models import RepeatRecord, RepeatRecordAttempt
@@ -159,7 +160,7 @@ class Command(BaseCommand):
 
         print "{} ambiguous vouchers resolved by property matching".format(self.resolved_by_inspection)
         print "{} ambiguous vouchers had all duplicates in payment anyways".format(self.resolved_by_duplicate_count)
-        print 'Found {} unidentifiable_vouchers'.format(len(unidentifiable_vouchers))
+        print 'Found {} unidentifiable_vouchers'.format(len(unidentifiable_vouchers) - self.resolved_by_duplicate_count)
 
         self.log_dump_confirmations(voucher_dicts)
         return  # Just saving time until we need this
@@ -407,6 +408,10 @@ class Command(BaseCommand):
                     'owner_id': '-',
                     'date_approved': date,
                 }
+                if voucher.get_case_property(FULFILLED_BY_LOCATION_ID) and not voucher.get_case_property(FULFILLED_BY_ID):
+                    location = SQLLocation.objects.get(location_id=voucher.get_case_property(FULFILLED_BY_LOCATION_ID))
+                    assert location.user_id, "{} should be an agency location".format(location.location_id)
+                    props_to_update[FULFILLED_BY_ID] = location.user_id
                 voucher_approvals.append((voucher.case_id, props_to_update, False))
 
                 # Manually update the existing voucher object
