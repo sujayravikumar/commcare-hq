@@ -163,7 +163,6 @@ class Command(BaseCommand):
         print 'Found {} unidentifiable_vouchers'.format(len(unidentifiable_vouchers) - self.resolved_by_duplicate_count)
 
         self.log_dump_confirmations(voucher_dicts)
-        return  # Just saving time until we need this
 
         self.log_voucher_updates(voucher_updates)
         # self.log_all_vouchers_in_domain(case_id_to_confirmation_status)
@@ -347,6 +346,7 @@ class Command(BaseCommand):
             'voucher case_id',
             'voucher found',
             'confirmation status',
+            'new approver',
         ] + self.voucher_update_properties + self.voucher_dump_properties
         rows = [
             [
@@ -354,12 +354,13 @@ class Command(BaseCommand):
                 voucher_dict['voucher case_id'],
                 voucher_dict['voucher found'],
                 voucher_dict['confirmation status'],
+                voucher_dict.get('new_approver', 'ALREADY APPROVED')
             ] + [
                 voucher_dict[prop] for prop in self.voucher_update_properties + self.voucher_dump_properties
             ]
             for voucher_dict in voucher_dicts
         ]
-        self.write_csv('confirmations', headers, rows)
+        self.write_csv('dump_confirmation', headers, rows)
 
     # def log_all_vouchers_in_domain(self, case_id_to_confirmation_status):
     #     voucher_ids = self.accessor.get_case_ids_in_domain(CASE_TYPE_VOUCHER)
@@ -397,9 +398,9 @@ class Command(BaseCommand):
         for voucher_dict in voucher_dicts:
             voucher = voucher_dict['voucher_case']
             if voucher and voucher.get_case_property('state') == 'fulfilled':
-                voucher_dict['marked_as_approved'] = True
                 approver = self.users_by_dto[voucher_dict['DTOLocation']]
                 date = parse(voucher_dict['paymentDate'] or '2017-09-01').date().isoformat()
+                voucher_dict['new_approver'] = approver.full_name
                 props_to_update = {
                     'state': 'approved',
                     'amount_approved': voucher_dict['amount'],
