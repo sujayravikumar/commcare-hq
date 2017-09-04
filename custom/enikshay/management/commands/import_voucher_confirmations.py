@@ -492,6 +492,7 @@ class Command(BaseCommand):
                         iter_db.save(record)
                     else:
                         # mark record as canceled
+                        status = "cancelled"
                         record.add_attempt(RepeatRecordAttempt(
                             cancelled=True,
                             datetime=datetime.datetime.utcnow(),
