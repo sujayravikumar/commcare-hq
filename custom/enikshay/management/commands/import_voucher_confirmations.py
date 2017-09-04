@@ -31,6 +31,7 @@ from custom.enikshay.const import (
     INVESTIGATION_TYPE,
     VOUCHER_TYPE,
 )
+from custom.enikshay.exceptions import ENikshayCaseNotFound
 from custom.enikshay.integrations.bets.repeater_generators import VoucherPayload
 from custom.enikshay.integrations.bets.views import VoucherUpdate
 
@@ -116,7 +117,7 @@ class Command(BaseCommand):
 
         for voucher_dict in self.get_voucher_dicts_from_dump_and_update():
             voucher_id = voucher_dict['id']
-            possible_vouchers = self.vouchers_by_readable_id[voucher_id]
+            possible_vouchers = self.vouchers_by_readable_id_and_person[(voucher_id, voucher_dict['PersonId'])]
             voucher_dict['possible_vouchers'] = possible_vouchers
             voucher_dict['number possible vouchers'] = len(possible_vouchers)
             if len(possible_vouchers) == 0:
@@ -221,14 +222,7 @@ class Command(BaseCommand):
                 and voucher.get_case_property("state") in ["fulfilled", "approved", "paid"]
             )
 
-        def person_matches(voucher):
-            person = get_person_case_from_voucher(self.domain, voucher.case_id)
-            return person.get_case_property('person_id') == voucher_dict['PersonId']
-
         possible_vouchers = filter(properties_match, possible_vouchers)
-        if len(possible_vouchers) != 1:
-            # This will be slower, do only if necessary
-            possible_vouchers = filter(person_matches, possible_vouchers)
         if len(possible_vouchers) == 1:
             self.resolved_by_inspection += 1
             return possible_vouchers[0]
@@ -285,12 +279,18 @@ class Command(BaseCommand):
 
     @property
     @memoized
-    def vouchers_by_readable_id(self):
+    def vouchers_by_readable_id_and_person(self):
         """returns a list of vouchers for each readable id"""
         vouchers = defaultdict(list)
         voucher_ids = self.accessor.get_case_ids_in_domain(CASE_TYPE_VOUCHER)
         for voucher in self.accessor.iter_cases(voucher_ids):
-            vouchers[voucher.get_case_property(VOUCHER_ID)].append(voucher)
+            try:
+                person = get_person_case_from_voucher(self.domain, voucher.case_id)
+                person_id = person.get_case_property('person_id')
+            except ENikshayCaseNotFound:
+                person_id = None
+            key = (voucher.get_case_property(VOUCHER_ID), person_id,)
+            vouchers[key].append(voucher)
         return vouchers
 
     @staticmethod
