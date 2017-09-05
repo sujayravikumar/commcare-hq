@@ -1,7 +1,6 @@
 import csv
 import datetime
 import decimal
-import math
 from mock import MagicMock
 from collections import defaultdict, Counter
 from dateutil.parser import parse
@@ -264,7 +263,7 @@ class Command(BaseCommand):
                     yield voucher_dict
 
     def make_voucher_update(self, voucher, voucher_dict):
-        voucher_dict['amount'] = int(math.ceil(float(voucher_dict['amount'])))
+        voucher_dict['amount'] = int(round(float(voucher_dict['amount'])))
         voucher_dict['paymentDate'] = parse(voucher_dict['paymentDate'] or '2017-09-01')
         update = VoucherUpdate(
             id=voucher.case_id,
