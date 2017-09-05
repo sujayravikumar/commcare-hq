@@ -1,23 +1,26 @@
 from StringIO import StringIO
 from collections import OrderedDict
+import datetime
 
 import pytz
 from dateutil.rrule import rrule, MONTHLY
-from django.db.models.functions import datetime
 from django.http.response import Http404
 from sqlagg.base import AliasColumn
 from sqlagg.columns import SumColumn, SimpleColumn
-from sqlagg.filters import EQ, OR, BETWEEN, RawFilter, EQFilter
+from sqlagg.filters import EQ, OR, BETWEEN, RawFilter, EQFilter, IN, NOT
 from sqlagg.sorting import OrderBy
 
 from corehq.apps.locations.models import SQLLocation
 from corehq.apps.reports.datatables import DataTablesColumn
 from corehq.apps.reports.datatables import DataTablesHeader
 from corehq.apps.reports.sqlreport import SqlData, DatabaseColumn, AggregateColumn, Column
+from corehq.apps.reports.util import get_INFilter_bindparams
+from custom.icds_reports.queries import get_test_state_locations_id
 from custom.icds_reports.utils import ICDSMixin
 from couchexport.export import export_from_tables
 from couchexport.shortcuts import export_response
 
+from custom.utils.utils import clean_IN_filter_value
 from dimagi.utils.decorators.memoized import memoized
 
 india_timezone = pytz.timezone('Asia/Kolkata')
@@ -114,14 +117,29 @@ def percent(x, y):
 class ExportableMixin(object):
     engine_id = 'icds-test-ucr'
 
-    def __init__(self, config=None, loc_level=1):
+    def __init__(self, config=None, loc_level=1, show_test=False):
         self.config = config
         self.loc_level = loc_level
+        self.excluded_states = get_test_state_locations_id(self.domain)
+        self.config['excluded_states'] = self.excluded_states
+        clean_IN_filter_value(self.config, 'excluded_states')
+        self.show_test = show_test
+
+    @property
+    def domain(self):
+        return self.config['domain']
 
     @property
     def filters(self):
         filters = []
+        infilter_params = get_INFilter_bindparams('excluded_states', self.excluded_states)
+
+        if not self.show_test:
+            filters.append(NOT(IN('state_id', infilter_params)))
+
         for key, value in self.config.iteritems():
+            if key == 'domain' or key in infilter_params:
+                continue
             filters.append(EQ(key, key))
         return filters
 
@@ -158,7 +176,10 @@ class ExportableMixin(object):
                     cell = row[c.slug]
                 else:
                     cell = row[c['slug']]
-                row_data.append(cell['sort_key'] if cell and 'sort_key' in cell else cell)
+                if not isinstance(cell, dict):
+                    row_data.append(cell)
+                else:
+                    row_data.append(cell['sort_key'] if cell and 'sort_key' in cell else cell)
             excel_rows.append(row_data)
 
         utc_now = datetime.datetime.now(pytz.utc)
@@ -226,8 +247,9 @@ class AggChildHealthMonthlyDataSource(SqlData):
     table_name = 'agg_child_health_monthly'
     engine_id = 'icds-test-ucr'
 
-    def __init__(self, config=None, loc_level='state'):
+    def __init__(self, config=None, loc_level='state', show_test=False):
         super(AggChildHealthMonthlyDataSource, self).__init__(config)
+        self.excluded_states = get_test_state_locations_id(self.domain)
         self.loc_key = '%s_site_code' % loc_level
         self.config.update({
             'age_0': '0',
@@ -237,16 +259,27 @@ class AggChildHealthMonthlyDataSource(SqlData):
             'age_36': '36',
             'age_48': '48',
             'age_60': '60',
-            'age_72': '72'
+            'age_72': '72',
+            'excluded_states': self.excluded_states
         })
+        clean_IN_filter_value(self.config, 'excluded_states')
+        self.show_test = show_test
 
     @property
     def group_by(self):
         return ['month']
 
     @property
+    def domain(self):
+        return self.config['domain']
+
+    @property
     def filters(self):
-        filters = [EQ('aggregation_level', 'aggregation_level')]
+        filters = [
+            EQ('aggregation_level', 'aggregation_level')
+        ]
+        if not self.show_test:
+            filters.append(NOT(IN('state_id', get_INFilter_bindparams('excluded_states', self.excluded_states))))
         if self.loc_key in self.config and self.config[self.loc_key]:
             filters.append(EQ(self.loc_key, self.loc_key))
         if 'month' in self.config and self.config['month']:
@@ -482,9 +515,17 @@ class AggCCSRecordMonthlyDataSource(SqlData):
     table_name = 'agg_ccs_record_monthly'
     engine_id = 'icds-test-ucr'
 
-    def __init__(self, config=None, loc_level='state'):
+    def __init__(self, config=None, loc_level='state', show_test=False):
         super(AggCCSRecordMonthlyDataSource, self).__init__(config)
         self.loc_key = '%s_site_code' % loc_level
+        self.excluded_states = get_test_state_locations_id(self.domain)
+        self.config['excluded_states'] = self.excluded_states
+        clean_IN_filter_value(self.config, 'excluded_states')
+        self.show_test = show_test
+
+    @property
+    def domain(self):
+        return self.config['domain']
 
     @property
     def group_by(self):
@@ -492,7 +533,13 @@ class AggCCSRecordMonthlyDataSource(SqlData):
 
     @property
     def filters(self):
-        filters = [EQ('aggregation_level', 'aggregation_level')]
+        filters = [
+            EQ('aggregation_level', 'aggregation_level')
+        ]
+
+        if not self.show_test:
+            filters.append(NOT(IN('state_id', get_INFilter_bindparams('excluded_states', self.excluded_states))))
+
         if self.loc_key in self.config and self.config[self.loc_key]:
             filters.append(EQ(self.loc_key, self.loc_key))
         if 'month' in self.config and self.config['month']:
@@ -596,13 +643,24 @@ class AggAWCMonthlyDataSource(SqlData):
     table_name = 'agg_awc_monthly'
     engine_id = 'icds-test-ucr'
 
-    def __init__(self, config=None, loc_level='state'):
+    def __init__(self, config=None, loc_level='state', show_test=False):
         super(AggAWCMonthlyDataSource, self).__init__(config)
         self.loc_key = '%s_site_code' % loc_level
+        self.excluded_states = get_test_state_locations_id(self.domain)
+        self.config['excluded_states'] = self.excluded_states
+        clean_IN_filter_value(self.config, 'excluded_states')
+        self.show_test = show_test
+
+    @property
+    def domain(self):
+        return self.config['domain']
 
     @property
     def filters(self):
-        filters = [EQ('aggregation_level', 'aggregation_level')]
+        filters = [
+            EQ('aggregation_level', 'aggregation_level'),
+            NOT(IN('state_id', get_INFilter_bindparams('excluded_states', self.excluded_states)))
+        ]
         if self.loc_key in self.config and self.config[self.loc_key]:
             filters.append(EQ(self.loc_key, self.loc_key))
         if 'month' in self.config and self.config['month']:
@@ -1119,27 +1177,6 @@ class DemographicsChildHealth(ExportableMixin, SqlData):
 
     table_name = 'agg_child_health_monthly'
 
-    def __init__(self, config=None, loc_level=1):
-        super(DemographicsChildHealth, self).__init__(config, loc_level)
-        self.config.update({
-            'age_0': '0',
-            'age_6': '6',
-            'age_12': '12',
-            'age_24': '24',
-            'age_36': '36',
-            'age_48': '48',
-            'age_60': '60',
-            'age_72': '72'
-        })
-
-    @property
-    def filters(self):
-        filters = []
-        for key, value in self.config.iteritems():
-            if not key.startswith('age'):
-                filters.append(EQ(key, key))
-        return filters
-
     @property
     def get_columns_by_loc_level(self):
         columns = [
@@ -1179,8 +1216,8 @@ class DemographicsChildHealth(ExportableMixin, SqlData):
                 'num_children_0_6mo_enrolled_for_services',
                 SumColumn('valid_in_month', filters=self.filters + [
                     OR([
-                        EQ('age_tranche', 'age_0'),
-                        EQ('age_tranche', 'age_6')
+                        RawFilter("age_tranche = '0'"),
+                        RawFilter("age_tranche = '6'")
                     ])
                 ]),
                 slug='num_children_0_6mo_enrolled_for_services'
@@ -1191,9 +1228,9 @@ class DemographicsChildHealth(ExportableMixin, SqlData):
                     'valid_in_month',
                     filters=self.filters + [
                         OR([
-                            EQ('age_tranche', 'age_12'),
-                            EQ('age_tranche', 'age_24'),
-                            EQ('age_tranche', 'age_36')
+                            RawFilter("age_tranche = '12'"),
+                            RawFilter("age_tranche = '24'"),
+                            RawFilter("age_tranche = '36'")
                         ])
                     ]
                 ),
@@ -1205,9 +1242,9 @@ class DemographicsChildHealth(ExportableMixin, SqlData):
                     'valid_in_month',
                     filters=self.filters + [
                         OR([
-                            EQ('age_tranche', 'age_48'),
-                            EQ('age_tranche', 'age_60'),
-                            EQ('age_tranche', 'age_72')
+                            RawFilter("age_tranche = '48'"),
+                            RawFilter("age_tranche = '60'"),
+                            RawFilter("age_tranche = '72'")
                         ])
                     ]
                 ),
@@ -1626,11 +1663,110 @@ class AWCInfrastructureExport(ExportableMixin, SqlData):
         return columns + agg_columns
 
 
+class ICDSDatabaseColumn(DatabaseColumn):
+    def get_raw_value(self, row):
+        return (self.view.get_value(row) or '') if row else ''
+
+
+class BeneficiaryExport(ExportableMixin, SqlData):
+    title = 'Child Beneficiary'
+    table_name = 'child_health_monthly_view'
+
+    @property
+    def group_by(self):
+        group_by_columns = self.get_columns_by_loc_level
+        group_by = []
+        for column in group_by_columns:
+            if column.slug != 'current_age':
+                group_by.append(column.slug)
+        return group_by
+
+    @property
+    def order_by(self):
+        return [OrderBy('person_name')]
+
+    @property
+    def get_columns_by_loc_level(self):
+
+        def current_age(dob):
+            return int(round((self.config['month'] - dob).days / 365.25))
+
+        columns = [
+            DatabaseColumn(
+                'Name',
+                SimpleColumn('person_name'),
+                slug='person_name'
+            ),
+            DatabaseColumn(
+                'Date of Birth',
+                SimpleColumn('dob'),
+                slug='dob'
+            ),
+            DatabaseColumn(
+                'Current Age (In years)',
+                AliasColumn('dob'),
+                format_fn=current_age,
+                slug='current_age'
+            ),
+            DatabaseColumn(
+                'Sex ',
+                SimpleColumn('sex'),
+                slug='sex'
+            ),
+            ICDSDatabaseColumn(
+                '1 Year Immunizations Complete',
+                SimpleColumn('fully_immunized_date'),
+                format_fn=lambda x: 'Yes' if x != '' else 'No'
+            ),
+            DatabaseColumn(
+                'Month for data shown',
+                SimpleColumn('month'),
+                slug='month'
+            ),
+            DatabaseColumn(
+                'Weight recorded',
+                SimpleColumn('recorded_weight'),
+                slug='recorded_weight'
+            ),
+            DatabaseColumn(
+                'Height recorded',
+                SimpleColumn('recorded_height'),
+                slug='recorded_height'
+            ),
+            DatabaseColumn(
+                'Weight-for-Age Status',
+                SimpleColumn('current_month_nutrition_status'),
+                slug='current_month_nutrition_status'
+            ),
+            DatabaseColumn(
+                'Weight-for-Height Status',
+                SimpleColumn('current_month_stunting'),
+                slug="current_month_stunting"
+            ),
+            DatabaseColumn(
+                'Height-for-Age status',
+                SimpleColumn('current_month_wasting'),
+                slug="current_month_wasting"
+            ),
+            DatabaseColumn(
+                'PSE Attendance',
+                SimpleColumn('pse_days_attended'),
+                slug="pse_days_attended"
+            ),
+        ]
+        return columns
+
+    @property
+    def columns(self):
+        return self.get_columns_by_loc_level
+
+
 class ProgressReport(object):
 
-    def __init__(self, config=None, loc_level='state'):
+    def __init__(self, config=None, loc_level='state', show_test=False):
         self.loc_level = loc_level
         self.config = config
+        self.show_test = show_test
 
     @property
     def new_table_config(self):
@@ -1653,7 +1789,7 @@ class ProgressReport(object):
                                 'data_source': 'AggChildHealthMonthlyDataSource',
                                 'header': 'Total number of unweighed children',
                                 'slug': 'nutrition_status_unweighed',
-                                'reverseColors': 'true',
+                                'reverseColors': True,
                             },
                             {
                                 'data_source': 'AggChildHealthMonthlyDataSource',
@@ -1661,7 +1797,7 @@ class ProgressReport(object):
                                           'severely underweight (weight-for-age)',
                                 'slug': 'severely_underweight',
                                 'average': [],
-                                'reverseColors': 'true',
+                                'reverseColors': True,
                             },
                             {
                                 'data_source': 'AggChildHealthMonthlyDataSource',
@@ -1669,7 +1805,7 @@ class ProgressReport(object):
                                           'are moderately underweight (weight-for-age)',
                                 'slug': 'moderately_underweight',
                                 'average': [],
-                                'reverseColors': 'true',
+                                'reverseColors': True,
                             },
                             {
                                 'data_source': 'AggChildHealthMonthlyDataSource',
@@ -1683,7 +1819,7 @@ class ProgressReport(object):
                                           'malnutrition (weight-for-height)',
                                 'slug': 'wasting_severe',
                                 'average': [],
-                                'reverseColors': 'true',
+                                'reverseColors': True,
                             },
                             {
                                 'data_source': 'AggChildHealthMonthlyDataSource',
@@ -1693,7 +1829,7 @@ class ProgressReport(object):
                                 ),
                                 'slug': 'wasting_moderate',
                                 'average': [],
-                                'reverseColors': 'true',
+                                'reverseColors': True,
                             },
                             {
                                 'data_source': 'AggChildHealthMonthlyDataSource',
@@ -1706,7 +1842,7 @@ class ProgressReport(object):
                                 'header': 'Children from 6 - 60 months with moderate stunting (height-for-age)',
                                 'slug': 'stunting_moderate',
                                 'average': [],
-                                'reverseColors': 'true',
+                                'reverseColors': True,
                             },
                             {
                                 'data_source': 'AggChildHealthMonthlyDataSource',
@@ -1999,15 +2135,18 @@ class ProgressReport(object):
         return {
             'AggChildHealthMonthlyDataSource': AggChildHealthMonthlyDataSource(
                 config=self.config,
-                loc_level=self.loc_level
+                loc_level=self.loc_level,
+                show_test=self.show_test
             ),
             'AggCCSRecordMonthlyDataSource': AggCCSRecordMonthlyDataSource(
                 config=self.config,
-                loc_level=self.loc_level
+                loc_level=self.loc_level,
+                show_test=self.show_test
             ),
             'AggAWCMonthlyDataSource': AggAWCMonthlyDataSource(
                 config=self.config,
-                loc_level=self.loc_level
+                loc_level=self.loc_level,
+                show_test=self.show_test
             )
         }
 

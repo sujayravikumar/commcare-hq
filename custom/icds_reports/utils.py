@@ -21,6 +21,7 @@ from corehq.apps.userreports.models import StaticReportConfiguration
 from corehq.apps.userreports.reports.factory import ReportFactory
 from corehq.util.view_utils import absolute_reverse
 from custom.icds_reports.const import LocationTypes
+from custom.icds_reports.queries import get_test_state_locations_id
 from dimagi.utils.dates import DateSpan
 
 from custom.icds_reports.models import AggChildHealthMonthly, AggAwcMonthly, \
@@ -236,6 +237,12 @@ def get_value(data, prop):
     return (data[0][prop] or 0) if data else 0
 
 
+def apply_exclude(domain, queryset):
+    return queryset.exclude(
+        state_id__in=get_test_state_locations_id(domain)
+    )
+
+
 def get_location_filter(location, domain, config):
     loc_level = 'state'
     if location:
@@ -332,11 +339,11 @@ def get_system_usage_data(yesterday, config):
     }
 
 
-@quickcache(['config'], timeout=24 * 60 * 60)
-def get_maternal_child_data(config):
+# @quickcache(['config'], timeout=24 * 60 * 60)
+def get_maternal_child_data(domain, config, show_test=False):
 
     def get_data_for_child_health_monthly(date, filters):
-        return AggChildHealthMonthly.objects.filter(
+        queryset = AggChildHealthMonthly.objects.filter(
             month=date, **filters
         ).values(
             'aggregation_level'
@@ -356,9 +363,12 @@ def get_maternal_child_data(config):
             cf_initiation=Sum('cf_initiation_in_month'),
             cf_initiation_eli=Sum('cf_initiation_eligible')
         )
+        if not show_test:
+            queryset = apply_exclude(domain, queryset)
+        return queryset
 
     def get_data_for_deliveries(date, filters):
-        return AggCcsRecordMonthly.objects.filter(
+        queryset = AggCcsRecordMonthly.objects.filter(
             month=date, **filters
         ).values(
             'aggregation_level'
@@ -366,6 +376,9 @@ def get_maternal_child_data(config):
             institutional_delivery=Sum('institutional_delivery_in_month'),
             delivered=Sum('delivered_in_month')
         )
+        if not show_test:
+            queryset = apply_exclude(domain, queryset)
+        return queryset
 
     current_month = datetime(*config['month'])
     previous_month = datetime(*config['prev_month'])
@@ -463,7 +476,7 @@ def get_maternal_child_data(config):
                 {
                     'label': _('Newborns with Low Birth Weight'),
                     'help_text': _((
-                        "Percentage of newborns with born with birth weight less than 2500 grams. Newborns with"
+                        "Percentage of newborns born with birth weight less than 2500 grams. Newborns with"
                         " Low Birth Weight are closely associated with foetal and neonatal mortality and "
                         "morbidity, inhibited growth and cognitive development, and chronic diseases later "
                         "in life")),
@@ -594,12 +607,12 @@ def get_maternal_child_data(config):
     }
 
 
-def get_cas_reach_data(yesterday, config):
+def get_cas_reach_data(domain, yesterday, config, show_test=False):
     yesterday_date = datetime(*yesterday)
     two_days_ago = (yesterday_date - relativedelta(days=1)).date()
 
     def get_data_for_awc_monthly(month, filters):
-        return AggAwcMonthly.objects.filter(
+        queryset = AggAwcMonthly.objects.filter(
             month=month, **filters
         ).values(
             'aggregation_level'
@@ -611,9 +624,12 @@ def get_cas_reach_data(yesterday, config):
             awcs=Sum('num_launched_awcs'),
 
         )
+        if not show_test:
+            queryset = apply_exclude(domain, queryset)
+        return queryset
 
     def get_data_for_daily_usage(date, filters):
-        return AggAwcDailyView.objects.filter(
+        queryset = AggAwcDailyView.objects.filter(
             date=date, **filters
         ).values(
             'aggregation_level'
@@ -621,6 +637,9 @@ def get_cas_reach_data(yesterday, config):
             awcs=Sum('num_awcs'),
             daily_attendance=Sum('daily_attendance_open')
         )
+        if not show_test:
+            queryset = apply_exclude(domain, queryset)
+        return queryset
 
     current_month = datetime(*config['month'])
     previous_month = datetime(*config['prev_month'])
@@ -712,12 +731,12 @@ def get_cas_reach_data(yesterday, config):
     }
 
 
-def get_demographics_data(yesterday, config):
+def get_demographics_data(domain, yesterday, config, show_test=False):
     yesterday_date = datetime(*yesterday)
     two_days_ago = (yesterday_date - relativedelta(days=1)).date()
 
     def get_data_for(date, filters):
-        return AggAwcDailyView.objects.filter(
+        queryset = AggAwcDailyView.objects.filter(
             date=date, **filters
         ).values(
             'aggregation_level'
@@ -734,6 +753,10 @@ def get_demographics_data(yesterday, config):
             person_aadhaar=Sum('cases_person_has_aadhaar'),
             all_persons=Sum('cases_person')
         )
+
+        if not show_test:
+            queryset = apply_exclude(domain, queryset)
+        return queryset
 
     yesterday_data = get_data_for(yesterday_date, config)
     two_days_ago_data = get_data_for(two_days_ago, config)
@@ -882,7 +905,7 @@ def get_demographics_data(yesterday, config):
                     'frequency': 'day'
                 },
                 {
-                    'label': _('Percent Adhaar seeded beneficaries'),
+                    'label': _('Percent Adhaar Seeded Individuals'),
                     'help_text': _((
                         'Percentage of ICDS beneficiaries whose Adhaar identification has been captured'
                     )),
@@ -907,9 +930,9 @@ def get_demographics_data(yesterday, config):
     }
 
 
-def get_awc_infrastructure_data(config):
+def get_awc_infrastructure_data(domain, config, show_test=False):
     def get_data_for(month, filters):
-        return AggAwcMonthly.objects.filter(
+        queryset = AggAwcMonthly.objects.filter(
             month=month, **filters
         ).values(
             'aggregation_level'
@@ -921,6 +944,10 @@ def get_awc_infrastructure_data(config):
             adult_scale=Sum('infra_adult_weighing_scale'),
             awcs=Sum('num_awcs')
         )
+
+        if not show_test:
+            queryset = apply_exclude(domain, queryset)
+        return queryset
 
     current_month = datetime(*config['month'])
     previous_month = datetime(*config['prev_month'])
@@ -1076,10 +1103,10 @@ def get_awc_infrastructure_data(config):
     }
 
 
-def get_awc_opened_data(filters):
+def get_awc_opened_data(domain, filters, show_test=False):
 
     def get_data_for(date):
-        return AggAwcDailyView.objects.filter(
+        queryset = AggAwcDailyView.objects.filter(
             date=datetime(*date), aggregation_level=1
         ).values(
             'state_name'
@@ -1087,6 +1114,9 @@ def get_awc_opened_data(filters):
             awcs=Sum('awc_count'),
             daily_attendance=Sum('daily_attendance_open'),
         )
+        if not show_test:
+            queryset = apply_exclude(domain, queryset)
+        return queryset
 
     yesterday_data = get_data_for(filters['yesterday'])
     data = {}
@@ -1127,11 +1157,11 @@ def get_awc_opened_data(filters):
 
 
 # @quickcache(['config', 'loc_level'], timeout=24 * 60 * 60)
-def get_prevalence_of_undernutrition_data_map(config, loc_level):
+def get_prevalence_of_undernutrition_data_map(domain, config, loc_level, show_test=False):
 
     def get_data_for(filters):
         filters['month'] = datetime(*filters['month'])
-        return AggChildHealthMonthly.objects.filter(
+        queryset = AggChildHealthMonthly.objects.filter(
             **filters
         ).values(
             '%s_name' % loc_level
@@ -1141,9 +1171,15 @@ def get_prevalence_of_undernutrition_data_map(config, loc_level):
             normal=Sum('nutrition_status_normal'),
             valid=Sum('wer_eligible'),
         )
+        if not show_test:
+            queryset = apply_exclude(domain, queryset)
+        return queryset
 
     map_data = {}
-    average = []
+    moderately_underweight_total = 0
+    severely_underweight_total = 0
+    valid_total = 0
+
     for row in get_data_for(config):
         valid = row['valid']
         name = row['%s_name' % loc_level]
@@ -1153,7 +1189,11 @@ def get_prevalence_of_undernutrition_data_map(config, loc_level):
         normal = row['normal']
 
         value = ((moderately_underweight or 0) + (severely_underweight or 0)) * 100 / (valid or 1)
-        average.append(value)
+
+        moderately_underweight_total += (moderately_underweight or 0)
+        severely_underweight_total += (severely_underweight_total or 0)
+        valid_total += (valid or 0)
+
         row_values = {
             'severely_underweight': severely_underweight or 0,
             'moderately_underweight': moderately_underweight or 0,
@@ -1175,13 +1215,15 @@ def get_prevalence_of_undernutrition_data_map(config, loc_level):
     fills.update({'35%-100%': RED})
     fills.update({'defaultFill': GREY})
 
+    average = ((moderately_underweight_total or 0) + (severely_underweight_total or 0)) * 100 / (valid_total or 1)
+
     return [
         {
             "slug": "moderately_underweight",
             "label": "Percent of Children Underweight (0-5 years)",
             "fills": fills,
             "rightLegend": {
-                "average": sum(average) / float(len(average) or 1),
+                "average": average,
                 "info": _((
                     "Percentage of children between 0-5 years enrolled for ICDS services with weight-for-age "
                     "less than -2 standard deviations of the WHO Child Growth Standards median. "
@@ -1195,7 +1237,7 @@ def get_prevalence_of_undernutrition_data_map(config, loc_level):
     ]
 
 
-def get_prevalence_of_undernutrition_data_chart(config, loc_level):
+def get_prevalence_of_undernutrition_data_chart(domain, config, loc_level, show_test=False):
     month = datetime(*config['month'])
     three_before = datetime(*config['month']) - relativedelta(months=3)
 
@@ -1211,6 +1253,9 @@ def get_prevalence_of_undernutrition_data_chart(config, loc_level):
         severely_underweight=Sum('nutrition_status_severely_underweight'),
         valid=Sum('valid_in_month'),
     ).order_by('month')
+
+    if not show_test:
+        chart_data = apply_exclude(domain, chart_data)
 
     data = {
         'green': OrderedDict(),
@@ -1287,7 +1332,7 @@ def get_prevalence_of_undernutrition_data_chart(config, loc_level):
     }
 
 
-def get_prevalence_of_undernutrition_sector_data(config, loc_level):
+def get_prevalence_of_undernutrition_sector_data(domain, config, loc_level, show_test=False):
     group_by = ['%s_name' % loc_level]
     if loc_level == LocationTypes.SUPERVISOR:
         config['aggregation_level'] += 1
@@ -1304,6 +1349,9 @@ def get_prevalence_of_undernutrition_sector_data(config, loc_level):
         valid=Sum('wer_eligible'),
         normal=Sum('nutrition_status_normal')
     ).order_by('%s_name' % loc_level)
+
+    if not show_test:
+        data = apply_exclude(domain, data)
 
     loc_data = {
         'green': 0,
@@ -1393,10 +1441,10 @@ def get_prevalence_of_undernutrition_sector_data(config, loc_level):
     }
 
 
-def get_awc_reports_system_usage(config, month, prev_month, two_before, loc_level):
+def get_awc_reports_system_usage(domain, config, month, prev_month, two_before, loc_level, show_test=False):
 
     def get_data_for(filters, date):
-        return AggAwcMonthly.objects.filter(
+        queryset = AggAwcMonthly.objects.filter(
             month=datetime(*date), **filters
         ).values(
             loc_level
@@ -1405,6 +1453,9 @@ def get_awc_reports_system_usage(config, month, prev_month, two_before, loc_leve
             weighed=Sum('wer_weighed'),
             all=Sum('wer_eligible'),
         )
+        if show_test:
+            queryset = apply_exclude(domain, queryset)
+        return queryset
 
     chart_data = DailyAttendanceView.objects.filter(
         pse_date__range=(datetime(*two_before), datetime(*month)), **config
@@ -1414,6 +1465,9 @@ def get_awc_reports_system_usage(config, month, prev_month, two_before, loc_leve
         awc_count=Sum('awc_open_count'),
         attended_children=Avg('attended_children_percent')
     ).order_by('pse_date')
+
+    if show_test:
+        chart_data = apply_exclude(domain, chart_data)
 
     awc_count_chart = []
     attended_children_chart = []
@@ -1483,7 +1537,7 @@ def get_awc_reports_system_usage(config, month, prev_month, two_before, loc_leve
     }
 
 
-def get_awc_reports_pse(config, month, domain):
+def get_awc_reports_pse(config, month, domain, show_test=False):
     now = datetime.utcnow()
     last_30_days = (now - relativedelta(days=30))
     selected_month = datetime(*month)
@@ -1512,17 +1566,22 @@ def get_awc_reports_pse(config, month, domain):
         open_count=Sum('awc_open_count'),
     ).order_by('pse_date')
 
+    if show_test:
+        map_image_data = apply_exclude(domain, map_image_data)
+        kpi_data_tm = apply_exclude(domain, kpi_data_tm)
+        kpi_data_lm = apply_exclude(domain, kpi_data_lm)
+        chart_data = apply_exclude(domain, chart_data)
+
     open_count_chart = {}
     attended_children_chart = {}
     for chart_row in chart_data:
         pse_week = chart_row['pse_date'].isocalendar()[1]
         if pse_week in open_count_chart:
-            open_count_chart[pse_week] += chart_row['open_count']
-            attended_children_chart[pse_week].append(chart_row['attended_children_percent'])
+            open_count_chart[pse_week] += (chart_row['open_count'] or 0)
+            attended_children_chart[pse_week].append((chart_row['attended_children_percent'] or 0))
         else:
-            open_count_chart[pse_week] = chart_row['open_count']
-            attended_children_chart[pse_week] = [chart_row['attended_children_percent']]
-
+            open_count_chart[pse_week] = (chart_row['open_count'] or 0)
+            attended_children_chart[pse_week] = [chart_row['attended_children_percent'] or 0]
 
     map_data = {}
 
@@ -1642,10 +1701,10 @@ def get_awc_reports_pse(config, month, domain):
     }
 
 
-def get_awc_reports_maternal_child(config, month, prev_month):
+def get_awc_reports_maternal_child(domain, config, month, prev_month, show_test=False):
 
     def get_data_for(date):
-        return AggChildHealthMonthly.objects.filter(
+        queryset = AggChildHealthMonthly.objects.filter(
             month=date, **config
         ).values(
             'month', 'aggregation_level'
@@ -1673,9 +1732,12 @@ def get_awc_reports_maternal_child(config, month, prev_month):
             month_cf=Sum('cf_initiation_in_month'),
             cf=Sum('cf_initiation_eligible')
         )
+        if not show_test:
+            queryset = apply_exclude(domain, queryset)
+        return queryset
 
     def get_weight_efficiency(date):
-        return AggAwcMonthly.objects.filter(
+        queryset = AggAwcMonthly.objects.filter(
             month=date, **config
         ).values(
             'month', 'aggregation_level', 'awc_name'
@@ -1683,6 +1745,9 @@ def get_awc_reports_maternal_child(config, month, prev_month):
             wer_weight=Sum('wer_weighed'),
             wer_eli=Sum('wer_eligible')
         )
+        if not show_test:
+            queryset = apply_exclude(domain, queryset)
+        return queryset
 
     this_month_data = get_data_for(datetime(*month))
     prev_month_data = get_data_for(datetime(*prev_month))
@@ -1907,7 +1972,7 @@ def get_awc_reports_maternal_child(config, month, prev_month):
     }
 
 
-def get_awc_report_demographics(config, month):
+def get_awc_report_demographics(domain, config, month, show_test=False):
     selected_month = datetime(*month)
 
     chart = AggChildHealthMonthly.objects.filter(
@@ -1917,6 +1982,9 @@ def get_awc_report_demographics(config, month):
     ).annotate(
         valid=Sum('valid_in_month')
     ).order_by('age_tranche')
+
+    if not show_test:
+        chart = apply_exclude(domain, chart)
 
     chart_data = OrderedDict()
     chart_data.update({'0-1 month': 0})
@@ -1941,7 +2009,7 @@ def get_awc_report_demographics(config, month):
                 chart_data['3-6 years'] += valid
 
     def get_data_for_kpi(filters, date):
-        return AggAwcDailyView.objects.filter(
+        queryset = AggAwcDailyView.objects.filter(
             date=date, **filters
         ).values(
             'aggregation_level'
@@ -1958,6 +2026,9 @@ def get_awc_report_demographics(config, month):
             person_aadhaar=Sum('cases_person_has_aadhaar'),
             all_persons=Sum('cases_person')
         )
+        if not show_test:
+            queryset = apply_exclude(domain, queryset)
+        return queryset
 
     yesterday = datetime.now() - relativedelta(days=1)
     two_days_ago = yesterday - relativedelta(days=1)
@@ -2127,7 +2198,7 @@ def get_awc_report_demographics(config, month):
                     'frequency': 'day'
                 },
                 {
-                    'label': _('Percent Adhaar seeded beneficaries'),
+                    'label': _('Percent Adhaar Seeded Individuals'),
                     'help_text': _(
                         'Percentage of ICDS beneficiaries whose Adhaar identification has been captured'
                     ),
@@ -2147,7 +2218,7 @@ def get_awc_report_demographics(config, month):
     }
 
 
-def get_awc_report_beneficiary(awc_id, month, two_before):
+def get_awc_report_beneficiary(domain, awc_id, month, two_before):
     data = ChildHealthMonthlyView.objects.filter(
         month__range=(datetime(*two_before), datetime(*month)),
         awc_id=awc_id,
@@ -2166,39 +2237,46 @@ def get_awc_report_beneficiary(awc_id, month, two_before):
             )
         ][::-1],
         'last_month': datetime(*month).strftime("%b %Y"),
-        'month_with_data': data[0].month.strftime("%b %Y") if data else '',
     }
 
     def row_format(row_data):
+        return dict(
+            nutrition_status=row_data.current_month_nutrition_status,
+            recorded_weight=row_data.recorded_weight or 0,
+            recorder_height=row_data.recorded_height or 0,
+            stunning=row_data.current_month_stunting,
+            wasting=row_data.current_month_wasting,
+            pse_days_attended=row_data.pse_days_attended
+        )
+
+    def base_data(row_data):
         return dict(
             case_id=row_data.case_id,
             person_name=row_data.person_name,
             dob=row_data.dob,
             sex=row_data.sex,
             age=round((datetime(*month).date() - row_data.dob).days / 365.25),
-            fully_immunized_date='Yes' if row_data.fully_immunized_date != '' else 'No',
-            nutrition_status=row_data.current_month_nutrition_status,
-            recorded_weight=row_data.recorded_weight or 0,
-            recorder_height=row_data.recorded_height or 0,
-            stunning=row_data.current_month_stunting,
-            wasting=row_data.current_month_wasting,
+            fully_immunized_date='Yes' if row_data.fully_immunized_date else 'No',
             mother_name=row_data.mother_name,
-            pse_days_attended=row_data.pse_days_attended,
             age_in_months=row_data.age_in_months,
         )
 
     for row in data:
         if row.case_id not in config['rows']:
-            config['rows'][row.case_id] = {}
+            config['rows'][row.case_id] = base_data(row)
         config['rows'][row.case_id][row.month.strftime("%b %Y")] = row_format(row)
 
     return config
 
 
-def get_beneficiary_details(case_id, month):
+def get_beneficiary_details(domain, case_id, month, show_test=False):
     data = ChildHealthMonthlyView.objects.filter(
         case_id=case_id, month__lte=datetime(*month)
     ).order_by('month')
+
+    if not show_test:
+        data = apply_exclude(domain, data)
+
     beneficiary = {
         'weight': [],
         'height': [],
@@ -2219,11 +2297,11 @@ def get_beneficiary_details(case_id, month):
     return beneficiary
 
 
-def get_prevalence_of_severe_data_map(config, loc_level):
+def get_prevalence_of_severe_data_map(domain, config, loc_level, show_test=False):
 
     def get_data_for(filters):
         filters['month'] = datetime(*filters['month'])
-        return AggChildHealthMonthly.objects.filter(
+        queryset = AggChildHealthMonthly.objects.filter(
             **filters
         ).values(
             '%s_name' % loc_level
@@ -2235,8 +2313,16 @@ def get_prevalence_of_severe_data_map(config, loc_level):
             total_measured=Sum('height_measured_in_month'),
         )
 
+        if not show_test:
+            queryset = apply_exclude(domain, queryset)
+        return queryset
+
     map_data = {}
-    average = []
+
+    severe_total = 0
+    moderate_total = 0
+    valid_total = 0
+
     for row in get_data_for(config):
         valid = row['valid']
         name = row['%s_name' % loc_level]
@@ -2246,8 +2332,11 @@ def get_prevalence_of_severe_data_map(config, loc_level):
         normal = row['normal']
         total_measured = row['total_measured']
 
+        severe_total += (severe or 0)
+        moderate_total += (moderate or 0)
+        valid_total += (valid or 0)
+
         value = ((moderate or 0) + (severe or 0)) * 100 / float(valid or 1)
-        average.append(value)
         row_values = {
             'severe': severe or 0,
             'moderate': moderate or 0,
@@ -2277,7 +2366,7 @@ def get_prevalence_of_severe_data_map(config, loc_level):
             "label": "Percent of Children Wasted (6 - 60 months)",
             "fills": fills,
             "rightLegend": {
-                "average": "%.2f" % (sum(average) / (len(average) or 1)),
+                "average": "%.2f" % (((severe_total + moderate_total) * 100) / float(valid_total or 1)),
                 "info": _((
                     "Percentage of children between 6 - 60 months enrolled for ICDS services with "
                     "weight-for-height below -3 standard deviations of the WHO Child Growth Standards median."
@@ -2293,7 +2382,7 @@ def get_prevalence_of_severe_data_map(config, loc_level):
     ]
 
 
-def get_prevalence_of_severe_data_chart(config, loc_level):
+def get_prevalence_of_severe_data_chart(domain, config, loc_level, show_test=False):
     month = datetime(*config['month'])
     three_before = datetime(*config['month']) - relativedelta(months=3)
 
@@ -2309,6 +2398,9 @@ def get_prevalence_of_severe_data_chart(config, loc_level):
         severe=Sum('wasting_severe'),
         valid=Sum('height_eligible'),
     ).order_by('month')
+
+    if not show_test:
+        chart_data = apply_exclude(domain, chart_data)
 
     data = {
         'red': OrderedDict()
@@ -2366,7 +2458,7 @@ def get_prevalence_of_severe_data_chart(config, loc_level):
     }
 
 
-def get_prevalence_of_severe_sector_data(config, loc_level):
+def get_prevalence_of_severe_sector_data(domain, config, loc_level, show_test=False):
     group_by = ['%s_name' % loc_level]
     if loc_level == LocationTypes.SUPERVISOR:
         config['aggregation_level'] += 1
@@ -2384,6 +2476,9 @@ def get_prevalence_of_severe_sector_data(config, loc_level):
         normal=Sum('wasting_normal'),
         total_measured=Sum('height_measured_in_month'),
     ).order_by('%s_name' % loc_level)
+
+    if not show_test:
+        data = apply_exclude(domain, data)
 
     loc_data = {
         'green': 0,
@@ -2476,11 +2571,11 @@ def get_prevalence_of_severe_sector_data(config, loc_level):
     }
 
 
-def get_prevalence_of_stunning_data_map(config, loc_level):
+def get_prevalence_of_stunning_data_map(domain, config, loc_level, show_test=False):
 
     def get_data_for(filters):
         filters['month'] = datetime(*filters['month'])
-        return AggChildHealthMonthly.objects.filter(
+        queryset = AggChildHealthMonthly.objects.filter(
             **filters
         ).values(
             '%s_name' % loc_level
@@ -2491,9 +2586,16 @@ def get_prevalence_of_stunning_data_map(config, loc_level):
             valid=Sum('height_eligible'),
             total_measured=Sum('height_measured_in_month'),
         )
+        if not show_test:
+            queryset = apply_exclude(domain, queryset)
+        return queryset
 
     map_data = {}
-    average = []
+
+    moderate_total = 0
+    severe_total = 0
+    valid_total = 0
+
     for row in get_data_for(config):
         valid = row['valid']
         name = row['%s_name' % loc_level]
@@ -2503,8 +2605,11 @@ def get_prevalence_of_stunning_data_map(config, loc_level):
         normal = row['normal']
         total_measured = row['total_measured']
 
+        moderate_total += (moderate or 0)
+        severe_total += (severe or 0)
+        valid_total += (valid or 0)
+
         value = ((moderate or 0) + (severe or 0)) * 100 / float(valid or 1)
-        average.append(value)
         row_values = {
             'severe': severe or 0,
             'moderate': moderate or 0,
@@ -2533,7 +2638,7 @@ def get_prevalence_of_stunning_data_map(config, loc_level):
             "label": "Percent of Children Stunted (6 - 60 months)",
             "fills": fills,
             "rightLegend": {
-                "average": "%.2f" % (sum(average) / (len(average) or 1)),
+                "average": "%.2f" % (((moderate_total + severe_total) * 100) / float(valid_total or 1)),
                 "info": _((
                     "Percentage of children (6-60 months) enrolled for ICDS services with height-for-age below "
                     "-2Z standard deviations of the WHO Child Growth Standards median."
@@ -2548,7 +2653,7 @@ def get_prevalence_of_stunning_data_map(config, loc_level):
     ]
 
 
-def get_prevalence_of_stunning_data_chart(config, loc_level):
+def get_prevalence_of_stunning_data_chart(domain, config, loc_level, show_test=False):
     month = datetime(*config['month'])
     three_before = datetime(*config['month']) - relativedelta(months=3)
 
@@ -2564,6 +2669,9 @@ def get_prevalence_of_stunning_data_chart(config, loc_level):
         severe=Sum('stunting_severe'),
         valid=Sum('height_eligible'),
     ).order_by('month')
+
+    if not show_test:
+        chart_data = apply_exclude(domain, chart_data)
 
     data = {
         'red': OrderedDict()
@@ -2621,7 +2729,7 @@ def get_prevalence_of_stunning_data_chart(config, loc_level):
     }
 
 
-def get_prevalence_of_stunning_sector_data(config, loc_level):
+def get_prevalence_of_stunning_sector_data(domain, config, loc_level, show_test=False):
     group_by = ['%s_name' % loc_level]
     if loc_level == LocationTypes.SUPERVISOR:
         config['aggregation_level'] += 1
@@ -2639,6 +2747,9 @@ def get_prevalence_of_stunning_sector_data(config, loc_level):
         normal=Sum('stunting_normal'),
         total_measured=Sum('height_measured_in_month'),
     ).order_by('%s_name' % loc_level)
+
+    if not show_test:
+        data = apply_exclude(domain, data)
 
     loc_data = {
         'green': 0,
@@ -2736,11 +2847,11 @@ def get_prevalence_of_stunning_sector_data(config, loc_level):
     }
 
 
-def get_newborn_with_low_birth_weight_map(config, loc_level):
+def get_newborn_with_low_birth_weight_map(domain, config, loc_level, show_test=False):
 
     def get_data_for(filters):
         filters['month'] = datetime(*filters['month'])
-        return AggChildHealthMonthly.objects.filter(
+        queryset = AggChildHealthMonthly.objects.filter(
             **filters
         ).values(
             '%s_name' % loc_level
@@ -2748,17 +2859,24 @@ def get_newborn_with_low_birth_weight_map(config, loc_level):
             low_birth=Sum('low_birth_weight_in_month'),
             in_month=Sum('born_in_month'),
         )
+        if not show_test:
+            queryset = apply_exclude(domain, queryset)
+        return queryset
 
     map_data = {}
-    average = []
+    low_birth_total = 0
+    in_month_total = 0
+
     for row in get_data_for(config):
         name = row['%s_name' % loc_level]
 
         low_birth = row['low_birth']
         in_month = row['in_month']
 
+        low_birth_total += (low_birth or 0)
+        in_month_total += (in_month or 0)
+
         value = (low_birth or 0) * 100 / (in_month or 1)
-        average.append(value)
         row_values = {
             'low_birth': low_birth,
             'in_month': in_month,
@@ -2784,7 +2902,7 @@ def get_newborn_with_low_birth_weight_map(config, loc_level):
             "label": "Percent Newborns with Low Birth Weight",
             "fills": fills,
             "rightLegend": {
-                "average": sum(average) / float(len(average) or 1),
+                "average": (low_birth_total * 100) / float(in_month_total or 1),
                 "info": _((
                     "Percentage of newborns with born with birth weight less than 2500 grams."
                     "<br/><br/>"
@@ -2799,7 +2917,7 @@ def get_newborn_with_low_birth_weight_map(config, loc_level):
     ]
 
 
-def get_newborn_with_low_birth_weight_chart(config, loc_level):
+def get_newborn_with_low_birth_weight_chart(domain, config, loc_level, show_test=False):
     month = datetime(*config['month'])
     three_before = datetime(*config['month']) - relativedelta(months=3)
 
@@ -2814,6 +2932,9 @@ def get_newborn_with_low_birth_weight_chart(config, loc_level):
         low_birth=Sum('low_birth_weight_in_month'),
         in_month=Sum('born_in_month'),
     ).order_by('month')
+
+    if not show_test:
+        chart_data = apply_exclude(domain, chart_data)
 
     data = {
         'blue': OrderedDict(),
@@ -2885,7 +3006,7 @@ def get_newborn_with_low_birth_weight_chart(config, loc_level):
     }
 
 
-def get_newborn_with_low_birth_weight_data(config, loc_level):
+def get_newborn_with_low_birth_weight_data(domain, config, loc_level, show_test=False):
     group_by = ['%s_name' % loc_level]
     if loc_level == LocationTypes.SUPERVISOR:
         config['aggregation_level'] += 1
@@ -2900,6 +3021,9 @@ def get_newborn_with_low_birth_weight_data(config, loc_level):
         low_birth=Sum('low_birth_weight_in_month'),
         in_month=Sum('born_in_month'),
     ).order_by('%s_name' % loc_level)
+
+    if not show_test:
+        data = apply_exclude(domain, data)
 
     loc_data = {
         'green': 0,
@@ -2975,11 +3099,11 @@ def get_newborn_with_low_birth_weight_data(config, loc_level):
     }
 
 
-def get_early_initiation_breastfeeding_map(config, loc_level):
+def get_early_initiation_breastfeeding_map(domain, config, loc_level, show_test=False):
 
     def get_data_for(filters):
         filters['month'] = datetime(*filters['month'])
-        return AggChildHealthMonthly.objects.filter(
+        queryset = AggChildHealthMonthly.objects.filter(
             **filters
         ).values(
             '%s_name' % loc_level
@@ -2988,16 +3112,23 @@ def get_early_initiation_breastfeeding_map(config, loc_level):
             in_month=Sum('born_in_month'),
         )
 
+        if not show_test:
+            queryset = apply_exclude(domain, queryset)
+        return queryset
+
     map_data = {}
-    average = []
+    birth_total = 0
+    in_month_total = 0
     for row in get_data_for(config):
         name = row['%s_name' % loc_level]
 
         birth = row['birth']
         in_month = row['in_month']
 
+        birth_total += (birth or 0)
+        in_month_total += (in_month or 0)
+
         value = (birth or 0) * 100 / (in_month or 1)
-        average.append(value)
         row_values = {
             'birth': birth,
             'in_month': in_month,
@@ -3023,7 +3154,7 @@ def get_early_initiation_breastfeeding_map(config, loc_level):
             "label": "Percent Early Initiation of Breastfeeding",
             "fills": fills,
             "rightLegend": {
-                "average": sum(average) / float(len(average) or 1),
+                "average": (birth_total * 100) / float(in_month_total or 1),
                 "info": _((
                     "Percentage of children who were put to the breast within one hour of birth."
                     "<br/><br/>"
@@ -3037,7 +3168,7 @@ def get_early_initiation_breastfeeding_map(config, loc_level):
     ]
 
 
-def get_early_initiation_breastfeeding_chart(config, loc_level):
+def get_early_initiation_breastfeeding_chart(domain, config, loc_level, show_test=False):
     month = datetime(*config['month'])
     three_before = datetime(*config['month']) - relativedelta(months=3)
 
@@ -3052,6 +3183,9 @@ def get_early_initiation_breastfeeding_chart(config, loc_level):
         birth=Sum('bf_at_birth'),
         in_month=Sum('born_in_month'),
     ).order_by('month')
+
+    if not show_test:
+        chart_data = apply_exclude(domain, chart_data)
 
     data = {
         'green': OrderedDict(),
@@ -3124,7 +3258,7 @@ def get_early_initiation_breastfeeding_chart(config, loc_level):
     }
 
 
-def get_early_initiation_breastfeeding_data(config, loc_level):
+def get_early_initiation_breastfeeding_data(domain, config, loc_level, show_test=False):
     group_by = ['%s_name' % loc_level]
     if loc_level == LocationTypes.SUPERVISOR:
         config['aggregation_level'] += 1
@@ -3139,6 +3273,9 @@ def get_early_initiation_breastfeeding_data(config, loc_level):
         birth=Sum('bf_at_birth'),
         in_month=Sum('born_in_month'),
     ).order_by('%s_name' % loc_level)
+
+    if not show_test:
+        data = apply_exclude(domain, data)
 
     loc_data = {
         'green': 0,
@@ -3215,11 +3352,11 @@ def get_early_initiation_breastfeeding_data(config, loc_level):
     }
 
 
-def get_exclusive_breastfeeding_data_map(config, loc_level):
+def get_exclusive_breastfeeding_data_map(domain, config, loc_level, show_test=False):
 
     def get_data_for(filters):
         filters['month'] = datetime(*filters['month'])
-        return AggChildHealthMonthly.objects.filter(
+        queryset = AggChildHealthMonthly.objects.filter(
             **filters
         ).values(
             '%s_name' % loc_level
@@ -3227,17 +3364,25 @@ def get_exclusive_breastfeeding_data_map(config, loc_level):
             in_month=Sum('ebf_in_month'),
             eligible=Sum('ebf_eligible'),
         )
+        if not show_test:
+            queryset = apply_exclude(domain, queryset)
+        return queryset
 
     map_data = {}
-    average = []
+
+    valid_total = 0
+    in_month_total = 0
+
     for row in get_data_for(config):
         valid = row['eligible']
         name = row['%s_name' % loc_level]
 
         in_month = row['in_month']
 
+        in_month_total += (in_month or 0)
+        valid_total += (valid or 0)
+
         value = (in_month or 0) * 100 / (valid or 1)
-        average.append(value)
         row_values = {
             'children': in_month or 0,
             'all': valid or 0
@@ -3263,7 +3408,7 @@ def get_exclusive_breastfeeding_data_map(config, loc_level):
             "label": "Percent Exclusive Breastfeeding",
             "fills": fills,
             "rightLegend": {
-                "average": sum(average) / float(len(average) or 1),
+                "average": (in_month_total * 100) / (float(valid_total) or 1),
                 "info": _((
                     "Percentage of infants 0-6 months of age who are fed exclusively with breast milk. "
                     "<br/><br/>"
@@ -3277,7 +3422,7 @@ def get_exclusive_breastfeeding_data_map(config, loc_level):
     ]
 
 
-def get_exclusive_breastfeeding_data_chart(config, loc_level):
+def get_exclusive_breastfeeding_data_chart(domain, config, loc_level, show_test=False):
     month = datetime(*config['month'])
     three_before = datetime(*config['month']) - relativedelta(months=3)
 
@@ -3292,6 +3437,9 @@ def get_exclusive_breastfeeding_data_chart(config, loc_level):
         in_month=Sum('ebf_in_month'),
         eligible=Sum('ebf_eligible'),
     ).order_by('month')
+
+    if not show_test:
+        chart_data = apply_exclude(domain, chart_data)
 
     data = {
         'blue': OrderedDict(),
@@ -3361,7 +3509,7 @@ def get_exclusive_breastfeeding_data_chart(config, loc_level):
     }
 
 
-def get_exclusive_breastfeeding_sector_data(config, loc_level):
+def get_exclusive_breastfeeding_sector_data(domain, config, loc_level, show_test=False):
     group_by = ['%s_name' % loc_level]
     if loc_level == LocationTypes.SUPERVISOR:
         config['aggregation_level'] += 1
@@ -3376,6 +3524,9 @@ def get_exclusive_breastfeeding_sector_data(config, loc_level):
         in_month=Sum('ebf_in_month'),
         eligible=Sum('ebf_eligible'),
     ).order_by('%s_name' % loc_level)
+
+    if not show_test:
+        data = apply_exclude(domain, data)
 
     loc_data = {
         'green': 0,
@@ -3466,11 +3617,11 @@ def get_exclusive_breastfeeding_sector_data(config, loc_level):
     }
 
 
-def get_children_initiated_data_map(config, loc_level):
+def get_children_initiated_data_map(domain, config, loc_level, show_test=False):
 
     def get_data_for(filters):
         filters['month'] = datetime(*filters['month'])
-        return AggChildHealthMonthly.objects.filter(
+        queryset = AggChildHealthMonthly.objects.filter(
             **filters
         ).values(
             '%s_name' % loc_level
@@ -3479,16 +3630,25 @@ def get_children_initiated_data_map(config, loc_level):
             eligible=Sum('cf_initiation_eligible'),
         )
 
+        if not show_test:
+            queryset = apply_exclude(domain, queryset)
+        return queryset
+
     map_data = {}
-    average = []
+
+    in_month_total = 0
+    valid_total = 0
+
     for row in get_data_for(config):
         valid = row['eligible']
         name = row['%s_name' % loc_level]
 
         in_month = row['in_month']
 
+        in_month_total += (in_month or 0)
+        valid_total += (valid or 0)
+
         value = (in_month or 0) * 100 / (valid or 1)
-        average.append(value)
         row_values = {
             'children': in_month or 0,
             'all': valid or 0
@@ -3514,7 +3674,7 @@ def get_children_initiated_data_map(config, loc_level):
             "label": "Percent Children (6-8 months) initiated Complementary Feeding",
             "fills": fills,
             "rightLegend": {
-                "average": sum(average) / float(len(average) or 1),
+                "average": (in_month_total * 100) / float(valid_total or 1),
                 "info": _((
                     "Percentage of children between 6 - 8 months given timely introduction to solid, "
                     "semi-solid or soft food."
@@ -3526,7 +3686,7 @@ def get_children_initiated_data_map(config, loc_level):
     ]
 
 
-def get_children_initiated_data_chart(config, loc_level):
+def get_children_initiated_data_chart(domain, config, loc_level, show_test=False):
     month = datetime(*config['month'])
     three_before = datetime(*config['month']) - relativedelta(months=3)
 
@@ -3541,6 +3701,9 @@ def get_children_initiated_data_chart(config, loc_level):
         in_month=Sum('cf_initiation_in_month'),
         eligible=Sum('cf_initiation_eligible'),
     ).order_by('month')
+
+    if not show_test:
+        chart_data = apply_exclude(domain, chart_data)
 
     data = {
         'blue': OrderedDict(),
@@ -3613,7 +3776,7 @@ def get_children_initiated_data_chart(config, loc_level):
     }
 
 
-def get_children_initiated_sector_data(config, loc_level):
+def get_children_initiated_sector_data(domain, config, loc_level, show_test=False):
     group_by = ['%s_name' % loc_level]
     if loc_level == LocationTypes.SUPERVISOR:
         config['aggregation_level'] += 1
@@ -3628,6 +3791,9 @@ def get_children_initiated_sector_data(config, loc_level):
         in_month=Sum('cf_initiation_in_month'),
         eligible=Sum('cf_initiation_eligible'),
     ).order_by('%s_name' % loc_level)
+
+    if not show_test:
+        data = apply_exclude(domain, data)
 
     loc_data = {
         'green': 0,
@@ -3714,11 +3880,11 @@ def get_children_initiated_sector_data(config, loc_level):
     }
 
 
-def get_institutional_deliveries_data_map(config, loc_level):
+def get_institutional_deliveries_data_map(domain, config, loc_level, show_test=False):
 
     def get_data_for(filters):
         filters['month'] = datetime(*filters['month'])
-        return AggCcsRecordMonthly.objects.filter(
+        queryset = AggCcsRecordMonthly.objects.filter(
             **filters
         ).values(
             '%s_name' % loc_level
@@ -3726,17 +3892,23 @@ def get_institutional_deliveries_data_map(config, loc_level):
             in_month=Sum('institutional_delivery_in_month'),
             eligible=Sum('delivered_in_month'),
         )
+        if not show_test:
+            queryset = apply_exclude(domain, queryset)
+        return queryset
 
     map_data = {}
-    average = []
+    in_month_total = 0
+    valid_total = 0
+
     for row in get_data_for(config):
         valid = row['eligible']
         name = row['%s_name' % loc_level]
 
         in_month = row['in_month']
+        in_month_total += (in_month or 0)
+        valid_total += (valid or 0)
 
         value = (in_month or 0) * 100 / (valid or 1)
-        average.append(value)
         row_values = {
             'children': in_month or 0,
             'all': valid or 0
@@ -3762,7 +3934,7 @@ def get_institutional_deliveries_data_map(config, loc_level):
             "label": "Percent Instituitional Deliveries",
             "fills": fills,
             "rightLegend": {
-                "average": sum(average) / float(len(average) or 1),
+                "average": (in_month_total * 100) / float(valid_total or 1),
                 "info": _((
                     "Percentage of pregant women who delivered in a public or private medical facility "
                     "in the last month. "
@@ -3776,7 +3948,7 @@ def get_institutional_deliveries_data_map(config, loc_level):
     ]
 
 
-def get_institutional_deliveries_data_chart(config, loc_level):
+def get_institutional_deliveries_data_chart(domain, config, loc_level, show_test=False):
     month = datetime(*config['month'])
     three_before = datetime(*config['month']) - relativedelta(months=3)
 
@@ -3791,6 +3963,9 @@ def get_institutional_deliveries_data_chart(config, loc_level):
         in_month=Sum('institutional_delivery_in_month'),
         eligible=Sum('delivered_in_month'),
     ).order_by('month')
+
+    if not show_test:
+        chart_data = apply_exclude(domain, chart_data)
 
     data = {
         'blue': OrderedDict(),
@@ -3863,7 +4038,7 @@ def get_institutional_deliveries_data_chart(config, loc_level):
     }
 
 
-def get_institutional_deliveries_sector_data(config, loc_level):
+def get_institutional_deliveries_sector_data(domain, config, loc_level, show_test=False):
     group_by = ['%s_name' % loc_level]
     if loc_level == LocationTypes.SUPERVISOR:
         config['aggregation_level'] += 1
@@ -3878,6 +4053,9 @@ def get_institutional_deliveries_sector_data(config, loc_level):
         in_month=Sum('institutional_delivery_in_month'),
         eligible=Sum('delivered_in_month'),
     ).order_by('%s_name' % loc_level)
+
+    if not show_test:
+        data = apply_exclude(domain, data)
 
     loc_data = {
         'green': 0,
@@ -3965,11 +4143,11 @@ def get_institutional_deliveries_sector_data(config, loc_level):
     }
 
 
-def get_immunization_coverage_data_map(config, loc_level):
+def get_immunization_coverage_data_map(domain, config, loc_level, show_test=False):
 
     def get_data_for(filters):
         filters['month'] = datetime(*filters['month'])
-        return AggChildHealthMonthly.objects.filter(
+        queryset = AggChildHealthMonthly.objects.filter(
             **filters
         ).values(
             '%s_name' % loc_level
@@ -3978,16 +4156,26 @@ def get_immunization_coverage_data_map(config, loc_level):
             eligible=Sum('fully_immunized_eligible'),
         )
 
+        if not show_test:
+            queryset = apply_exclude(domain, queryset)
+
+        return queryset
+
     map_data = {}
-    average = []
+
+    in_month_total = 0
+    valid_total = 0
+
     for row in get_data_for(config):
         valid = row['eligible']
         name = row['%s_name' % loc_level]
 
         in_month = row['in_month']
 
+        in_month_total += (in_month or 0)
+        valid_total += (valid or 0)
+
         value = (in_month or 0) * 100 / (valid or 1)
-        average.append(value)
         row_values = {
             'children': in_month or 0,
             'all': valid or 0
@@ -4013,7 +4201,7 @@ def get_immunization_coverage_data_map(config, loc_level):
             "label": "Percent Immunization Coverage at 1 year",
             "fills": fills,
             "rightLegend": {
-                "average": sum(average) / float(len(average) or 1),
+                "average": (in_month_total * 100) / float(valid_total or 1),
                 "info": _((
                     "Percentage of children at age 3 who have recieved complete immunization as per "
                     "National Immunization Schedule of India."
@@ -4025,7 +4213,7 @@ def get_immunization_coverage_data_map(config, loc_level):
     ]
 
 
-def get_immunization_coverage_data_chart(config, loc_level):
+def get_immunization_coverage_data_chart(domain, config, loc_level, show_test=False):
     month = datetime(*config['month'])
     three_before = datetime(*config['month']) - relativedelta(months=3)
 
@@ -4040,6 +4228,9 @@ def get_immunization_coverage_data_chart(config, loc_level):
         in_month=Sum('fully_immunized_on_time') + Sum('fully_immunized_late'),
         eligible=Sum('fully_immunized_eligible'),
     ).order_by('month')
+
+    if not show_test:
+        chart_data = apply_exclude(domain, chart_data)
 
     data = {
         'blue': OrderedDict(),
@@ -4112,7 +4303,7 @@ def get_immunization_coverage_data_chart(config, loc_level):
     }
 
 
-def get_immunization_coverage_sector_data(config, loc_level):
+def get_immunization_coverage_sector_data(domain, config, loc_level, show_test=False):
     group_by = ['%s_name' % loc_level]
     if loc_level == LocationTypes.SUPERVISOR:
         config['aggregation_level'] += 1
@@ -4127,6 +4318,9 @@ def get_immunization_coverage_sector_data(config, loc_level):
         in_month=Sum('fully_immunized_on_time') + Sum('fully_immunized_late'),
         eligible=Sum('fully_immunized_eligible'),
     ).order_by('%s_name' % loc_level)
+
+    if not show_test:
+        data = apply_exclude(domain, data)
 
     loc_data = {
         'green': 0,
@@ -4214,12 +4408,12 @@ def get_immunization_coverage_sector_data(config, loc_level):
     }
 
 
-def get_awc_daily_status_data_map(config, loc_level):
+def get_awc_daily_status_data_map(domain, config, loc_level, show_test=False):
 
     def get_data_for(filters):
         filters['date'] = datetime(*filters['month'])
         del filters['month']
-        return AggAwcDailyView.objects.filter(
+        queryset = AggAwcDailyView.objects.filter(
             **filters
         ).values(
             '%s_name' % loc_level
@@ -4228,16 +4422,26 @@ def get_awc_daily_status_data_map(config, loc_level):
             all=Sum('num_launched_awcs'),
         )
 
+        if not show_test:
+            queryset = apply_exclude(domain, queryset)
+
+        return queryset
+
     map_data = {}
-    average = []
+
+    in_day_total = 0
+    valid_total = 0
+
     for row in get_data_for(config):
         valid = row['all']
         name = row['%s_name' % loc_level]
 
         in_day = row['in_day']
 
+        in_day_total += (in_day or 0)
+        valid_total += (valid or 0)
+
         value = (in_day or 0) * 100 / (valid or 1)
-        average.append(value)
         row_values = {
             'in_day': in_day or 0,
             'all': valid or 0
@@ -4263,7 +4467,7 @@ def get_awc_daily_status_data_map(config, loc_level):
             "label": "Percent AWCs Open Yesterday",
             "fills": fills,
             "rightLegend": {
-                "average": sum(average) / float(len(average) or 1),
+                "average": (in_day_total or 0) * 100 / float(valid_total or 1),
                 "info": _((
                     "Percentage of Angwanwadi Centers that were open yesterday."
                 )),
@@ -4275,7 +4479,7 @@ def get_awc_daily_status_data_map(config, loc_level):
     ]
 
 
-def get_awc_daily_status_data_chart(config, loc_level):
+def get_awc_daily_status_data_chart(domain, config, loc_level, show_test=False):
     month = datetime(*config['month'])
     last = datetime(*config['month']) - relativedelta(days=30)
 
@@ -4290,6 +4494,9 @@ def get_awc_daily_status_data_chart(config, loc_level):
         in_day=Sum('daily_attendance_open'),
         all=Sum('num_launched_awcs'),
     ).order_by('date')
+
+    if not show_test:
+        chart_data = apply_exclude(domain, chart_data)
 
     data = {
         'blue': OrderedDict(),
@@ -4308,7 +4515,7 @@ def get_awc_daily_status_data_chart(config, loc_level):
         date = row['date']
         in_day = row['in_day'] or 0
         location = row['%s_name' % loc_level]
-        valid = row['all']
+        valid = row['all'] or 0
 
         if location in best_worst:
             best_worst[location].append(in_day / (valid or 1))
@@ -4362,7 +4569,7 @@ def get_awc_daily_status_data_chart(config, loc_level):
     }
 
 
-def get_awc_daily_status_sector_data(config, loc_level):
+def get_awc_daily_status_sector_data(domain, config, loc_level, show_test=False):
     group_by = ['%s_name' % loc_level]
     if loc_level == LocationTypes.SUPERVISOR:
         config['aggregation_level'] += 1
@@ -4378,6 +4585,9 @@ def get_awc_daily_status_sector_data(config, loc_level):
         in_day=Sum('daily_attendance_open'),
         all=Sum('num_launched_awcs'),
     ).order_by('%s_name' % loc_level)
+
+    if not show_test:
+        data = apply_exclude(domain, data)
 
     loc_data = {
         'green': 0,
@@ -4464,12 +4674,11 @@ def get_awc_daily_status_sector_data(config, loc_level):
     }
 
 
-def get_awcs_covered_data_map(config, loc_level):
+def get_awcs_covered_data_map(domain, config, loc_level, show_test=False):
 
     def get_data_for(filters):
         filters['month'] = datetime(*filters['month'])
-        del filters['month']
-        return AggAwcMonthly.objects.filter(
+        queryset = AggAwcMonthly.objects.filter(
             **filters
         ).values(
             '%s_name' % loc_level
@@ -4479,6 +4688,10 @@ def get_awcs_covered_data_map(config, loc_level):
             supervisors=Sum('num_launched_supervisors'),
             awcs=Sum('num_launched_awcs'),
         )
+
+        if not show_test:
+            queryset = apply_exclude(domain, queryset)
+        return queryset
 
     map_data = {}
     for row in get_data_for(config):
@@ -4519,7 +4732,7 @@ def get_awcs_covered_data_map(config, loc_level):
     ]
 
 
-def get_awcs_covered_sector_data(config, loc_level):
+def get_awcs_covered_sector_data(domain, config, loc_level, show_test=False):
     group_by = ['%s_name' % loc_level]
     if loc_level == LocationTypes.SUPERVISOR:
         config['aggregation_level'] += 1
@@ -4537,6 +4750,9 @@ def get_awcs_covered_sector_data(config, loc_level):
         supervisors=Sum('num_launched_supervisors'),
         awcs=Sum('num_launched_awcs'),
     ).order_by('%s_name' % loc_level)
+
+    if not show_test:
+        data = apply_exclude(domain, data)
 
     chart_data = {
         'blue': [],
@@ -4609,18 +4825,22 @@ def get_awcs_covered_sector_data(config, loc_level):
     }
 
 
-def get_registered_household_data_map(config, loc_level):
+def get_registered_household_data_map(domain, config, loc_level, show_test=False):
 
     def get_data_for(filters):
         filters['month'] = datetime(*filters['month'])
-        del filters['month']
-        return AggAwcMonthly.objects.filter(
+        queryset = AggAwcMonthly.objects.filter(
             **filters
         ).values(
             '%s_name' % loc_level
         ).annotate(
             household=Sum('cases_household'),
         )
+        if not show_test:
+            queryset = apply_exclude(domain, queryset)
+
+        return queryset
+
     average = []
     map_data = {}
     for row in get_data_for(config):
@@ -4654,7 +4874,7 @@ def get_registered_household_data_map(config, loc_level):
     ]
 
 
-def get_registered_household_sector_data(config, loc_level):
+def get_registered_household_sector_data(domain, config, loc_level, show_test=False):
     group_by = ['%s_name' % loc_level]
     if loc_level == LocationTypes.SUPERVISOR:
         config['aggregation_level'] += 1
@@ -4669,6 +4889,9 @@ def get_registered_household_sector_data(config, loc_level):
     ).annotate(
         household=Sum('cases_household'),
     ).order_by('%s_name' % loc_level)
+
+    if not show_test:
+        data = apply_exclude(domain, data)
 
     chart_data = {
         'blue': []
@@ -4705,17 +4928,20 @@ def get_registered_household_sector_data(config, loc_level):
     }
 
 
-def get_enrolled_children_data_map(config, loc_level):
+def get_enrolled_children_data_map(domain, config, loc_level, show_test=False):
 
     def get_data_for(filters):
         filters['month'] = datetime(*filters['month'])
-        return AggChildHealthMonthly.objects.filter(
+        queryset = AggChildHealthMonthly.objects.filter(
             **filters
         ).values(
             '%s_name' % loc_level
         ).annotate(
             valid=Sum('valid_in_month'),
         )
+        if not show_test:
+            queryset = apply_exclude(domain, queryset)
+        return queryset
 
     map_data = {}
     average = []
@@ -4753,7 +4979,7 @@ def get_enrolled_children_data_map(config, loc_level):
     ]
 
 
-def get_enrolled_children_data_chart(config, loc_level):
+def get_enrolled_children_data_chart(domain, config, loc_level, show_test=False):
     config['month'] = datetime(*config['month'])
 
     chart_data = AggChildHealthMonthly.objects.filter(
@@ -4763,6 +4989,9 @@ def get_enrolled_children_data_chart(config, loc_level):
     ).annotate(
         valid=Sum('valid_in_month'),
     ).order_by('month')
+
+    if not show_test:
+        chart_data = apply_exclude(domain, chart_data)
 
     chart = OrderedDict()
     chart.update({'0-1 month': 0})
@@ -4827,7 +5056,7 @@ def get_enrolled_children_data_chart(config, loc_level):
     }
 
 
-def get_enrolled_children_sector_data(config, loc_level):
+def get_enrolled_children_sector_data(domain, config, loc_level, show_test=False):
     group_by = ['%s_name' % loc_level]
     if loc_level == LocationTypes.SUPERVISOR:
         config['aggregation_level'] += 1
@@ -4841,6 +5070,9 @@ def get_enrolled_children_sector_data(config, loc_level):
     ).annotate(
         valid=Sum('valid_in_month'),
     ).order_by('%s_name' % loc_level)
+
+    if not show_test:
+        data = apply_exclude(domain, data)
 
     loc_data = {
         'blue': 0,
@@ -4892,17 +5124,20 @@ def get_enrolled_children_sector_data(config, loc_level):
     }
 
 
-def get_enrolled_women_data_map(config, loc_level):
+def get_enrolled_women_data_map(domain, config, loc_level, show_test=False):
 
     def get_data_for(filters):
         filters['month'] = datetime(*filters['month'])
-        return AggCcsRecordMonthly.objects.filter(
+        queryset = AggCcsRecordMonthly.objects.filter(
             **filters
         ).values(
             '%s_name' % loc_level
         ).annotate(
             valid=Sum('pregnant'),
         )
+        if not show_test:
+            queryset = apply_exclude(domain, queryset)
+        return queryset
 
     map_data = {}
     average = []
@@ -4940,7 +5175,7 @@ def get_enrolled_women_data_map(config, loc_level):
     ]
 
 
-def get_enrolled_women_sector_data(config, loc_level):
+def get_enrolled_women_sector_data(domain, config, loc_level, show_test=False):
     group_by = ['%s_name' % loc_level]
     if loc_level == LocationTypes.SUPERVISOR:
         config['aggregation_level'] += 1
@@ -4954,6 +5189,9 @@ def get_enrolled_women_sector_data(config, loc_level):
     ).annotate(
         valid=Sum('pregnant'),
     ).order_by('%s_name' % loc_level)
+
+    if not show_test:
+        data = apply_exclude(domain, data)
 
     loc_data = {
         'blue': 0,
@@ -5005,17 +5243,20 @@ def get_enrolled_women_sector_data(config, loc_level):
     }
 
 
-def get_lactating_enrolled_women_data_map(config, loc_level):
+def get_lactating_enrolled_women_data_map(domain, config, loc_level, show_test=False):
 
     def get_data_for(filters):
         filters['month'] = datetime(*filters['month'])
-        return AggCcsRecordMonthly.objects.filter(
+        queryset = AggCcsRecordMonthly.objects.filter(
             **filters
         ).values(
             '%s_name' % loc_level
         ).annotate(
             valid=Sum('lactating'),
         )
+        if not show_test:
+            queryset = apply_exclude(domain, queryset)
+        return queryset
 
     map_data = {}
     average = []
@@ -5053,7 +5294,7 @@ def get_lactating_enrolled_women_data_map(config, loc_level):
     ]
 
 
-def get_lactating_enrolled_women_sector_data(config, loc_level):
+def get_lactating_enrolled_women_sector_data(domain, config, loc_level, show_test=False):
     group_by = ['%s_name' % loc_level]
     if loc_level == LocationTypes.SUPERVISOR:
         config['aggregation_level'] += 1
@@ -5067,6 +5308,9 @@ def get_lactating_enrolled_women_sector_data(config, loc_level):
     ).annotate(
         valid=Sum('lactating'),
     ).order_by('%s_name' % loc_level)
+
+    if not show_test:
+        data = apply_exclude(domain, data)
 
     loc_data = {
         'blue': 0,
@@ -5118,17 +5362,20 @@ def get_lactating_enrolled_women_sector_data(config, loc_level):
     }
 
 
-def get_adolescent_girls_data_map(config, loc_level):
+def get_adolescent_girls_data_map(domain, config, loc_level, show_test=False):
 
     def get_data_for(filters):
         filters['month'] = datetime(*filters['month'])
-        return AggAwcMonthly.objects.filter(
+        queryset = AggAwcMonthly.objects.filter(
             **filters
         ).values(
             '%s_name' % loc_level
         ).annotate(
             valid=Sum('cases_person_adolescent_girls_11_14') + Sum('cases_person_adolescent_girls_15_18'),
         )
+        if not show_test:
+            queryset = apply_exclude(domain, queryset)
+        return queryset
 
     map_data = {}
     average = []
@@ -5166,7 +5413,7 @@ def get_adolescent_girls_data_map(config, loc_level):
     ]
 
 
-def get_adolescent_girls_sector_data(config, loc_level):
+def get_adolescent_girls_sector_data(domain, config, loc_level, show_test=False):
     group_by = ['%s_name' % loc_level]
     if loc_level == LocationTypes.SUPERVISOR:
         config['aggregation_level'] += 1
@@ -5180,6 +5427,9 @@ def get_adolescent_girls_sector_data(config, loc_level):
     ).annotate(
         valid=Sum('cases_person_adolescent_girls_11_14') + Sum('cases_person_adolescent_girls_15_18'),
     ).order_by('%s_name' % loc_level)
+
+    if not show_test:
+        data = apply_exclude(domain, data)
 
     loc_data = {
         'blue': 0,
@@ -5231,11 +5481,11 @@ def get_adolescent_girls_sector_data(config, loc_level):
     }
 
 
-def get_adhaar_data_map(config, loc_level):
+def get_adhaar_data_map(domain, config, loc_level, show_test=False):
 
     def get_data_for(filters):
         filters['month'] = datetime(*filters['month'])
-        return AggAwcMonthly.objects.filter(
+        queryset = AggAwcMonthly.objects.filter(
             **filters
         ).values(
             '%s_name' % loc_level
@@ -5243,9 +5493,14 @@ def get_adhaar_data_map(config, loc_level):
             in_month=Sum('cases_person_has_aadhaar'),
             all=Sum('cases_person'),
         )
+        if not show_test:
+            queryset = apply_exclude(domain, queryset)
+        return queryset
 
     map_data = {}
-    average = []
+    valid_total = 0
+    in_month_total = 0
+
     for row in get_data_for(config):
         valid = row['all']
         name = row['%s_name' % loc_level]
@@ -5253,7 +5508,10 @@ def get_adhaar_data_map(config, loc_level):
         in_month = row['in_month']
 
         value = (in_month or 0) * 100 / (valid or 1)
-        average.append(value)
+
+        valid_total += (valid or 0)
+        in_month_total += (in_month or 0)
+
         row_values = {
             'in_month': in_month or 0,
             'all': valid or 0
@@ -5276,10 +5534,10 @@ def get_adhaar_data_map(config, loc_level):
     return [
         {
             "slug": "adhaar",
-            "label": "Percent Adhaar seeded beneficiaries",
+            "label": "Percent Adhaar Seeded Individuals",
             "fills": fills,
             "rightLegend": {
-                "average": sum(average) / float(len(average) or 1),
+                "average": (in_month_total * 100) / float(valid_total or 1),
                 "info": _((
                     "Percentage number of ICDS beneficiaries whose Adhaar identification has been captured"
                 )),
@@ -5290,7 +5548,7 @@ def get_adhaar_data_map(config, loc_level):
     ]
 
 
-def get_adhaar_data_chart(config, loc_level):
+def get_adhaar_data_chart(domain, config, loc_level, show_test=False):
     month = datetime(*config['month'])
     three_before = datetime(*config['month']) - relativedelta(months=3)
 
@@ -5305,6 +5563,9 @@ def get_adhaar_data_chart(config, loc_level):
         in_month=Sum('cases_person_has_aadhaar'),
         all=Sum('cases_person'),
     ).order_by('month')
+
+    if not show_test:
+        chart_data = apply_exclude(domain, chart_data)
 
     data = {
         'blue': OrderedDict(),
@@ -5377,7 +5638,7 @@ def get_adhaar_data_chart(config, loc_level):
     }
 
 
-def get_adhaar_sector_data(config, loc_level):
+def get_adhaar_sector_data(domain, config, loc_level, show_test=False):
     group_by = ['%s_name' % loc_level]
     if loc_level == LocationTypes.SUPERVISOR:
         config['aggregation_level'] += 1
@@ -5392,6 +5653,9 @@ def get_adhaar_sector_data(config, loc_level):
         in_month=Sum('cases_person_has_aadhaar'),
         all=Sum('cases_person'),
     ).order_by('%s_name' % loc_level)
+
+    if not show_test:
+        data = apply_exclude(domain, data)
 
     loc_data = {
         'green': 0,
@@ -5479,11 +5743,11 @@ def get_adhaar_sector_data(config, loc_level):
     }
 
 
-def get_clean_water_data_map(config, loc_level):
+def get_clean_water_data_map(domain, config, loc_level, show_test=False):
 
     def get_data_for(filters):
         filters['month'] = datetime(*filters['month'])
-        return AggAwcMonthly.objects.filter(
+        queryset = AggAwcMonthly.objects.filter(
             **filters
         ).values(
             '%s_name' % loc_level
@@ -5491,17 +5755,24 @@ def get_clean_water_data_map(config, loc_level):
             in_month=Sum('infra_clean_water'),
             all=Sum('num_awcs'),
         )
+        if not show_test:
+            queryset = apply_exclude(domain, queryset)
+        return queryset
 
     map_data = {}
-    average = []
+    in_month_total = 0
+    valid_total = 0
+
     for row in get_data_for(config):
         valid = row['all']
         name = row['%s_name' % loc_level]
 
         in_month = row['in_month']
 
+        in_month_total += (in_month or 0)
+        valid_total += (valid or 0)
+
         value = (in_month or 0) * 100 / (valid or 1)
-        average.append(value)
         row_values = {
             'in_month': in_month or 0,
             'all': valid or 0
@@ -5527,7 +5798,7 @@ def get_clean_water_data_map(config, loc_level):
             "label": "Percent AWCs with Clean Drinking Water",
             "fills": fills,
             "rightLegend": {
-                "average": sum(average) / float(len(average) or 1),
+                "average": (in_month_total * 100) / float(valid_total or 1),
                 "info": _((
                     "Percentage of AWCs with a source of clean drinking water"
                 )),
@@ -5538,7 +5809,7 @@ def get_clean_water_data_map(config, loc_level):
     ]
 
 
-def get_clean_water_data_chart(config, loc_level):
+def get_clean_water_data_chart(domain, config, loc_level, show_test=False):
     month = datetime(*config['month'])
     three_before = datetime(*config['month']) - relativedelta(months=3)
 
@@ -5553,6 +5824,9 @@ def get_clean_water_data_chart(config, loc_level):
         in_month=Sum('infra_clean_water'),
         all=Sum('num_awcs'),
     ).order_by('month')
+
+    if not show_test:
+        chart_data = apply_exclude(domain, chart_data)
 
     data = {
         'blue': OrderedDict(),
@@ -5625,7 +5899,7 @@ def get_clean_water_data_chart(config, loc_level):
     }
 
 
-def get_clean_water_sector_data(config, loc_level):
+def get_clean_water_sector_data(domain, config, loc_level, show_test=False):
     group_by = ['%s_name' % loc_level]
     if loc_level == LocationTypes.SUPERVISOR:
         config['aggregation_level'] += 1
@@ -5640,6 +5914,9 @@ def get_clean_water_sector_data(config, loc_level):
         in_month=Sum('infra_clean_water'),
         all=Sum('num_awcs'),
     ).order_by('%s_name' % loc_level)
+
+    if not show_test:
+        data = apply_exclude(domain, data)
 
     loc_data = {
         'green': 0,
@@ -5727,11 +6004,11 @@ def get_clean_water_sector_data(config, loc_level):
     }
 
 
-def get_functional_toilet_data_map(config, loc_level):
+def get_functional_toilet_data_map(domain, config, loc_level, show_test=False):
 
     def get_data_for(filters):
         filters['month'] = datetime(*filters['month'])
-        return AggAwcMonthly.objects.filter(
+        queryset = AggAwcMonthly.objects.filter(
             **filters
         ).values(
             '%s_name' % loc_level
@@ -5739,17 +6016,24 @@ def get_functional_toilet_data_map(config, loc_level):
             in_month=Sum('infra_functional_toilet'),
             all=Sum('num_awcs'),
         )
+        if not show_test:
+            queryset = apply_exclude(domain, queryset)
+        return queryset
 
     map_data = {}
-    average = []
+    in_month_total = 0
+    valid_total = 0
+
     for row in get_data_for(config):
         valid = row['all']
         name = row['%s_name' % loc_level]
 
         in_month = row['in_month']
 
+        in_month_total += (in_month or 0)
+        valid_total += (valid or 0)
+
         value = (in_month or 0) * 100 / (valid or 1)
-        average.append(value)
         row_values = {
             'in_month': in_month or 0,
             'all': valid or 0
@@ -5775,7 +6059,7 @@ def get_functional_toilet_data_map(config, loc_level):
             "label": "Percent AWCs with Functional Toilet",
             "fills": fills,
             "rightLegend": {
-                "average": sum(average) / float(len(average) or 1),
+                "average": (in_month_total * 100) / float(valid_total or 1),
                 "info": _((
                     "Percentage of AWCs with a functional toilet"
                 )),
@@ -5786,7 +6070,7 @@ def get_functional_toilet_data_map(config, loc_level):
     ]
 
 
-def get_functional_toilet_data_chart(config, loc_level):
+def get_functional_toilet_data_chart(domain, config, loc_level, show_test=False):
     month = datetime(*config['month'])
     three_before = datetime(*config['month']) - relativedelta(months=3)
 
@@ -5801,6 +6085,9 @@ def get_functional_toilet_data_chart(config, loc_level):
         in_month=Sum('infra_functional_toilet'),
         all=Sum('num_awcs'),
     ).order_by('month')
+
+    if not show_test:
+        chart_data = apply_exclude(domain, chart_data)
 
     data = {
         'blue': OrderedDict(),
@@ -5873,7 +6160,7 @@ def get_functional_toilet_data_chart(config, loc_level):
     }
 
 
-def get_functional_toilet_sector_data(config, loc_level):
+def get_functional_toilet_sector_data(domain, config, loc_level, show_test=False):
     group_by = ['%s_name' % loc_level]
     if loc_level == LocationTypes.SUPERVISOR:
         config['aggregation_level'] += 1
@@ -5888,6 +6175,9 @@ def get_functional_toilet_sector_data(config, loc_level):
         in_month=Sum('infra_functional_toilet'),
         all=Sum('num_awcs'),
     ).order_by('%s_name' % loc_level)
+
+    if not show_test:
+        data = apply_exclude(domain, data)
 
     loc_data = {
         'green': 0,
@@ -5976,11 +6266,11 @@ def get_functional_toilet_sector_data(config, loc_level):
     }
 
 
-def get_medicine_kit_data_map(config, loc_level):
+def get_medicine_kit_data_map(domain, config, loc_level, show_test=False):
 
     def get_data_for(filters):
         filters['month'] = datetime(*filters['month'])
-        return AggAwcMonthly.objects.filter(
+        queryset = AggAwcMonthly.objects.filter(
             **filters
         ).values(
             '%s_name' % loc_level
@@ -5988,17 +6278,25 @@ def get_medicine_kit_data_map(config, loc_level):
             in_month=Sum('infra_medicine_kits'),
             all=Sum('num_awcs'),
         )
+        if not show_test:
+            queryset = apply_exclude(domain, queryset)
+        return queryset
 
     map_data = {}
-    average = []
+    in_month_total = 0
+    valid_total = 0
+
     for row in get_data_for(config):
         valid = row['all']
         name = row['%s_name' % loc_level]
 
         in_month = row['in_month']
 
+        in_month_total += (in_month or 0)
+        valid_total += (valid or 0)
+
         value = (in_month or 0) * 100 / (valid or 1)
-        average.append(value)
+
         row_values = {
             'in_month': in_month or 0,
             'all': valid or 0
@@ -6024,7 +6322,7 @@ def get_medicine_kit_data_map(config, loc_level):
             "label": "Percent AWCs with Medicine Kit",
             "fills": fills,
             "rightLegend": {
-                "average": sum(average) / float(len(average) or 1),
+                "average": (in_month_total * 100) / float(valid_total or 1),
                 "info": _((
                     "Percentage of AWCs with a Medicine Kit"
                 )),
@@ -6035,7 +6333,7 @@ def get_medicine_kit_data_map(config, loc_level):
     ]
 
 
-def get_medicine_kit_data_chart(config, loc_level):
+def get_medicine_kit_data_chart(domain, config, loc_level, show_test=False):
     month = datetime(*config['month'])
     three_before = datetime(*config['month']) - relativedelta(months=3)
 
@@ -6050,6 +6348,9 @@ def get_medicine_kit_data_chart(config, loc_level):
         in_month=Sum('infra_medicine_kits'),
         all=Sum('num_awcs'),
     ).order_by('month')
+
+    if not show_test:
+        chart_data = apply_exclude(domain, chart_data)
 
     data = {
         'blue': OrderedDict(),
@@ -6122,7 +6423,7 @@ def get_medicine_kit_data_chart(config, loc_level):
     }
 
 
-def get_medicine_kit_sector_data(config, loc_level):
+def get_medicine_kit_sector_data(domain, config, loc_level, show_test=False):
     group_by = ['%s_name' % loc_level]
     if loc_level == LocationTypes.SUPERVISOR:
         config['aggregation_level'] += 1
@@ -6137,6 +6438,9 @@ def get_medicine_kit_sector_data(config, loc_level):
         in_month=Sum('infra_medicine_kits'),
         all=Sum('num_awcs'),
     ).order_by('%s_name' % loc_level)
+
+    if not show_test:
+        data = apply_exclude(domain, data)
 
     loc_data = {
         'green': 0,
@@ -6225,11 +6529,11 @@ def get_medicine_kit_sector_data(config, loc_level):
     }
 
 
-def get_infants_weight_scale_data_map(config, loc_level):
+def get_infants_weight_scale_data_map(domain, config, loc_level, show_test=False):
 
     def get_data_for(filters):
         filters['month'] = datetime(*filters['month'])
-        return AggAwcMonthly.objects.filter(
+        queryset = AggAwcMonthly.objects.filter(
             **filters
         ).values(
             '%s_name' % loc_level
@@ -6237,17 +6541,24 @@ def get_infants_weight_scale_data_map(config, loc_level):
             in_month=Sum('infra_infant_weighing_scale'),
             all=Sum('num_awcs'),
         )
+        if not show_test:
+            queryset = apply_exclude(domain, queryset)
+        return queryset
 
     map_data = {}
-    average = []
+    valid_total = 0
+    in_month_total = 0
+
     for row in get_data_for(config):
         valid = row['all']
         name = row['%s_name' % loc_level]
 
         in_month = row['in_month']
 
+        in_month_total += (in_month or 0)
+        valid_total += (valid or 0)
+
         value = (in_month or 0) * 100 / (valid or 1)
-        average.append(value)
         row_values = {
             'in_month': in_month or 0,
             'all': valid or 0
@@ -6273,7 +6584,7 @@ def get_infants_weight_scale_data_map(config, loc_level):
             "label": "Percent AWCs with Weighing Scale: Infants",
             "fills": fills,
             "rightLegend": {
-                "average": sum(average) / float(len(average) or 1),
+                "average": (in_month_total * 100) / float(valid_total or 1),
                 "info": _((
                     "Percentage of AWCs with weighing scale for infants"
                 )),
@@ -6284,7 +6595,7 @@ def get_infants_weight_scale_data_map(config, loc_level):
     ]
 
 
-def get_infants_weight_scale_data_chart(config, loc_level):
+def get_infants_weight_scale_data_chart(domain, config, loc_level, show_test=False):
     month = datetime(*config['month'])
     three_before = datetime(*config['month']) - relativedelta(months=3)
 
@@ -6299,6 +6610,9 @@ def get_infants_weight_scale_data_chart(config, loc_level):
         in_month=Sum('infra_infant_weighing_scale'),
         all=Sum('num_awcs'),
     ).order_by('month')
+
+    if not show_test:
+        chart_data = apply_exclude(domain, chart_data)
 
     data = {
         'blue': OrderedDict(),
@@ -6371,7 +6685,7 @@ def get_infants_weight_scale_data_chart(config, loc_level):
     }
 
 
-def get_infants_weight_scale_sector_data(config, loc_level):
+def get_infants_weight_scale_sector_data(domain, config, loc_level, show_test=False):
     group_by = ['%s_name' % loc_level]
     if loc_level == LocationTypes.SUPERVISOR:
         config['aggregation_level'] += 1
@@ -6386,6 +6700,9 @@ def get_infants_weight_scale_sector_data(config, loc_level):
         in_month=Sum('infra_infant_weighing_scale'),
         all=Sum('num_awcs'),
     ).order_by('%s_name' % loc_level)
+
+    if not show_test:
+        data = apply_exclude(domain, data)
 
     loc_data = {
         'green': 0,
@@ -6473,11 +6790,11 @@ def get_infants_weight_scale_sector_data(config, loc_level):
     }
 
 
-def get_adult_weight_scale_data_map(config, loc_level):
+def get_adult_weight_scale_data_map(domain, config, loc_level, show_test=False):
 
     def get_data_for(filters):
         filters['month'] = datetime(*filters['month'])
-        return AggAwcMonthly.objects.filter(
+        queryset = AggAwcMonthly.objects.filter(
             **filters
         ).values(
             '%s_name' % loc_level
@@ -6485,17 +6802,26 @@ def get_adult_weight_scale_data_map(config, loc_level):
             in_month=Sum('infra_adult_weighing_scale'),
             all=Sum('num_awcs'),
         )
+        if not show_test:
+            queryset = apply_exclude(domain, queryset)
+        return queryset
 
     map_data = {}
-    average = []
+
+    in_month_total = 0
+    valid_total = 0
+
     for row in get_data_for(config):
         valid = row['all']
         name = row['%s_name' % loc_level]
 
         in_month = row['in_month']
 
+        in_month_total += (in_month or 0)
+        valid_total += (valid or 0)
+
         value = (in_month or 0) * 100 / (valid or 1)
-        average.append(value)
+
         row_values = {
             'in_month': in_month or 0,
             'all': valid or 0
@@ -6521,7 +6847,7 @@ def get_adult_weight_scale_data_map(config, loc_level):
             "label": "Percent AWCs with Weighing Scale: Mother and Child",
             "fills": fills,
             "rightLegend": {
-                "average": sum(average) / float(len(average) or 1),
+                "average": (in_month_total * 100) / float(valid_total or 1),
                 "info": _((
                     "Percentage of AWCs with weighing scale for mother and child"
                 )),
@@ -6532,7 +6858,7 @@ def get_adult_weight_scale_data_map(config, loc_level):
     ]
 
 
-def get_adult_weight_scale_data_chart(config, loc_level):
+def get_adult_weight_scale_data_chart(domain, config, loc_level, show_test=False):
     month = datetime(*config['month'])
     three_before = datetime(*config['month']) - relativedelta(months=3)
 
@@ -6547,6 +6873,9 @@ def get_adult_weight_scale_data_chart(config, loc_level):
         in_month=Sum('infra_adult_weighing_scale'),
         all=Sum('num_awcs'),
     ).order_by('month')
+
+    if not show_test:
+        chart_data = apply_exclude(domain, chart_data)
 
     data = {
         'blue': OrderedDict(),
@@ -6619,7 +6948,7 @@ def get_adult_weight_scale_data_chart(config, loc_level):
     }
 
 
-def get_adult_weight_scale_sector_data(config, loc_level):
+def get_adult_weight_scale_sector_data(domain, config, loc_level, show_test=False):
     group_by = ['%s_name' % loc_level]
     if loc_level == LocationTypes.SUPERVISOR:
         config['aggregation_level'] += 1
@@ -6634,6 +6963,8 @@ def get_adult_weight_scale_sector_data(config, loc_level):
         in_month=Sum('infra_adult_weighing_scale'),
         all=Sum('num_awcs'),
     ).order_by('%s_name' % loc_level)
+    if not show_test:
+        data = apply_exclude(domain, data)
 
     loc_data = {
         'green': 0,
