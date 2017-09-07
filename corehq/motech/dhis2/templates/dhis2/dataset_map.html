@@ -11,7 +11,11 @@
     <script>
     $(function () {
         var Dhis2MapSettings = hqImport('dhis2/js/dhis2_map_settings').Dhis2MapSettings;
-        var viewModel = new Dhis2MapSettings({{ dataset_maps|JSON }}, {{ send_data_url|JSON }});
+        var viewModel = new Dhis2MapSettings(
+            {{ dataset_maps|JSON }},
+            {{ send_data_url|JSON }},
+            {{ data_sets|JSON }},
+        );
         viewModel.init();
         $('#dataset-maps').koApplyBindings(viewModel);
     });
