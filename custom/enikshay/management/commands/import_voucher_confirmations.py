@@ -288,7 +288,10 @@ class Command(BaseCommand):
     def vouchers_by_readable_id_and_person(self):
         """returns a list of vouchers for each readable id"""
         vouchers = defaultdict(list)
-        voucher_ids = self.accessor.get_case_ids_in_domain(CASE_TYPE_VOUCHER)
+        # voucher_ids = self.accessor.get_case_ids_in_domain(CASE_TYPE_VOUCHER)
+        with open('voucher_ids.csv', 'r') as f:
+            reader = csv.reader(f)
+            voucher_ids = [id[0] for id in reader]
         for voucher in self.accessor.iter_cases(voucher_ids):
             try:
                 person = get_person_case_from_voucher(self.domain, voucher.case_id)
