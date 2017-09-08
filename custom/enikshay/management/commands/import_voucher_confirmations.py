@@ -114,7 +114,7 @@ class Command(BaseCommand):
         voucher_dicts = []  # The row-by-row upload confirmation
         unidentifiable_vouchers = []
 
-        for voucher_dict in self.get_voucher_dicts_from_dump_and_update():
+        for voucher_dict in self.get_voucher_dicts_from_api_output():
             voucher_id = voucher_dict['id']
             possible_vouchers = self.vouchers_by_readable_id_and_person[(voucher_id, voucher_dict['PersonId'])]
             voucher_dict['possible_vouchers'] = possible_vouchers
@@ -170,6 +170,13 @@ class Command(BaseCommand):
         self.reconcile_repeat_records(voucher_updates)
         print "Couldn't generate payloads for {} vouchers".format(self.bad_payloads)
 
+    def get_voucher_dicts_from_api_output(self):
+        with open('voucher-api-output.csv') as update_file:
+            update = csv.DictReader(update_file)
+            for row in update:
+                row['id'] = row['ReadableID']
+                yield row
+
     def get_voucher_dicts_from_dump_and_update(self):
         """open the two files, join the rows together and return a list of dicts"""
         with open('voucher-export.csv') as dump_file:
@@ -214,7 +221,7 @@ class Command(BaseCommand):
                     if amount - 1 < float(get_value(field)) < amount + 1:
                         amount_matches = True
 
-            spreadsheet_date = voucher_dict["Event Occur Date (Voucher Validation date)"]
+            spreadsheet_date = voucher_dict["EventOccurDate"]
             return (
                 amount_matches
                 and parse(spreadsheet_date) == parse(get_value("date_fulfilled") or '2021-01-01 01:01')
@@ -233,7 +240,7 @@ class Command(BaseCommand):
                 voucher_dict['number possible vouchers'],
                 voucher_dict['voucher case_id'],
             ] + [
-                voucher_dict[prop] for prop in self.voucher_update_properties + self.voucher_dump_properties
+                voucher_dict[prop] for prop in self.voucher_api_properties
             ])
 
         dicts_by_hash = defaultdict(list)
@@ -324,7 +331,7 @@ class Command(BaseCommand):
             return defaultdict(lambda: "PAYLOAD_ERROR")
 
     def log_voucher_updates(self, voucher_updates):
-        update_props = [prop for prop in self.voucher_update_properties
+        update_props = [prop for prop in self.voucher_api_properties
                         if prop not in ['EventID', 'Beneficiary ID']]
         headers = ['ReadableID'] + self.voucher_api_properties + update_props
 
@@ -356,7 +363,7 @@ class Command(BaseCommand):
                 voucher_dict['confirmation status'],
                 voucher_dict.get('new_approver', 'ALREADY APPROVED')
             ] + [
-                voucher_dict[prop] for prop in self.voucher_update_properties + self.voucher_dump_properties
+                voucher_dict[prop] for prop in self.voucher_api_properties
             ]
             for voucher_dict in voucher_dicts
         ]
