@@ -69,7 +69,7 @@ class Command(BaseCommand):
         'status',
         'failureDescription',
         'amount',
-        'Beneficiary ID',
+        'BeneficiaryUUID',
         'bankName',
         'paymentMode',
         'checkNumber',
@@ -331,8 +331,8 @@ class Command(BaseCommand):
             return defaultdict(lambda: "PAYLOAD_ERROR")
 
     def log_voucher_updates(self, voucher_updates):
-        update_props = [prop for prop in self.voucher_api_properties
-                        if prop not in ['EventID', 'Beneficiary ID']]
+        update_props = [prop for prop in self.voucher_update_properties
+                        if prop not in ['EventID', 'BeneficiaryUUID']]
         headers = ['ReadableID'] + self.voucher_api_properties + update_props
 
         def make_row(voucher_update):
@@ -354,7 +354,7 @@ class Command(BaseCommand):
             'voucher found',
             'confirmation status',
             'new approver',
-        ] + self.voucher_update_properties + self.voucher_dump_properties
+        ] + self.voucher_update_properties + self.voucher_api_properties
         rows = [
             [
                 voucher_dict['number possible vouchers'],
@@ -363,7 +363,7 @@ class Command(BaseCommand):
                 voucher_dict['confirmation status'],
                 voucher_dict.get('new_approver', 'ALREADY APPROVED')
             ] + [
-                voucher_dict[prop] for prop in self.voucher_api_properties
+                voucher_dict[prop] for prop in self.voucher_update_properties + self.voucher_api_properties
             ]
             for voucher_dict in voucher_dicts
         ]
