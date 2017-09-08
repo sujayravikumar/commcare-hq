@@ -286,7 +286,7 @@ class IncentivePayload(BETSPayload):
 class VoucherPayload(BETSPayload):
 
     VoucherID = jsonobject.StringProperty(required=False)
-    Amount = jsonobject.IntegerProperty(required=False)
+    Amount = jsonobject.StringProperty(required=False)
 
     @classmethod
     def create_voucher_payload(cls, voucher_case):
