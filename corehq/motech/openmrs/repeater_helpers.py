@@ -126,6 +126,7 @@ def create_visit(requests, person_uuid, visit_datetime, values_for_concept, enco
     encounter_uuid = response.json()['uuid']
 
     observation_uuids = []
+    exceptions = []
     for concept_uuid, values in values_for_concept.items():
         for value in values:
             observation = {
@@ -140,13 +141,16 @@ def create_visit(requests, person_uuid, visit_datetime, values_for_concept, enco
             response = requests.post('/ws/rest/v1/obs', json=observation)
             try:
                 response.raise_for_status()
-            except HTTPError:
+            except HTTPError as err:
                 logger.debug('Request: ', requests.get_url('/ws/rest/v1/obs'), observation)
                 logger.debug('Response: ', response.json())
-                raise
-            observation_uuids.append(response.json()['uuid'])
+                exceptions.append(err)
+            else:
+                observation_uuids.append(response.json()['uuid'])
 
     logger.debug('Observations created: ', observation_uuids)
+    if exceptions:
+        raise exceptions[0]
 
 
 def search_patients(requests, search_string):
