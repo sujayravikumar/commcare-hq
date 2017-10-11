@@ -17,6 +17,7 @@ from casexml.apps.phone.tests.utils import (
 from casexml.apps.phone.models import OwnershipCleanlinessFlag
 from corehq.apps.domain.models import Domain
 from corehq.apps.groups.models import Group
+from corehq.apps.locations.tests.util import setup_locations_and_types
 from corehq.apps.users.dbaccessors.all_commcare_users import delete_all_users
 from corehq.apps.receiverwrapper.util import submit_form_locally
 from corehq.blobs import get_blob_db
@@ -1190,6 +1191,66 @@ class ChangingOwnershipTest(BaseSyncTest):
         sync2 = self.device.sync()
         self.assertTrue(group._id in sync2.log.owner_ids_on_phone)
         self.assertTrue(sync2.log.phone_is_holding_case(case_id))
+
+    def test_user_in_location_hierarchy(self):
+        location_type_names = ['province', 'district']
+        location_structure = [
+            ('Western Cape', [
+                ('Cape Winelands', []),
+            ]),
+        ]
+
+        location_types, locations = setup_locations_and_types(
+            self.project.name,
+            location_type_names,
+            [],
+            location_structure,
+        )
+        for loc_type in location_types.values():
+            loc_type.shares_cases = True
+            loc_type.save()
+            self.addCleanup(loc_type.delete)
+
+        user_location = locations['Western Cape']
+        child_location = locations['Cape Winelands']
+        self.addCleanup(user_location.delete)
+        self.addCleanup(child_location.delete)
+        self.user.couch_user.set_location(user_location)
+
+        case_type = 'tech_issue'
+        index_identifier = 'parent'
+        issue_case = CaseStructure(
+            case_id='issue',
+            attrs={
+                'create': True,
+                'owner_id': user_location.location_id
+            })
+        delegate = CaseStructure(
+            case_id='issue_delegate',
+            attrs={'create': True, 'owner_id': user_location.location_id},
+            indices=[CaseIndex(
+                issue_case,
+                identifier=index_identifier,
+                relationship='child',
+                related_type=case_type,
+            )],
+        )
+        self.device.post_changes(delegate)
+        sync1 = self.device.sync()
+        self.assertTrue(user_location.location_id in sync1.log.owner_ids_on_phone)
+        self.assertFalse(child_location.location_id in sync1.log.owner_ids_on_phone)
+        self.assertTrue(sync1.log.phone_is_holding_case('issue'))
+        self.assertTrue(sync1.log.phone_is_holding_case('issue_delegate'))
+
+        # assign delegate to child location
+        self.device.post_changes(CaseStructure(
+            case_id='issue_delegate',
+            attrs={'owner_id': child_location.location_id},
+        ))
+
+        sync2 = self.device.sync()
+        self.assertTrue(sync2.log.phone_is_holding_case('issue'))
+        self.assertFalse(sync2.log.phone_is_holding_case('issue_delegate'))
 
 
 @use_sql_backend

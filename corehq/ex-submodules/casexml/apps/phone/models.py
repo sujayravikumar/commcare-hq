@@ -40,6 +40,10 @@ class OTARestoreUser(object):
         self._couch_user = couch_user
 
     @property
+    def couch_user(self):
+        return self._couch_user
+
+    @property
     def user_id(self):
         return self._couch_user.user_id
 
