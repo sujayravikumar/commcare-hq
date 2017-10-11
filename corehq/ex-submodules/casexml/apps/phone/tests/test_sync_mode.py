@@ -1142,6 +1142,8 @@ class ChangingOwnershipTest(BaseSyncTest):
             users=[self.user.user_id]
         )
         group.save()
+        self.addCleanup(group.delete)
+
         sync0 = self.device.sync()
         self.assertIn(group._id, sync0.log.owner_ids_on_phone)
 
@@ -1175,6 +1177,7 @@ class ChangingOwnershipTest(BaseSyncTest):
             users=[]
         )
         group.save()
+        self.addCleanup(group.delete)
         # create a case owned by the group
         case_id = uuid.uuid4().hex
         self.device.change_cases(case_id=case_id, owner_id=group._id, create=True)
