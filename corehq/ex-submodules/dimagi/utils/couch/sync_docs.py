@@ -21,9 +21,12 @@ def sync_design_docs(db, design_dir, design_name, temp=None):
     """
     design_name_ = '%s-%s' % (design_name, temp) if temp else design_name
     docid = "_design/%s" % design_name_
-    push(design_dir, db, force=True, docid=docid)
-    log.info("synced '%s' in couchdb", design_name)
-    if temp:
+    pushed = push(design_dir, db, force=True, docid=docid)
+    if pushed:
+        log.info("synced '%s' in couchdb", design_name)
+    else:
+        log.info("skipped syncing '%s' to couchdb as it has no changes", design_name)
+    if pushed and temp:
         index_design_docs(db, docid, design_name_)
 
 
