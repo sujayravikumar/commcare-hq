@@ -44,6 +44,8 @@
             <div class="tab-content">
                 {% if dynamic_properties %}
                 <div class="tab-pane active" id="properties">
+                    {% include "case/partials/case_property_modal.html" %}
+
                     <div class="row-fluid">
                         {% render_tables dynamic_properties dynamic_properties_options %}
                     </div>

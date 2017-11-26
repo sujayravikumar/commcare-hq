@@ -14,6 +14,14 @@
     {# import error: http://manage.dimagi.com/default.asp?223100 #}
     {% include 'cloudcare/includes/formplayer-inline.html' %}
     <script src="{% static "reports/js/case_details.js" %}"></script>
+    <script src="{% static "case/js/case_property_modal.js" %}"></script>
+{% endblock %}
+
+{% block js-inline %}{{ block.super }}
+    <script>
+     var CasePropertyTable = hqImport('case/js/case_property_table');
+     $("#properties").koApplyBindings(new CasePropertyTable());
+    </script>
 {% endblock %}
 
 {% block page_content %}
