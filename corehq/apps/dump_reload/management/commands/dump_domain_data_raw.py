@@ -20,6 +20,23 @@ from corehq.elastic import ES_EXPORT_INSTANCE
 from corehq.util.log import with_progress_bar
 
 
+def _get_form_query(domain):
+    return (FormES(es_instance_alias=ES_EXPORT_INSTANCE)
+            .domain(domain)
+            .remove_default_filter('has_user'))
+
+
+def _get_query(ES, domain):
+    return ES(es_instance_alias=ES_EXPORT_INSTANCE).domain(domain)
+
+
+QUERIES = {
+    'forms': _get_form_query,
+    'cases': functools.partial(_get_query, CaseES),
+    'ledgers': functools.partial(_get_query, LedgerES),
+}
+
+
 class Command(BaseCommand):
     """Created for the data mining project: https://github.com/dimagi/dimagi_defaulters
     """
@@ -31,7 +48,7 @@ class Command(BaseCommand):
         parser.add_argument('-k', '--s3-key', dest='key')
         parser.add_argument('-s', '--s3-secret', dest='secret')
         parser.add_argument('-b', '--s3-bucket', dest='bucket')
-        parser.add_argument('-t', '--type', choices=['forms', 'cases'], dest='type')
+        parser.add_argument('-t', '--type', choices=list(QUERIES), dest='type')
 
     def handle(self, domain, **options):
         self.domain = domain
@@ -54,16 +71,12 @@ class Command(BaseCommand):
         )
         self._create_bucket()
 
-        exporters = {
-            'forms': _get_form_query,
-            'cases': functools.partial(_get_query, CaseES),
-            'ledgers': functools.partial(_get_query, LedgerES),
-        }.items()
+        queries = QUERIES.items()
 
         if options['type']:
-            exporters = [exp for exp in exporters if exp[0] == options['type']]
+            queries = [exp for exp in queries if exp[0] == options['type']]
 
-        for type_, query_fn in exporters:
+        for type_, query_fn in queries:
             query = query_fn(domain)
             path = _dump_docs(query, type_)
             self._upload(type_, path)
@@ -108,13 +121,3 @@ def _filename(domain, type_, date):
 def _get_file(doc_type):
     fileobj = tempfile.NamedTemporaryFile(prefix='domain_dump_raw_{}_'.format(doc_type), mode='wb', delete=False)
     return fileobj.name, gzip.GzipFile(fileobj=fileobj)
-
-
-def _get_form_query(domain):
-    return (FormES(es_instance_alias=ES_EXPORT_INSTANCE)
-            .domain(domain)
-            .remove_default_filter('has_user'))
-
-
-def _get_query(ES, domain):
-    return ES(es_instance_alias=ES_EXPORT_INSTANCE).domain(domain)
