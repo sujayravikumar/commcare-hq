@@ -102,6 +102,7 @@ class ConfigurableReportDataSourceMixin(object):
 
     @property
     def group_by(self):
+        # TODO here?
         # ask each column for its group_by contribution and combine to a single list
         return [
             group_by for col_id in self.aggregation_columns

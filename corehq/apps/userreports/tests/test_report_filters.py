@@ -710,6 +710,7 @@ class DateFilterOffsetTest(SimpleTestCase):
         self.assertEqual((computed_end - end).days, 0)
 
 
+# TODO inspect
 class LocationDrilldownFilterTest(LocationHierarchyTestCase):
     location_type_names = ['state', 'county', 'city']
     location_structure = [

@@ -28,6 +28,7 @@ _soft_assert = soft_assert(
 def catch_and_raise_exceptions(func):
     @wraps(func)
     def _inner(*args, **kwargs):
+        return func(*args, **kwargs)
         try:
             return func(*args, **kwargs)
         except (
