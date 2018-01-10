@@ -1,11 +1,11 @@
 from __future__ import absolute_import
 import json
 from itertools import chain
-from pprint import pformat
 
 import jsonfield
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
+import six
 
 from corehq.motech.dhis2.utils import (
     get_date_filter,
@@ -184,12 +184,47 @@ class JsonApiLog(models.Model):
             response_body=response_body,
         )
 
+    @staticmethod
+    def prettyprint_json(json_data):
+        """
+        Formats json_data for readability
+
+        :return: A 2-space-indented string with sorted keys.
+        :raises ValueError: if json_data cannot be parsed as JSON
+        """
+        if isinstance(json_data, six.string_types):
+            json_data = json.loads(json_data)
+        return json.dumps(json_data, indent=2, sort_keys=True)
+
+    @property
+    def pp_request_headers(self):
+        """
+        Pretty-print the request headers
+        """
+        try:
+            return self.prettyprint_json(self.request_headers)
+        except ValueError:
+            return self.request_headers
+
+    @property
+    def pp_request_params(self):
+        """
+        Pretty-print the request params
+        """
+        try:
+            return self.prettyprint_json(self.request_params)
+        except ValueError:
+            return self.request_params
+
     @property
     def pp_request_body(self):
         """
         Pretty-print the request body
         """
-        return pformat(self.request_body)
+        try:
+            return self.prettyprint_json(self.request_body)
+        except ValueError:
+            return self.request_body
 
     @property
     def pp_response_body(self):
@@ -197,6 +232,6 @@ class JsonApiLog(models.Model):
         Pretty-print the response body
         """
         try:
-            return pformat(json.loads(self.response_body))
+            return self.prettyprint_json(self.response_body)
         except ValueError:
             return self.response_body
