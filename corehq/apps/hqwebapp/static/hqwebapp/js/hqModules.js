@@ -40,6 +40,9 @@
 
 var COMMCAREHQ_MODULES = {};
 
+var dependency_queue = [];
+var dependency_queue_paths = [];
+
 /*
  * Transitional version of "define" to handle both RequireJS and non-RequireJS pages.
  * Signature deliberately matches that of "define". On non-RequireJS pages, the dependencies
@@ -68,6 +71,10 @@ function hqDefine(path, dependencies, moduleAccessor) {
                     args[i] = thirdParty[dependency];
                 } else if (COMMCAREHQ_MODULES.hasOwnProperty(dependency)) {
                     args[i] = hqImport(dependency);
+                } else {
+                    dependency_queue.push([path, dependencies, factory]);
+                    dependency_queue_paths.push(path);
+                    return;
                 }
             }
             if (!COMMCAREHQ_MODULES.hasOwnProperty(path)) {
@@ -78,6 +85,23 @@ function hqDefine(path, dependencies, moduleAccessor) {
             }
             else {
                 throw new Error("The module '" + path + "' has already been defined elsewhere.");
+            }
+
+            console.log(dependency_queue_paths);
+            if (dependency_queue.length > 0) {
+                var queue = dependency_queue;
+                dependency_queue = [];
+                dependency_queue_paths = [];
+                for (var i = 0; i < queue.length; i++) {
+                    var dep = queue[i];
+                    console.log(dep[0], dep[1]);
+                    hqDefine(dep[0], dep[1], dep[2]);
+                }
+            }
+            for (var name in COMMCAREHQ_MODULES) {
+              if (COMMCAREHQ_MODULES.hasOwnProperty(name)) {
+                console.log(name);
+              }
             }
         }
     }(moduleAccessor));
