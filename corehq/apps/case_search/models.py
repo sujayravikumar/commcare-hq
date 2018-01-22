@@ -5,7 +5,7 @@ import json
 
 from corehq.util.quickcache import quickcache
 from django.db import models
-from jsonfield.fields import JSONField
+from django.contrib.postgres.fields import JSONField
 from django.contrib.postgres.fields import ArrayField
 import six
 
