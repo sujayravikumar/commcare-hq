@@ -1,14 +1,14 @@
 from __future__ import absolute_import
+
 import copy
-import re
 import json
+import re
+
+import six
+from django.contrib.postgres.fields import ArrayField, JSONField
+from django.db import models
 
 from corehq.util.quickcache import quickcache
-from django.db import models
-from django.contrib.postgres.fields import JSONField
-from django.contrib.postgres.fields import ArrayField
-import six
-
 
 CLAIM_CASE_TYPE = 'commcare-case-claim'
 FUZZY_PROPERTIES = "fuzzy_properties"
@@ -245,3 +245,41 @@ def case_search_enabled_domains():
     """Returns a list of all domains that have case search enabled
     """
     return CaseSearchConfig.objects.filter(enabled=True).values_list('domain', flat=True)
+
+
+class SearchResult(models.Model):
+    """
+
+    """
+    domain = models.CharField(
+        max_length=256,
+        null=False,
+        blank=False,
+        db_index=True,
+    )
+    user_id = models.CharField(
+        max_length=256,
+        null=False,
+        blank=False,
+        db_index=True,
+    )  # The user who performed this search
+    search_criteria = JSONField()  # key/value pairs of the searched properties
+    results = ArrayField(
+        models.CharField(null=True, blank=True, max_length=256)
+    )  # The case_ids of the results that were returned
+    converted = models.BooleanField(default=False)  # Whether this search resulted in a case claim
+    last_performed = models.DateTimeField(auto_now=True)  # The date and time this search was performed
+    pillow_lag = models.IntegerField(null=True, blank=True)  # The pillow lag at the time of this search
+
+    @classmethod
+    def create(cls, domain, user_id, search_criteria, results):
+        client = get_redis_client()
+        search_result = cls(
+            domain=domain,
+            user_id=user_id,
+            search_criteria=search_criteria,
+            results=[r['_id'] for r in results],
+            pillow_lag=client.get(CHANGE_LAG_KEY.format('CaseSearchToElasticsearchPillow')),
+        )
+        search_result.save()
+        return search_result
