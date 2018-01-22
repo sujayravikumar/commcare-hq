@@ -273,13 +273,11 @@ class SearchResult(models.Model):
 
     @classmethod
     def create(cls, domain, user_id, search_criteria, results):
-        client = get_redis_client()
         search_result = cls(
             domain=domain,
             user_id=user_id,
             search_criteria=search_criteria,
-            results=[r['_id'] for r in results],
-            pillow_lag=client.get(CHANGE_LAG_KEY.format('CaseSearchToElasticsearchPillow')),
+            results=[r['_id'] for r in results]
         )
         search_result.save()
         return search_result

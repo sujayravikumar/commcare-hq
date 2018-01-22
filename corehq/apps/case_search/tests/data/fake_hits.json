@@ -1,0 +1,398 @@
+[
+    {
+        "_score": 7.622071,
+        "_type": "case",
+        "_id": "ff96f733-e4a7-4732-b4e6-0b04252a45ff",
+        "_source": {
+            "opened_on": "2017-09-28T19:22:15.260000Z",
+            "closed_on": null,
+            "domain": "enikshay",
+            "referrals": null,
+            "user_id": "87ec94ab6b950a73ddb8db6280996aa1",
+            "name": "adsfa",
+            "doc_type": "CommCareCase",
+            "export_tag": null,
+            "location_id": null,
+            "external_id": null,
+            "case_properties": [
+                {
+                    "key": "name",
+                    "value": "adsfa"
+                },
+                {
+                    "key": "external_id",
+                    "value": null
+                },
+                {
+                    "key": "voucher_type",
+                    "value": "test"
+                },
+                {
+                    "key": "state",
+                    "value": "approved"
+                },
+                {
+                    "key": "amount_approved",
+                    "value": "123"
+                },
+                {
+                    "key": "voucher_id",
+                    "value": "abcdef"
+                },
+                {
+                    "key": "voucher_fulfilled_by_id",
+                    "value": "227b56fa4e1d44c4b7a4395884ca81bf"
+                },
+                {
+                    "key": "voucher_district_id",
+                    "value": "227b56fa4e1d44c4b7a4395884ca81bf"
+                }
+            ],
+            "opened_by": "87ec94ab6b950a73ddb8db6280996aa1",
+            "modified_on": "2017-09-28T19:22:15.260000Z",
+            "version": null,
+            "closed": false,
+            "indices": [],
+            "_id": "ff96f733-e4a7-4732-b4e6-0b04252a45ff",
+            "type": "voucher",
+            "closed_by": null,
+            "server_modified_on": "2017-09-28T19:22:15.755039Z",
+            "owner_id": "87ec94ab6b950a73ddb8db6280996aa1"
+        },
+        "_index": "case_search_2016-03-15"
+    },
+    {
+        "_score": 7.3099184,
+        "_type": "case",
+        "_id": "41cc387c-2172-4fec-897a-de6065a5990b",
+        "_source": {
+            "opened_on": "2017-09-28T19:28:19.309000Z",
+            "closed_on": null,
+            "domain": "enikshay",
+            "referrals": null,
+            "user_id": "87ec94ab6b950a73ddb8db6280996aa1",
+            "name": "78907890",
+            "doc_type": "CommCareCase",
+            "export_tag": null,
+            "location_id": null,
+            "external_id": null,
+            "case_properties": [
+                {
+                    "key": "name",
+                    "value": "78907890"
+                },
+                {
+                    "key": "external_id",
+                    "value": null
+                },
+                {
+                    "key": "voucher_type",
+                    "value": "test"
+                },
+                {
+                    "key": "state",
+                    "value": "approved"
+                },
+                {
+                    "key": "amount_approved",
+                    "value": "1234"
+                },
+                {
+                    "key": "bets_102_error",
+                    "value": ""
+                },
+                {
+                    "key": "voucher_id",
+                    "value": "123"
+                },
+                {
+                    "key": "voucher_fulfilled_by_id",
+                    "value": "227b56fa4e1d44c4b7a4395884ca81bf"
+                },
+                {
+                    "key": "voucher_district_id",
+                    "value": "227b56fa4e1d44c4b7a4395884ca81bf"
+                },
+                {
+                    "key": "event_102",
+                    "value": "sent"
+                }
+            ],
+            "opened_by": "87ec94ab6b950a73ddb8db6280996aa1",
+            "modified_on": "2017-10-10T02:53:42.491407Z",
+            "version": null,
+            "closed": false,
+            "indices": [],
+            "_id": "41cc387c-2172-4fec-897a-de6065a5990b",
+            "type": "voucher",
+            "closed_by": null,
+            "server_modified_on": "2017-10-10T02:53:42.503502Z",
+            "owner_id": "87ec94ab6b950a73ddb8db6280996aa1"
+        },
+        "_index": "case_search_2016-03-15"
+    },
+    {
+        "_score": 7.3013973,
+        "_type": "case",
+        "_id": "1d9a515a-b363-4511-96b9-733de8a2db09",
+        "_source": {
+            "opened_on": "2017-09-28T19:26:56.112000Z",
+            "closed_on": null,
+            "domain": "enikshay",
+            "referrals": null,
+            "user_id": "87ec94ab6b950a73ddb8db6280996aa1",
+            "name": "asbdlkfa",
+            "doc_type": "CommCareCase",
+            "export_tag": null,
+            "location_id": null,
+            "external_id": null,
+            "case_properties": [
+                {
+                    "key": "name",
+                    "value": "asbdlkfa"
+                },
+                {
+                    "key": "external_id",
+                    "value": null
+                },
+                {
+                    "key": "voucher_type",
+                    "value": "test"
+                },
+                {
+                    "key": "state",
+                    "value": "approved"
+                },
+                {
+                    "key": "amount_approved",
+                    "value": "123"
+                },
+                {
+                    "key": "voucher_id",
+                    "value": "abcde"
+                },
+                {
+                    "key": "voucher_fulfilled_by_id",
+                    "value": "227b56fa4e1d44c4b7a4395884ca81bf"
+                },
+                {
+                    "key": "voucher_district_id",
+                    "value": "227b56fa4e1d44c4b7a4395884ca81bf"
+                }
+            ],
+            "opened_by": "87ec94ab6b950a73ddb8db6280996aa1",
+            "modified_on": "2017-09-28T19:26:56.112000Z",
+            "version": null,
+            "closed": false,
+            "indices": [],
+            "_id": "1d9a515a-b363-4511-96b9-733de8a2db09",
+            "type": "voucher",
+            "closed_by": null,
+            "server_modified_on": "2017-09-28T19:26:56.539623Z",
+            "owner_id": "87ec94ab6b950a73ddb8db6280996aa1"
+        },
+        "_index": "case_search_2016-03-15"
+    },
+    {
+        "_score": 7.3013973,
+        "_type": "case",
+        "_id": "1cba9702-c231-4168-a4f3-b5469f3aad43",
+        "_source": {
+            "opened_on": "2017-10-06T20:20:52.259000Z",
+            "closed_on": null,
+            "domain": "enikshay",
+            "referrals": null,
+            "user_id": "87ec94ab6b950a73ddb8db6280996aa1",
+            "name": "1234",
+            "doc_type": "CommCareCase",
+            "export_tag": null,
+            "location_id": null,
+            "external_id": null,
+            "case_properties": [
+                {
+                    "key": "name",
+                    "value": "1234"
+                },
+                {
+                    "key": "external_id",
+                    "value": null
+                },
+                {
+                    "key": "voucher_type",
+                    "value": "test"
+                },
+                {
+                    "key": "voucher_fulfilled_by_location_id",
+                    "value": "227b56fa4e1d44c4b7a4395884ca81bf"
+                },
+                {
+                    "key": "state",
+                    "value": "approved"
+                },
+                {
+                    "key": "amount_approved",
+                    "value": "123"
+                },
+                {
+                    "key": "bets_102_error",
+                    "value": ""
+                },
+                {
+                    "key": "voucher_id",
+                    "value": "ABCDEF"
+                },
+                {
+                    "key": "voucher_fulfilled_by_id",
+                    "value": "227b56fa4e1d44c4b7a4395884ca81bf"
+                },
+                {
+                    "key": "voucher_district_id",
+                    "value": "227b56fa4e1d44c4b7a4395884ca81bf"
+                },
+                {
+                    "key": "event_102",
+                    "value": "sent"
+                }
+            ],
+            "opened_by": "87ec94ab6b950a73ddb8db6280996aa1",
+            "modified_on": "2017-10-10T02:53:42.854574Z",
+            "version": null,
+            "closed": false,
+            "indices": [],
+            "_id": "1cba9702-c231-4168-a4f3-b5469f3aad43",
+            "type": "voucher",
+            "closed_by": null,
+            "server_modified_on": "2017-10-10T02:53:42.860869Z",
+            "owner_id": "87ec94ab6b950a73ddb8db6280996aa1"
+        },
+        "_index": "case_search_2016-03-15"
+    },
+    {
+        "_score": 6.766235,
+        "_type": "case",
+        "_id": "eb1d5857-12a0-4baf-9166-f1a44e4e2ed6",
+        "_source": {
+            "opened_on": "2017-09-28T19:20:56.073000Z",
+            "closed_on": null,
+            "domain": "enikshay",
+            "referrals": null,
+            "user_id": "87ec94ab6b950a73ddb8db6280996aa1",
+            "name": "bddd",
+            "doc_type": "CommCareCase",
+            "export_tag": null,
+            "location_id": null,
+            "external_id": null,
+            "case_properties": [
+                {
+                    "key": "name",
+                    "value": "bddd"
+                },
+                {
+                    "key": "external_id",
+                    "value": null
+                },
+                {
+                    "key": "voucher_type",
+                    "value": "test"
+                },
+                {
+                    "key": "state",
+                    "value": "approved"
+                },
+                {
+                    "key": "amount_approved",
+                    "value": "12321"
+                },
+                {
+                    "key": "voucher_id",
+                    "value": "1231231"
+                },
+                {
+                    "key": "voucher_fulfilled_by_id",
+                    "value": "227b56fa4e1d44c4b7a4395884ca81bf"
+                },
+                {
+                    "key": "voucher_district_id",
+                    "value": "227b56fa4e1d44c4b7a4395884ca81bf"
+                }
+            ],
+            "opened_by": "87ec94ab6b950a73ddb8db6280996aa1",
+            "modified_on": "2017-09-28T19:20:56.073000Z",
+            "version": null,
+            "closed": false,
+            "indices": [],
+            "_id": "eb1d5857-12a0-4baf-9166-f1a44e4e2ed6",
+            "type": "voucher",
+            "closed_by": null,
+            "server_modified_on": "2017-09-28T19:20:56.392325Z",
+            "owner_id": "87ec94ab6b950a73ddb8db6280996aa1"
+        },
+        "_index": "case_search_2016-03-15"
+    },
+    {
+        "_score": 6.766235,
+        "_type": "case",
+        "_id": "54ee0310-3194-4917-9bd0-e95149d50c2c",
+        "_source": {
+            "opened_on": "2017-10-06T20:17:59.762000Z",
+            "closed_on": null,
+            "domain": "enikshay",
+            "referrals": null,
+            "user_id": "87ec94ab6b950a73ddb8db6280996aa1",
+            "name": "bacdasda",
+            "doc_type": "CommCareCase",
+            "export_tag": null,
+            "location_id": null,
+            "external_id": null,
+            "case_properties": [
+                {
+                    "key": "name",
+                    "value": "bacdasda"
+                },
+                {
+                    "key": "external_id",
+                    "value": null
+                },
+                {
+                    "key": "voucher_type",
+                    "value": "test"
+                },
+                {
+                    "key": "voucher_id",
+                    "value": ""
+                },
+                {
+                    "key": "state",
+                    "value": "approved"
+                },
+                {
+                    "key": "amount_approved",
+                    "value": "2131"
+                },
+                {
+                    "key": "voucher_fulfilled_by_location_id",
+                    "value": "227b56fa4e1d44c4b7a4395884ca81bf"
+                },
+                {
+                    "key": "voucher_fulfilled_by_id",
+                    "value": "227b56fa4e1d44c4b7a4395884ca81bf"
+                },
+                {
+                    "key": "voucher_district_id",
+                    "value": "227b56fa4e1d44c4b7a4395884ca81bf"
+                }
+            ],
+            "opened_by": "87ec94ab6b950a73ddb8db6280996aa1",
+            "modified_on": "2017-10-06T20:17:59.762000Z",
+            "version": null,
+            "closed": false,
+            "indices": [],
+            "_id": "54ee0310-3194-4917-9bd0-e95149d50c2c",
+            "type": "voucher",
+            "closed_by": null,
+            "server_modified_on": "2017-10-06T20:18:00.112446Z",
+            "owner_id": "87ec94ab6b950a73ddb8db6280996aa1"
+        },
+        "_index": "case_search_2016-03-15"
+    }
+]
