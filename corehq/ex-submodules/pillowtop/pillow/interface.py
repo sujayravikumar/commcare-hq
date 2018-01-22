@@ -5,12 +5,13 @@ from datetime import datetime
 import sys
 
 from django.db.utils import DatabaseError, InterfaceError
+from dimagi.utils.couch.cache.cache_core import get_redis_client
 
 from corehq.util.datadog.gauges import datadog_counter, datadog_gauge, datadog_histogram
 from corehq.util.timer import TimingContext
 from dimagi.utils.logging import notify_exception
 from kafka.common import TopicAndPartition
-from pillowtop.const import CHECKPOINT_MIN_WAIT
+from pillowtop.const import CHANGE_LAG_KEY, CHECKPOINT_MIN_WAIT
 from pillowtop.dao.exceptions import DocumentMissingError
 from pillowtop.utils import force_seq_int
 from pillowtop.exceptions import PillowtopCheckpointReset
@@ -123,6 +124,7 @@ class PillowBase(six.with_metaclass(ABCMeta, object)):
                             self._record_checkpoint_in_datadog()
                         self._record_change_success_in_datadog(change)
                     self._record_change_in_datadog(change, timer)
+                    self._record_change_lag_in_redis(change)
                 else:
                     updated = self.checkpoint.touch(min_interval=CHECKPOINT_MIN_WAIT)
                     if updated:
@@ -196,14 +198,21 @@ class PillowBase(six.with_metaclass(ABCMeta, object)):
             ]
             datadog_counter(metric, tags=tags)
 
-            change_lag = (datetime.utcnow() - change.metadata.publish_timestamp).seconds
-            datadog_gauge('commcare.change_feed.change_lag', change_lag, tags=[
+            datadog_gauge('commcare.change_feed.change_lag', self._change_lag(change), tags=[
                 u'pillow_name:{}'.format(self.get_name()),
                 _topic_for_ddog(change.topic),
             ])
 
             if timer:
                 datadog_histogram('commcare.change_feed.processing_time', timer.duration, tags=tags)
+
+    def _change_lag(self, change):
+        return (datetime.utcnow() - change.metadata.publish_timestamp).seconds
+
+    def _record_change_lag_in_redis(self, change):
+        if change.metadata is not None:
+            client = get_redis_client()
+            client.set(CHANGE_LAG_KEY.format(self.get_name()), self._change_lag(change))
 
 
 class ChangeEventHandler(six.with_metaclass(ABCMeta, object)):
