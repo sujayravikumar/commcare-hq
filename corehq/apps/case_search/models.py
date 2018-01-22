@@ -9,6 +9,8 @@ from django.contrib.postgres.fields import ArrayField, JSONField
 from django.db import models
 
 from corehq.util.quickcache import quickcache
+from dimagi.utils.couch.cache.cache_core import get_redis_client
+from pillowtop.const import CHANGE_LAG_KEY
 
 CLAIM_CASE_TYPE = 'commcare-case-claim'
 FUZZY_PROPERTIES = "fuzzy_properties"
@@ -273,11 +275,13 @@ class SearchResult(models.Model):
 
     @classmethod
     def create(cls, domain, user_id, search_criteria, results):
+        client = get_redis_client()
         search_result = cls(
             domain=domain,
             user_id=user_id,
             search_criteria=search_criteria,
-            results=[r['_id'] for r in results]
+            results=[r['_id'] for r in results],
+            pillow_lag=client.get(CHANGE_LAG_KEY.format('CaseSearchToElasticsearchPillow')),
         )
         search_result.save()
         return search_result

@@ -20,7 +20,7 @@ from corehq import toggles
 from corehq.const import OPENROSA_VERSION_MAP
 from corehq.middleware import OPENROSA_VERSION_HEADER
 from corehq.apps.app_manager.util import get_app, LatestAppInfo
-from corehq.apps.case_search.models import QueryMergeException
+from corehq.apps.case_search.models import QueryMergeException, SearchResult
 from corehq.apps.case_search.utils import CaseSearchCriteria
 from corehq.apps.domain.decorators import (
     mobile_auth,
@@ -77,6 +77,11 @@ def search(request, domain):
         hits = search_es.run().raw_hits
     except Exception as e:
         return _handle_es_exception(request, e, case_search_criteria.query_addition_debug_details)
+
+    try:
+        SearchResult.create(domain, request.couch_user.user_id, criteria, hits)
+    except Exception as e:
+        _handle_es_exception(request, e)
 
     # Even if it's a SQL domain, we just need to render the hits as cases, so CommCareCase.wrap will be fine
     cases = [CommCareCase.wrap(flatten_result(result)) for result in hits]
